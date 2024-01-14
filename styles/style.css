@@ -65,7 +65,7 @@ body {
     justify-content: center;
     gap: 16px;
     align-items: center;
-    width: 50%;
+    width: 54%;
     border-radius: 8px;
     font-size: 1.5rem;
     padding: 21.5px 0;
@@ -77,7 +77,7 @@ body {
 }
 .apresentacao__links__navegacao:hover {
     background-color:   var(--cor-hover);
-    width: 52%;
+    width: 56%;
 }
 .apresentacao__imagem {
     width: 50%;

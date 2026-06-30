@@ -1,0 +1,19 @@
+---
+// src/components/effects/ImageReveal.astro
+const { src } = Astro.props;
+---
+<figure data-reveal>
+  <img {src} alt="" />
+</figure>
+
+<script>
+  import gsap from 'gsap';
+  import { ScrollTrigger } from 'gsap/ScrollTrigger';
+  gsap.registerPlugin(ScrollTrigger);
+
+  document.querySelectorAll('[data-reveal]').forEach((el) => {
+    // ⬇️ AQUI é o que você martela no olho:
+    // a timeline, o easing, o displacement, o clip-path.
+    // Esse é o pedaço de "feeling" — não terceiriza pra ninguém.
+  });
+</script>

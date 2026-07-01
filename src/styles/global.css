@@ -1,1 +1,26 @@
 @import "tailwindcss";
+
+:root {
+  --ink: #0a0a0a;
+  --paper: #ffffff;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;               /* canvas é fixo; nada de scroll de página */
+}

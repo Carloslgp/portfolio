@@ -4,8 +4,8 @@ import { Segment } from './Segment';
 import { CameraRig } from './CameraRig';
 import { Input } from './Input';
 import {
-  SECTIONS, SEG_ANGLE, HEIGHT, FLAT_STEP, FLAT_Z, REFLECT_OPACITY,
-  CAM, PARALLAX_AMP, PARALLAX_EASE,
+  SECTIONS, SEG_ANGLE, RADIUS, HEIGHT, FLAT_STEP, FLAT_Z, REFLECT_OPACITY,
+  CAM, BASE_ASPECT, PARALLAX_AMP, PARALLAX_EASE,
 } from './config';
 
 const N = SECTIONS.length;
@@ -36,6 +36,14 @@ export class Carousel {
 
   private pointer = { x: 0, y: 0 };        // mouse normalizado (-1..1)
   private pointerEased = { x: 0, y: 0 };   // versão suavizada (o parallax segue esta)
+
+  private viewRadius = CAM.side.radius;    // distância da câmera, ajustada pela proporção da tela
+
+  // clicar numa foto navega pra seção dela; hover mostra cursor pointer
+  private raycaster = new THREE.Raycaster();
+  private ndc = new THREE.Vector2();
+  private downX = 0;
+  private downY = 0;
 
   async init(canvas: HTMLCanvasElement, lenis: any) {
     this.lenis = lenis;
@@ -96,11 +104,50 @@ export class Carousel {
       this.setMode(!!(e as CustomEvent).detail?.flat);
     });
 
+    this.updateViewRadius();
+
     window.addEventListener('resize', this.onResize);
     window.addEventListener('pointermove', (e) => {
       this.pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
       this.pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
     });
+
+    // --- clique na foto → navega pra seção; hover na foto → cursor pointer ---
+    canvas.addEventListener('pointerdown', (e) => {
+      this.downX = e.clientX;
+      this.downY = e.clientY;
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      canvas.style.cursor = this.pick(e) ? 'pointer' : '';
+    });
+    canvas.addEventListener('pointerup', (e) => {
+      // só conta como clique se quase não moveu (senão foi arrasto do carrossel)
+      if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) > 6) return;
+      const seg = this.pick(e);
+      if (seg) window.location.hash = `#${SECTIONS[seg.index].id}`;
+    });
+  }
+
+  // raycast do ponteiro contra os segmentos visíveis; retorna o Segment atingido
+  private pick(e: PointerEvent): Segment | null {
+    this.ndc.set(
+      (e.clientX / window.innerWidth) * 2 - 1,
+      -(e.clientY / window.innerHeight) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(this.ndc, this.camera);
+    // meshes invisíveis (modo inativo) são ignorados pelo raycaster
+    const meshes = this.segments.flatMap((s) => [s.curved, s.flat]);
+    const hit = this.raycaster.intersectObjects(meshes, false)[0];
+    return hit ? (hit.object.userData.segment as Segment) : null;
+  }
+
+  // em telas mais estreitas que BASE_ASPECT, afasta a câmera para o segmento
+  // ativo continuar cabendo na largura. O que importa é a distância até a FACE
+  // frontal do cilindro (z = RADIUS), então o excedente escala a partir dela.
+  private updateViewRadius() {
+    const aspect = window.innerWidth / window.innerHeight;
+    const fit = Math.max(1, BASE_ASPECT / aspect);
+    this.viewRadius = RADIUS + (CAM.side.radius - RADIUS) * fit;
   }
 
   // câmera desloca de leve rumo ao mouse e continua olhando o centro → a cena "encara" o cursor
@@ -111,7 +158,7 @@ export class Carousel {
     this.camera.position.set(
       -this.pointerEased.x * PARALLAX_AMP,
       CAM.side.height + this.pointerEased.y * PARALLAX_AMP,
-      CAM.side.radius,
+      this.viewRadius,
     );
     this.camera.lookAt(0, 0, 0);
   }
@@ -179,6 +226,7 @@ export class Carousel {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.updateViewRadius();
   };
 
   private loop = (time = 0) => {

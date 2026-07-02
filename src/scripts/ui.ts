@@ -6,7 +6,6 @@ export function initUI() {
   const label = document.querySelector<HTMLElement>('[data-active-label]');
   const cat = document.querySelector<HTMLElement>('[data-active-category]');
   const thumb = document.querySelector<HTMLImageElement>('[data-active-thumb]');
-  const view = document.querySelector<HTMLAnchorElement>('[data-view]');
 
   function render(index: number) {
     const s = SECTIONS[index];
@@ -14,7 +13,6 @@ export function initUI() {
     if (label) label.textContent = s.label;
     if (cat) cat.textContent = s.label.toUpperCase();
     if (thumb) { thumb.src = s.texture; thumb.alt = s.label; }
-    if (view) view.href = `#${s.id}`;
   }
 
   window.addEventListener('carousel:change', (e) => {

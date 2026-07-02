@@ -32,6 +32,11 @@ export const FLAT_STEP = ARC_WIDTH + FLAT_GAP; // passo horizontal entre segment
 export const FLAT_Z = 3.0;             // quão pra frente (rumo à câmera) a fita avança no FLAT
 export const REFLECT_OPACITY = 0.16;   // opacidade do reflexo espelhado
 
+// --- responsividade da cena ---
+// abaixo desta proporção (largura/altura), a câmera se afasta na mesma medida
+// para o segmento ativo continuar cabendo na largura visível (retrato/estreito)
+export const BASE_ASPECT = 1.4;
+
 // --- parallax: a cena "olha" pro mouse de leve ---
 export const PARALLAX_AMP = 0.5;       // deslocamento máx. da câmera (unidades de mundo)
 export const PARALLAX_EASE = 0.06;     // suavização do parallax (baixo = preguiçoso/suave)

@@ -22,9 +22,6 @@ const first = SECTIONS[0];
     <!-- label grande e semitransparente da seção ativa, sobre o segmento central -->
     <h1 class="active-label" data-active-label>{first.label}</h1>
 
-    <!-- botão sobre o centro -->
-    <a class="view" data-view href={`#${first.id}`}>VIEW</a>
-
     <!-- card de categoria na base -->
     <div class="card">
       <button class="nav" data-step="1" aria-label="Anterior">‹</button>
@@ -123,32 +120,12 @@ const first = SECTIONS[0];
     transform: translate(-50%, -50%);
     font-family: "Playfair Display", Georgia, serif;
     font-weight: 500;
-    font-size: 8vw;
+    font-size: clamp(2.6rem, 8vw, 9rem);
     letter-spacing: 0;
     color: rgba(255, 255, 255, 0.6);
     text-shadow: 0 2px 24px rgba(0, 0, 0, 0.25);
     user-select: none;
     pointer-events: none;
-  }
-
-  .view {
-    position: absolute;
-    top: calc(50% + 7vw);
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.15em;
-    color: var(--ink);
-    border: 1px solid var(--ink);
-    border-radius: 999px;
-    padding: 0.5rem 1.4rem;
-    background: transparent;
-    transition: background 0.2s, color 0.2s;
-  }
-  .view:hover {
-    background: var(--ink);
-    color: var(--paper);
   }
 
   .card {
@@ -267,5 +244,58 @@ const first = SECTIONS[0];
   .mode.is-flat svg {
     transform: rotate(180deg);
     transition: transform 0.5s ease;
+  }
+
+  /* ——— telas estreitas: card ancora à esquerda, toggle à direita ———
+     (o offset fixo de 170px do .mode estouraria a largura no celular) */
+  @media (max-width: 700px) {
+    .intro {
+      top: 1.2rem;
+      width: calc(100vw - 2rem);
+      text-align: center;
+      white-space: normal;
+      font-size: 0.85rem;
+    }
+
+    .bg-portfolio {
+      padding-top: calc(3rem + 4vh);   /* abre espaço pro .intro, que pode quebrar em 2 linhas */
+      font-size: 17vw;
+    }
+
+    .card {
+      left: 1rem;
+      transform: none;
+      bottom: calc(1.2rem + env(safe-area-inset-bottom));
+      gap: 0.6rem;
+      padding: 0.4rem 0.55rem 0.4rem 0.4rem;
+    }
+    .card .thumb {
+      width: 40px;
+      height: 40px;
+    }
+    .card .nav {
+      width: 30px;
+      height: 30px;
+      font-size: 1rem;
+    }
+    .meta-v {
+      font-size: 0.85rem;
+    }
+
+    .mode {
+      left: auto;
+      right: 1rem;
+      transform: none;
+      bottom: calc(1.2rem + env(safe-area-inset-bottom));
+      width: 48px;
+      height: 48px;
+    }
+  }
+
+  /* paisagem baixa (celular deitado): comprime os respiros verticais */
+  @media (max-height: 480px) {
+    .bg-portfolio { padding-top: 1.2rem; }
+    .intro { top: 0.8rem; }
+    .card, .mode { bottom: 1rem; }
   }
 </style>

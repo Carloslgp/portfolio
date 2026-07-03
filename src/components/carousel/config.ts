@@ -38,7 +38,8 @@ export const LABEL = {
   size: 0.3,          // altura da caixa-alta em unidades de mundo (foto tem 1.6)
   depth: 0.045,       // extrusão rasa: vidro delgado, não bloco
   bevel: 0.005,       // chanfro mínimo, só pra arredondar a borda
-  bevelOffset: -0.003, // ENCOLHE o contorno da letra → traço mais fino que a fonte
+  bevelOffset: 0,     // NÃO usar negativo: afina o traço, mas colapsa o furo
+                      // de letras como o "b" do About (contorno se auto-intersecta)
   lift: 0.16,         // quanto o texto flutua à frente da superfície da foto
   maxWidth: ARC_WIDTH * 0.72,  // labels longas encolhem pra caber na foto
 };

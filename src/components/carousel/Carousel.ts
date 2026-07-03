@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Segment } from './Segment';
 import { CameraRig } from './CameraRig';
 import { Input } from './Input';
+import { Labels } from './Labels';
 import {
   SECTIONS, SEG_ANGLE, RADIUS, HEIGHT, FLAT_STEP, FLAT_Z, REFLECT_OPACITY,
-  CAM, BASE_ASPECT, PARALLAX_AMP, PARALLAX_EASE,
+  CAM, BASE_ASPECT, PARALLAX_AMP, PARALLAX_EASE, LABEL,
 } from './config';
 
 const N = SECTIONS.length;
@@ -29,6 +31,7 @@ export class Carousel {
 
   private rig!: CameraRig;             // posiciona a câmera; guardado para o reveal futuro
   private input!: Input;
+  private labels = new Labels();       // textos 3D "liquid glass" presos às fotos
 
   private morph = 0;                 // 0 = CURVED, 1 = FLAT (tweenado por GSAP)
   private lenis: any;
@@ -53,6 +56,12 @@ export class Carousel {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor(0x000000, 0);
+
+    // ambiente PMREM: dá os reflexos/brilhos do vidro das labels.
+    // Só afeta materiais físicos — as fotos (MeshBasicMaterial) ficam intactas.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
 
     // --- câmera (posição vem do rig, já na lateral) ---
     this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -93,6 +102,12 @@ export class Carousel {
       this.reflCurved.add(rc);
       this.reflFlat.add(rf);
     });
+
+    // textos de vidro presos aos grupos: o curvo gira com o anel,
+    // o reto desliza com a fita — cada label acompanha a sua foto
+    await this.labels.init();
+    this.curvedGroup.add(...this.labels.curved);
+    this.flatGroup.add(...this.labels.flat);
 
     this.layout();  // pose inicial (CURVED)
 
@@ -135,10 +150,17 @@ export class Carousel {
       -(e.clientY / window.innerHeight) * 2 + 1,
     );
     this.raycaster.setFromCamera(this.ndc, this.camera);
-    // meshes invisíveis (modo inativo) são ignorados pelo raycaster
-    const meshes = this.segments.flatMap((s) => [s.curved, s.flat]);
+    // o Raycaster NÃO pula meshes invisíveis sozinho — sem o filtro, a fita
+    // reta oculta (modo inativo) vira uma faixa clicável atravessando a tela
+    const meshes = this.segments
+      .flatMap((s) => [s.curved, s.flat])
+      .filter((m) => m.visible);
     const hit = this.raycaster.intersectObjects(meshes, false)[0];
-    return hit ? (hit.object.userData.segment as Segment) : null;
+    if (!hit) return null;
+    // só a metade FRONTAL do anel conta: pelos vãos entre as fotos o raio
+    // atravessa e acha a parede de trás (z < 0) — ali não é "em cima do anel"
+    if (hit.point.z < 0.01) return null;
+    return hit.object.userData.segment as Segment;
   }
 
   // em telas mais estreitas que BASE_ASPECT, afasta a câmera para o segmento
@@ -203,6 +225,7 @@ export class Carousel {
     this.segments.forEach((seg, i) => {
       const x = wrapOffset(i - s) * FLAT_STEP;
       seg.flat.position.set(x, 0, flatZ);
+      this.labels.flat[i]?.position.set(x, 0, flatZ + LABEL.lift);
       (this.reflFlat.children[i] as THREE.Mesh).position.set(x, 0, flatZ);
 
       // crossfade curved↔flat
@@ -214,6 +237,7 @@ export class Carousel {
       rc.visible = this.morph < 1;
       rf.visible = this.morph > 0;
     });
+    this.labels.setMorph(this.morph, cur);
   }
 
   private emitActive(index: number) {

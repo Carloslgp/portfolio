@@ -7,8 +7,10 @@ const N = SECTIONS.length;
 // lerp (inércia). O mesmo target serve pros dois modos: o Carousel mapeia pra
 // group.rotation.y (CURVED) ou pra offset horizontal (FLAT).
 export class Input {
-  target = 0;
-  current = 0;
+  // nasce numa POSIÇÃO DE SNAP (centros ficam a meio segmento da origem);
+  // -SEG_ANGLE/2 deixa a seção 0 de frente pra câmera desde o primeiro frame
+  target = -SEG_ANGLE / 2;
+  current = -SEG_ANGLE / 2;
   enabled = false;
   private dragging = false;
   private lastX = 0;

@@ -72,6 +72,18 @@ export class Segment {
     this.flatMat.opacity = morph;
     this.curved.visible = morph < 1;
     this.flat.visible = morph > 0;
+
+    // transparent SÓ durante o morph: o passe de transmissão do three (o vidro
+    // das labels) enxerga apenas objetos opacos — se a foto ficar sempre
+    // transparent, o vidro refrata um buffer branco vazio em vez da foto.
+    this.setTransparent(this.curvedMat, morph > 0);
+    this.setTransparent(this.flatMat, morph < 1);
+  }
+
+  private setTransparent(mat: THREE.MeshBasicMaterial, value: boolean) {
+    if (mat.transparent === value) return;
+    mat.transparent = value;
+    mat.needsUpdate = true;   // muda o modo de blend → recompila o programa
   }
 
   setActive(_active: boolean) {

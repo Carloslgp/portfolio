@@ -5,35 +5,40 @@ import { Segment } from './Segment';
 import { CameraRig } from './CameraRig';
 import { Input } from './Input';
 import { Labels } from './Labels';
+import { makeReflectionMaterial, reflectTime } from './Reflection';
 import {
-  SECTIONS, SEG_ANGLE, RADIUS, HEIGHT, FLAT_STEP, FLAT_Z, REFLECT_OPACITY,
-  CAM, BASE_ASPECT, PARALLAX_AMP, PARALLAX_EASE, LABEL,
+  makeRibbonGeometry, captureRest, bendRibbon, ribbonPose, placeOnRibbon,
+  type RibbonRest,
+} from './Ribbon';
+import {
+  SECTIONS, RADIUS, HEIGHT, REFLECT,
+  CAM, BASE_ASPECT, PARALLAX_AMP, PARALLAX_EASE,
 } from './config';
 
-const N = SECTIONS.length;
-// distância mais curta (com wrap) até o segmento ativo → flat também vira um loop.
-// O "salto" de N acontece em ±N/2 (fora da tela), então é imperceptível.
-const wrapOffset = (v: number) => v - N * Math.round(v / N);
+const TAU = Math.PI * 2;
+// menor ângulo equivalente, em (-π, π]. É o que embrulha a fita: o segmento que
+// passa de um extremo pro outro faz isso no ponto mais distante da câmera, e em
+// k=1 (anel) nem é um salto — é literalmente o mesmo ponto do círculo.
+const wrapAngle = (a: number) => a - TAU * Math.round(a / TAU);
 
 export class Carousel {
   private renderer!: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera!: THREE.PerspectiveCamera;
 
-  private curvedGroup = new THREE.Group();  // o "cilindro" — giramos ISSO no modo CURVED
-  private flatGroup = new THREE.Group();     // a fita reta — planos deslizam em x no modo FLAT
-  private reflect = new THREE.Group();       // reflexo espelhado (clones de baixa opacidade)
-  private reflCurved = new THREE.Group();
-  private reflFlat = new THREE.Group();
+  private ribbon = makeRibbonGeometry();   // geometria ÚNICA, dobrada 1x por frame
+  private ribbonRest!: RibbonRest;         // pose esticada de referência
+  private reflect = new THREE.Group();     // reflexo espelhado (clones translúcidos)
 
   private segments: Segment[] = [];
-  private reflMats: THREE.MeshBasicMaterial[] = [];  // [curvedRefl_0, flatRefl_0, curvedRefl_1, ...]
+  private reflMeshes: THREE.Mesh[] = [];
 
   private rig!: CameraRig;             // posiciona a câmera; guardado para o reveal futuro
   private input!: Input;
   private labels = new Labels();       // textos 3D "liquid glass" presos às fotos
 
-  private morph = 0;                 // 0 = CURVED, 1 = FLAT (tweenado por GSAP)
+  private morph = 0;                 // 0 = anel, 1 = fita (tweenado por GSAP)
+  private lastK = NaN;               // última curvatura dobrada (evita redobrar à toa)
   private lenis: any;
   private lastActive = -1;
 
@@ -66,12 +71,13 @@ export class Carousel {
     // --- câmera (posição vem do rig, já na lateral) ---
     this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
 
-    this.scene.add(this.curvedGroup, this.flatGroup);
+    this.ribbonRest = captureRest(this.ribbon);
 
-    // reflexo: espelha em Y no plano da base do cilindro (y = -HEIGHT/2)
+    // reflexo: espelha em Y no plano da base da fita (y = -HEIGHT/2) e afunda
+    // mais REFLECT.gap — o espelhamento exato deixa foto e reflexo colados, e o
+    // respiro é o que faz o de baixo ler como reflexo na água, não como continuação
     this.reflect.scale.y = -1;
-    this.reflect.position.y = -HEIGHT;
-    this.reflect.add(this.reflCurved, this.reflFlat);
+    this.reflect.position.y = -HEIGHT - REFLECT.gap;
     this.scene.add(this.reflect);
 
     this.rig = new CameraRig(this.camera);
@@ -91,25 +97,21 @@ export class Carousel {
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.magFilter = THREE.LinearFilter;
       tex.generateMipmaps = true;
-      const seg = new Segment(i, tex);
+      const seg = new Segment(i, tex, this.ribbon);
       this.segments[i] = seg;
-      this.curvedGroup.add(seg.curved);
-      this.flatGroup.add(seg.flat);
+      this.scene.add(seg.mesh);
 
-      // clones de reflexo: mesma geometria, material de baixa opacidade próprio
-      const rc = new THREE.Mesh(seg.curved.geometry, this.makeReflMat(seg.curved));
-      const rf = new THREE.Mesh(seg.flat.geometry, this.makeReflMat(seg.flat));
-      this.reflCurved.add(rc);
-      this.reflFlat.add(rf);
+      // reflexo: mesma fita dobrável, material de água próprio (Reflection.ts)
+      const refl = new THREE.Mesh(this.ribbon, makeReflectionMaterial(seg.mesh));
+      this.reflMeshes[i] = refl;
+      this.reflect.add(refl);
     });
 
-    // textos de vidro presos aos grupos: o curvo gira com o anel,
-    // o reto desliza com a fita — cada label acompanha a sua foto
+    // cada label é posicionada junto com a sua foto no layout()
     await this.labels.init();
-    this.curvedGroup.add(...this.labels.curved);
-    this.flatGroup.add(...this.labels.flat);
+    this.scene.add(...this.labels.meshes);
 
-    this.layout();  // pose inicial (CURVED)
+    this.layout();  // pose inicial (anel)
 
     // --- UI ↔ carrossel via CustomEvent ---
     window.addEventListener('carousel:step', (e: Event) => {
@@ -150,15 +152,10 @@ export class Carousel {
       -(e.clientY / window.innerHeight) * 2 + 1,
     );
     this.raycaster.setFromCamera(this.ndc, this.camera);
-    // o Raycaster NÃO pula meshes invisíveis sozinho — sem o filtro, a fita
-    // reta oculta (modo inativo) vira uma faixa clicável atravessando a tela
-    const meshes = this.segments
-      .flatMap((s) => [s.curved, s.flat])
-      .filter((m) => m.visible);
-    const hit = this.raycaster.intersectObjects(meshes, false)[0];
+    const hit = this.raycaster.intersectObjects(this.segments.map((s) => s.mesh), false)[0];
     if (!hit) return null;
-    // só a metade FRONTAL do anel conta: pelos vãos entre as fotos o raio
-    // atravessa e acha a parede de trás (z < 0) — ali não é "em cima do anel"
+    // só a metade FRONTAL conta: pelos vãos entre as fotos o raio atravessa e
+    // acha a parede de trás do anel (z < 0) — ali não é "em cima da foto"
     if (hit.point.z < 0.01) return null;
     return hit.object.userData.segment as Segment;
   }
@@ -185,59 +182,46 @@ export class Carousel {
     this.camera.lookAt(0, 0, 0);
   }
 
-  private makeReflMat(src: THREE.Mesh): THREE.MeshBasicMaterial {
-    const base = src.material as THREE.MeshBasicMaterial;
-    const mat = new THREE.MeshBasicMaterial({
-      map: base.map,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-    });
-    this.reflMats.push(mat);
-    return mat;
-  }
-
   async start() {
     this.input.enabled = true;   // câmera já na lateral; libera o controle direto
     this.emitActive(this.input.activeIndex);
     this.loop();
   }
 
-  // alterna CURVED (false) ↔ FLAT (true) animando o morph com GSAP
+  // alterna anel (false) ↔ fita (true) animando o desenrolar com GSAP
   setMode(flat: boolean) {
     gsap.to(this, { morph: flat ? 1 : 0, duration: 0.9, ease: 'power3.inOut' });
   }
 
-  // posiciona os dois modos a partir da rotação suavizada (input.current)
+  // Uma passada só: dobra a fita na curvatura atual e distribui as fotos ao
+  // longo dela. Não existe mais "os dois modos" — existe uma superfície e um
+  // parâmetro de curvatura (ver Ribbon.ts).
   private layout() {
     const cur = this.input.current;
+    const k = 1 - this.morph;   // 1 = anel fechado, 0 = fita esticada
 
-    // CURVED: gira o anel inteiro
-    this.curvedGroup.rotation.y = cur;
-    this.reflCurved.rotation.y = cur;
+    // Dobrar é a única parte cara, e só a curvatura muda a forma: girar o anel
+    // apenas desliza as fotos por uma fita que já está dobrada. Então em
+    // repouso (k parado em 0 ou 1) isto não roda nenhum frame.
+    if (k !== this.lastK) {
+      bendRibbon(this.ribbon, this.ribbonRest, k);
+      this.ribbon.computeBoundingSphere();   // o raycaster do pick() depende dela
+      this.labels.bend(k);
+      this.lastK = k;
+    }
 
-    // FLAT: "posição de segmento" contínua; ativo fica centrado em x = 0.
-    // wrapOffset mantém o ativo no centro e embrulha os planos distantes (loop).
-    // O z avança com o morph → no FLAT a fita vem em direção à câmera (fica maior).
-    const s = -(cur + SEG_ANGLE / 2) / SEG_ANGLE;
-    const flatZ = this.morph * FLAT_Z;
     this.segments.forEach((seg, i) => {
-      const x = wrapOffset(i - s) * FLAT_STEP;
-      seg.flat.position.set(x, 0, flatZ);
-      this.labels.flat[i]?.position.set(x, 0, flatZ + LABEL.lift);
-      (this.reflFlat.children[i] as THREE.Mesh).position.set(x, 0, flatZ);
-
-      // crossfade curved↔flat
-      seg.setMorph(this.morph);
-      this.reflMats[i * 2].opacity = (1 - this.morph) * REFLECT_OPACITY;      // curved refl
-      this.reflMats[i * 2 + 1].opacity = this.morph * REFLECT_OPACITY;        // flat refl
-      const rc = this.reflCurved.children[i] as THREE.Mesh;
-      const rf = this.reflFlat.children[i] as THREE.Mesh;
-      rc.visible = this.morph < 1;
-      rf.visible = this.morph > 0;
+      // ângulo do segmento em relação à frente da cena → comprimento de arco.
+      // wrapAngle é o que embrulha a fita: quem passa de -π vira +π, e isso
+      // acontece no ponto mais longe da câmera.
+      const pose = ribbonPose(wrapAngle(seg.centerAngle + cur) * RADIUS, k);
+      placeOnRibbon(seg.mesh, pose);
+      placeOnRibbon(this.labels.meshes[i], pose);
+      placeOnRibbon(this.reflMeshes[i], pose);
+      // no anel a label some quando a foto vira de perfil; na fita a guinada é
+      // zero em todo mundo, então todas ficam visíveis — cai da mesma conta
+      this.labels.setFacing(i, Math.cos(pose.yaw));
     });
-    this.labels.setMorph(this.morph, cur);
   }
 
   private emitActive(index: number) {
@@ -256,6 +240,7 @@ export class Carousel {
   private loop = (time = 0) => {
     requestAnimationFrame(this.loop);
     this.lenis?.raf(time);
+    reflectTime.value = time * 0.001;   // relógio das ondas do reflexo (segundos)
     this.input.update();          // inércia
     this.layout();                // aplica rotação/offset/morph
     this.applyParallax();         // câmera segue o mouse de leve

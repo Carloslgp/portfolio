@@ -25,12 +25,27 @@ export const DRAG_FACTOR = 0.003;      // dx do arrasto → radianos de alvo
 export const MOMENTUM = 1.6;           // quanto a velocidade do arrasto "arremessa" ao soltar
 export const SNAP_DELAY = 140;         // ms de ociosidade antes de travar no segmento
 
-// --- layout FLAT / reflexo ---
-export const ARC_WIDTH = RADIUS * THETA_LEN;   // largura do plano no modo FLAT
-export const FLAT_GAP = ARC_WIDTH * GAP_RATIO; // respiro entre planos na fita reta
-export const FLAT_STEP = ARC_WIDTH + FLAT_GAP; // passo horizontal entre segmentos
-export const FLAT_Z = 3.0;             // quão pra frente (rumo à câmera) a fita avança no FLAT
-export const REFLECT_OPACITY = 0.16;   // opacidade do reflexo espelhado
+// --- a fita (ver Ribbon.ts) ---
+// Anel e fita reta são a MESMA superfície com curvaturas diferentes, então não
+// existe "largura no modo reto" separada: tudo é comprimento de arco. O passo
+// entre fotos na fita cai de graça, é SEG_ANGLE * RADIUS.
+export const ARC_WIDTH = RADIUS * THETA_LEN;   // comprimento de arco de uma foto
+export const RIBBON_SEGMENTS = 48;             // subdivisões na largura = lisura da curva
+
+// --- reflexo "na água" (clones espelhados sob as fotos, ver Reflection.ts) ---
+// Só a faixa do topo do reflexo entra no enquadramento (a câmera corta perto de
+// y = -1.35, o reflexo começa em -0.8 - gap), então tudo aqui é calibrado para os
+// primeiros ~25% da altura espelhada: é ali que o reflexo tem que se resolver.
+export const REFLECT = {
+  opacity: 0.5,      // brilho na linha d'água (antes do apagamento por profundidade)
+  gap: 0.14,         // respiro entre a foto e o reflexo — 0 deixa os dois colados
+  fade: 2.2,         // expoente do apagamento com a profundidade (maior = some antes)
+  amp: 0.02,         // amplitude da ondulação, em UV (0.02 ≈ 7 cm de mundo na horizontal)
+  freq: 46,          // nº de cristas ao longo da altura espelhada (alto = ondas curtas)
+  speed: 0.8,        // velocidade com que as cristas descem
+  rampDepth: 0.35,   // profundidade em que a onda atinge a amplitude cheia
+  shimmer: 0.16,     // ganho de brilho nas cristas (o "vidrado" da água)
+};
 
 // --- labels 3D "liquid glass" (texto de vidro preso na frente de cada foto) ---
 export const LABEL = {

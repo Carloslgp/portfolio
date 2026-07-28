@@ -2,19 +2,16 @@ import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { SECTIONS, RADIUS, SEG_ANGLE, LABEL } from './config';
+import { SECTIONS, LABEL } from './config';
+import { bendRibbon, captureRest, type RibbonRest } from './Ribbon';
 
-// Labels 3D de vidro PRESAS ao anel — mesmo padrão dos Segments: cada seção
-// tem dois textos extrudados que compartilham a aparência:
-//   - curved: DOBRADO no arco do cilindro, baked no ângulo da sua fatia.
-//     Vive no curvedGroup, então gira colado na frente da sua foto.
-//   - flat:   reto; vive no flatGroup e desliza em x junto com a fita.
-// O crossfade curvo↔reto usa o mesmo morph dos Segments (ver setMorph).
+// Labels 3D de vidro presas às fotos. Como as fotos, cada seção tem UM texto só:
+// ele dobra junto com a fita (mesma curvatura, ver Ribbon.bendRibbon), flutuando
+// LABEL.lift à frente da superfície em qualquer ponto da animação.
 export class Labels {
-  curved: THREE.Mesh[] = [];
-  flat: THREE.Mesh[] = [];
-  private curvedMats: THREE.MeshPhysicalMaterial[] = [];
-  private flatMats: THREE.MeshPhysicalMaterial[] = [];
+  meshes: THREE.Mesh[] = [];
+  private mats: THREE.MeshPhysicalMaterial[] = [];
+  private rests: RibbonRest[] = [];
 
   async init() {
     const font = await new FontLoader().loadAsync(LABEL.font);
@@ -41,94 +38,59 @@ export class Labels {
       geo.computeVertexNormals();
 
       // labels largas encolhem pra caber na foto (baked na geometria,
-      // assim o bend a seguir já trabalha nas medidas finais)
+      // assim a dobra a seguir já trabalha nas medidas finais)
       geo.computeBoundingBox();
       const w = geo.boundingBox!.max.x - geo.boundingBox!.min.x;
       const fit = Math.min(1, LABEL.maxWidth / w);
       geo.scale(fit, fit, fit);
 
-      // mesmo centro de fatia dos Segments (Segment.centerAngle)
-      const centerAngle = i * SEG_ANGLE + SEG_ANGLE / 2;
-      const curvedGeo = bendToRing(geo.clone(), centerAngle);
+      const mat = makeGlass();
+      const mesh = new THREE.Mesh(geo, mat);
+      // a esfera envolvente ficaria desatualizada a cada dobra; são 5 textos
+      // pequenos, sai mais barato desligar o culling do que recalculá-la
+      mesh.frustumCulled = false;
 
-      const curvedMat = makeGlass();
-      const flatMat = makeGlass();
-      flatMat.opacity = 0;
-
-      const curved = new THREE.Mesh(curvedGeo, curvedMat);
-      const flat = new THREE.Mesh(geo, flatMat);
-      flat.visible = false;
-
-      this.curved[i] = curved;
-      this.flat[i] = flat;
-      this.curvedMats[i] = curvedMat;
-      this.flatMats[i] = flatMat;
+      this.rests[i] = captureRest(geo);   // pose esticada, fonte de toda dobra
+      this.meshes[i] = mesh;
+      this.mats[i] = mat;
     });
   }
 
-  // crossfade curvo↔reto (mesmo morph dos Segments) + fade por orientação:
-  // a label acompanha o giro do anel, mas esmaece conforme a foto dela sai
-  // da frente — de perfil o vidro viraria um borrão fosco na borda do anel.
-  setMorph(morph: number, ringAngle: number) {
-    for (let i = 0; i < this.curved.length; i++) {
-      const centerAngle = i * SEG_ANGLE + SEG_ANGLE / 2;
-      // cos(ângulo até a frente): 1 = encarando a câmera, 0 = de perfil
-      const facing = Math.cos(centerAngle + ringAngle);
-      // visível cheia até ~26° do centro, some de vez perto de ~50°
-      const frontness = THREE.MathUtils.smoothstep(facing, 0.64, 0.9);
-
-      const curvedOpacity = (1 - morph) * frontness;
-      this.curvedMats[i].opacity = curvedOpacity;
-      this.flatMats[i].opacity = morph;
-      this.curved[i].visible = curvedOpacity > 0.001;
-      this.flat[i].visible = morph > 0;
+  // dobra os textos na curvatura atual da fita
+  bend(k: number) {
+    for (let i = 0; i < this.meshes.length; i++) {
+      bendRibbon(this.meshes[i].geometry, this.rests[i], k, LABEL.lift);
     }
   }
-}
 
-// "veste" o texto no cilindro: x vira arco (ângulo em volta do anel) e a
-// profundidade z vira deslocamento radial — o texto abraça a curva da foto.
-// As normais NÃO são recalculadas (viraria facetado de novo): como a dobra é
-// uma rotação em Y que varia com x, basta girar a normal original junto.
-function bendToRing(geo: THREE.BufferGeometry, centerAngle: number): THREE.BufferGeometry {
-  const R = RADIUS + LABEL.lift;
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  const nor = geo.attributes.normal as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    const z = pos.getZ(i);
-    const a = centerAngle + x / R;
-    const sin = Math.sin(a);
-    const cos = Math.cos(a);
-    const r = R + z;
-    pos.setXYZ(i, r * sin, y, r * cos);
-
-    const nx = nor.getX(i);
-    const nz = nor.getZ(i);
-    nor.setXYZ(i, nx * cos + nz * sin, nor.getY(i), -nx * sin + nz * cos);
+  // esmaece a label conforme a foto dela sai da frente — de perfil o vidro
+  // viraria um borrão fosco na borda do anel. `facing` é o cosseno da guinada
+  // da fita ali: 1 encarando a câmera, 0 de perfil. Na fita reta a guinada é
+  // zero em todo mundo, então todas as labels ficam cheias, como devem ficar.
+  setFacing(i: number, facing: number) {
+    // visível cheia até ~26° do centro, some de vez perto de ~50°
+    const o = THREE.MathUtils.smoothstep(facing, 0.64, 0.9);
+    this.mats[i].opacity = o;
+    this.meshes[i].visible = o > 0.001;
   }
-  pos.needsUpdate = true;
-  nor.needsUpdate = true;
-  return geo;
 }
 
-// vidro FOSCO discreto (referência): a roughness borra o que atravessa a letra
-// (frosted glass), o ior baixo distorce pouco — a legibilidade vem do blur
-// contrastando com a foto nítida ao redor + o brilho do chanfro
+// vidro POLIDO: o corpo da letra é quase invisível e quem desenha a forma é a
+// BORDA — refração deslocando a foto + Fresnel acendendo o chanfro.
+// Uma versão jateada (roughness alta) borrava o que passava pela letra, e a
+// média daquele borrão sobre uma foto cheia de detalhe dava sempre o mesmo
+// cinza leitoso. Legível, mas opaco. Aqui a legibilidade vem de contorno.
 function makeGlass(): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
-    transmission: 0.97,       // quase toda a cor vem da FOTO atrás (borrada)
-    roughness: 0.32,          // é o que dá o BLUR da transmissão (vidro jateado)
+    transmission: 1,          // sem resto difuso: 100% da cor vem da foto atrás
+    roughness: 0.08,          // quase liso — é o blur que acinzenta
     metalness: 0,
-    ior: 1.15,
-    thickness: 0.55,          // espessura também alarga o raio do blur
-    dispersion: 1,
-    clearcoat: 0.45,
-    clearcoatRoughness: 0.25,
-    envMapIntensity: 0.4,     // reflexo branco contido pra não lavar a cor
-    transparent: true,        // permite o crossfade de morph
-    // depthWrite LIGADO (default): as fotos em morph são transparent e
-    // renderizam depois do passe transmissivo — sem depth, cobririam o vidro.
+    ior: 1.62,                // refração forte: a foto DESLOCA dentro da letra
+    thickness: 1.1,           // alonga o raio refratado → deslocamento maior
+    dispersion: 1.6,          // franja cromática na borda: definição sem cinza
+    clearcoat: 1,
+    clearcoatRoughness: 0.04, // verniz nítido: fio de brilho na borda, não véu largo
+    envMapIntensity: 0.55,    // liso, o ambiente só acende os ângulos rasantes
+    transparent: true,        // permite o fade por orientação
   });
 }

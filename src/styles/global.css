@@ -14,6 +14,9 @@
 html,
 body {
   height: 100%;
+  /* o gesto lateral do trackpad gira o carrossel; sem isto o navegador ainda
+     o interpreta como overscroll e dispara "voltar página" no meio do arrasto */
+  overscroll-behavior: none;
 }
 
 body {

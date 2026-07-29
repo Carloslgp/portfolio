@@ -19,13 +19,26 @@ export class Input {
   private lastTime = performance.now();
 
   constructor(private el: HTMLElement, private lenis: any) {
-    // scroll → gira. Canvas é fixo (sem página rolável), então lemos wheel direto.
+    // Scroll → gira. Canvas é fixo (sem página rolável), então lemos wheel direto.
+    //
+    // Vale o eixo DOMINANTE do gesto, não um fixo: o trackpad manda deltaX no
+    // gesto lateral (que é o natural pra empurrar uma fita pro lado), mas a
+    // roda do mouse só manda deltaY. Escolhendo o maior dos dois, o gesto
+    // lateral passa a funcionar sem tirar a roda de quem usa mouse.
+    //
+    // O X entra com sinal trocado pra bater com o arrasto logo abaixo: passar
+    // os dedos pra direita manda as fotos pra direita, igual a puxar com o
+    // dedo. Em deltaX, ir pra direita é negativo.
     el.addEventListener('wheel', (e) => {
       if (!this.enabled) return;
+      // sem consumir o evento, o gesto lateral vira "voltar página" no Chrome
+      // (overscroll do histórico) — por isso passive: false + preventDefault
+      e.preventDefault();
       gsap.killTweensOf(this);          // não deixa um snap em curso brigar com o scroll
-      this.target += e.deltaY * WHEEL_FACTOR;
+      const lateral = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      this.target += (lateral ? -e.deltaX : e.deltaY) * WHEEL_FACTOR;
       this.scheduleSnap();
-    }, { passive: true });
+    }, { passive: false });
 
     el.addEventListener('pointerdown', (e) => {
       if (!this.enabled || (e.pointerType === 'mouse' && e.button !== 0)) return;

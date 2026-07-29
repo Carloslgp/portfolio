@@ -7,18 +7,21 @@ const first = SECTIONS[0];
 ---
 
 <Layout>
-  <!-- fundo: palavra gigante ATRÁS do canvas (canvas é transparente) -->
-  <div class="bg-portfolio" aria-hidden="true">PORTFOLIO</div>
-
+  <!-- a palavra gigante do fundo NÃO mora mais aqui: virou geometria na cena
+       (Backdrop.ts), pra pegar perspectiva e descer junto com a câmera.
+       A classe .bg-portfolio continua viva porque a cortina ainda a usa. -->
   <canvas id="scene"></canvas>
+
+  <!-- Linha miúda do topo. Fica FORA do .overlay de propósito: aquele bloco tem
+       z-index e por isso cria contexto de empilhamento próprio, onde o
+       mix-blend-mode da .intro só enxergaria o próprio .overlay (vazio) em vez
+       da cena. Aqui na raiz ela mistura com o canvas. -->
+  <p class="intro" data-intro>
+    <a href="#about" class="name">Carlos Leonardo</a> is a developer from Brazil.
+  </p>
 
   <!-- camada 2D sobreposta -->
   <div class="overlay">
-    <!-- linha miúda do topo (elemento separado do PORTFOLIO) -->
-    <p class="intro">
-      <a href="#about" class="name">Carlos Leonardo</a> is a developer from Brazil.
-    </p>
-
     <!-- a label da seção ativa agora é texto 3D de vidro dentro do canvas (Labels.ts);
          este h1 fica só pra semântica/leitores de tela -->
     <h1 class="sr-only" data-active-label>{first.label}</h1>
@@ -47,6 +50,15 @@ const first = SECTIONS[0];
 
   <!-- cursor sutil que segue o mouse com atraso -->
   <div class="cursor" data-cursor aria-hidden="true"></div>
+
+  <!-- cortina: cobre a cena até fotos, fonte e shaders estarem prontos.
+       Sai antes de a câmera começar a descer (ver scripts/loading.ts).
+       O PORTFOLIO aqui é a MESMA classe do fundo da página, de propósito: ele
+       cai exatamente em cima do outro, então a cortina abre sem a palavra pular -->
+  <div class="loader" data-loader>
+    <div class="bg-portfolio" aria-hidden="true">PORTFOLIO</div>
+    <span class="loader-track"><i data-loader-bar></i></span>
+  </div>
 </Layout>
 
 <script>
@@ -65,6 +77,37 @@ const first = SECTIONS[0];
     display: block;
     z-index: 1;
     touch-action: none;         /* arrasto controla o carrossel, não a página */
+  }
+
+  /* cortina de carregamento — acima de tudo (canvas 1, cursor 2, overlay 3) */
+  .loader {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: var(--paper);
+    transition: opacity 0.6s ease;
+  }
+  .loader.is-done {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .loader-track {
+    position: absolute;
+    top: 46%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(220px, 42vw);
+    height: 1px;
+    background: rgba(10, 10, 10, 0.14);
+    overflow: hidden;
+  }
+  .loader-track i {
+    display: block;
+    height: 100%;
+    background: var(--ink);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
   }
 
   /* fundo gigante atrás do canvas */
@@ -99,19 +142,40 @@ const first = SECTIONS[0];
   }
 
   .intro {
-    position: absolute;
+    position: fixed;
     top: 2rem;
     left: 50%;
-    transform: translateX(-50%);
+    z-index: 4;
     font-size: 0.9rem;
     font-weight: 400;
-    color: var(--ink);
     white-space: nowrap;
+
+    /* Legibilidade sobre QUALQUER fundo, pixel a pixel: 'difference' devolve o
+       inverso do que está atrás. Sobre o branco da página a letra sai preta;
+       onde passar o PORTFOLIO escuro ou uma foto escura, sai branca. Como a
+       conta é por pixel, uma letra pega metade em cada lado quando a borda do
+       preto corta ela no meio — não é um liga/desliga do texto inteiro. */
+    color: #fff;
+    mix-blend-mode: difference;
+
+    /* só entra depois que a câmera assenta (a classe vem do main.ts) */
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+    transition: opacity 0.9s ease, transform 0.9s ease;
+
+    /* fora do .overlay ela deixaria de ser "furada" a clique e viraria uma
+       faixa morta em cima do canvas; só o link precisa capturar ponteiro */
+    pointer-events: none;
+  }
+  .intro.is-in {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
   }
   .intro .name {
     color: inherit;
     text-decoration: underline;
     text-underline-offset: 2px;
+    pointer-events: auto;
   }
 
   /* h1 invisível mas acessível (a versão visual é o texto 3D no canvas) */

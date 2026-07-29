@@ -5,15 +5,14 @@ import { Segment } from './Segment';
 import { CameraRig } from './CameraRig';
 import { Input } from './Input';
 import { Labels } from './Labels';
+import { Backdrop } from './Backdrop';
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import { makeReflectionMaterial, reflectTime } from './Reflection';
 import {
   makeRibbonGeometry, captureRest, bendRibbon, ribbonPose, placeOnRibbon,
   type RibbonRest,
 } from './Ribbon';
-import {
-  SECTIONS, RADIUS, HEIGHT, REFLECT,
-  CAM, BASE_ASPECT, PARALLAX_AMP, PARALLAX_EASE,
-} from './config';
+import { SECTIONS, RADIUS, HEIGHT, REFLECT, CAM, BASE_ASPECT, LABEL } from './config';
 
 const TAU = Math.PI * 2;
 // menor ângulo equivalente, em (-π, π]. É o que embrulha a fita: o segmento que
@@ -33,19 +32,18 @@ export class Carousel {
   private segments: Segment[] = [];
   private reflMeshes: THREE.Mesh[] = [];
 
-  private rig!: CameraRig;             // posiciona a câmera; guardado para o reveal futuro
+  private rig!: CameraRig;             // dono da pose da câmera (entrada + parallax)
   private input!: Input;
   private labels = new Labels();       // textos 3D "liquid glass" presos às fotos
+  private backdrop = new Backdrop();   // o PORTFOLIO gigante, agora dentro da cena
 
   private morph = 0;                 // 0 = anel, 1 = fita (tweenado por GSAP)
   private lastK = NaN;               // última curvatura dobrada (evita redobrar à toa)
+  private lastFrame: number | null = null;   // timestamp do frame anterior (dt do rig)
   private lenis: any;
   private lastActive = -1;
 
-  private pointer = { x: 0, y: 0 };        // mouse normalizado (-1..1)
-  private pointerEased = { x: 0, y: 0 };   // versão suavizada (o parallax segue esta)
-
-  private viewRadius = CAM.side.radius;    // distância da câmera, ajustada pela proporção da tela
+  private viewRadius = CAM.side.radius;    // distância lateral, ajustada pela proporção da tela
 
   // clicar numa foto navega pra seção dela; hover mostra cursor pointer
   private raycaster = new THREE.Raycaster();
@@ -83,11 +81,19 @@ export class Carousel {
     this.rig = new CameraRig(this.camera);
     this.input = new Input(canvas, lenis);
 
-    // --- carregar texturas + criar segmentos (mantém a ordem de SECTIONS) ---
-    const loader = new THREE.TextureLoader();
-    const textures = await Promise.all(
-      SECTIONS.map((s) => loader.loadAsync(s.texture)),
-    );
+    // --- carregar texturas + fonte, reportando progresso pra cortina ---
+    // fotos e fonte carregam JUNTAS: em série o total do manager saltava de 5
+    // pra 6 no meio, e a barra recuava depois de encher
+    const manager = new THREE.LoadingManager();
+    manager.onProgress = (_url, loaded, total) => {
+      window.dispatchEvent(new CustomEvent('carousel:progress', { detail: { loaded, total } }));
+    };
+    const loader = new THREE.TextureLoader(manager);
+    const [textures, font] = await Promise.all([
+      Promise.all(SECTIONS.map((s) => loader.loadAsync(s.texture))),
+      new FontLoader(manager).loadAsync(LABEL.font),   // serve labels E backdrop
+    ]);
+
     const maxAniso = this.renderer.capabilities.getMaxAnisotropy();
     textures.forEach((tex, i) => {
       tex.colorSpace = THREE.SRGBColorSpace;
@@ -108,8 +114,12 @@ export class Carousel {
     });
 
     // cada label é posicionada junto com a sua foto no layout()
-    await this.labels.init();
+    this.labels.init(font);
     this.scene.add(...this.labels.meshes);
+
+    // a palavra do fundo vive na cena: pega perspectiva e desce com a câmera
+    this.backdrop.init(font);
+    this.scene.add(this.backdrop.mesh);
 
     this.layout();  // pose inicial (anel)
 
@@ -125,8 +135,10 @@ export class Carousel {
 
     window.addEventListener('resize', this.onResize);
     window.addEventListener('pointermove', (e) => {
-      this.pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-      this.pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
+      this.rig.setPointer(
+        (e.clientX / window.innerWidth) * 2 - 1,
+        (e.clientY / window.innerHeight) * 2 - 1,
+      );
     });
 
     // --- clique na foto → navega pra seção; hover na foto → cursor pointer ---
@@ -143,6 +155,15 @@ export class Carousel {
       const seg = this.pick(e);
       if (seg) window.location.hash = `#${SECTIONS[seg.index].id}`;
     });
+
+    // --- aquecimento: paga o custo do primeiro frame AQUI, atrás da cortina ---
+    // Compilar o vidro das labels (transmission + dispersion) trava a thread por
+    // um bom tempo. Se isso acontecesse durante a entrada, o relógio do GSAP
+    // correria por baixo do travamento e a câmera chegaria no fim antes do
+    // primeiro frame sair — a animação rodava, só que ninguém via.
+    await this.renderer.compileAsync(this.scene, this.camera);
+    this.rig.update(0, this.viewRadius);              // pose de topo (dt 0: nada avança)
+    this.renderer.render(this.scene, this.camera);    // aloca o alvo de transmissão
   }
 
   // raycast do ponteiro contra os segmentos visíveis; retorna o Segment atingido
@@ -169,23 +190,17 @@ export class Carousel {
     this.viewRadius = RADIUS + (CAM.side.radius - RADIUS) * fit;
   }
 
-  // câmera desloca de leve rumo ao mouse e continua olhando o centro → a cena "encara" o cursor
-  private applyParallax() {
-    this.pointerEased.x += (this.pointer.x - this.pointerEased.x) * PARALLAX_EASE;
-    this.pointerEased.y += (this.pointer.y - this.pointerEased.y) * PARALLAX_EASE;
-    // sinais invertidos: mover a câmera pro lado oposto faz a cena "seguir" o mouse
-    this.camera.position.set(
-      -this.pointerEased.x * PARALLAX_AMP,
-      CAM.side.height + this.pointerEased.y * PARALLAX_AMP,
-      this.viewRadius,
-    );
-    this.camera.lookAt(0, 0, 0);
-  }
-
-  async start() {
-    this.input.enabled = true;   // câmera já na lateral; libera o controle direto
+  // liga o render loop na pose de topo — a cena fica viva (a água ondulando)
+  // já atrás da cortina, então ela não abre sobre um quadro congelado
+  run() {
     this.emitActive(this.input.activeIndex);
     this.loop();
+  }
+
+  // a entrada em si; chamar DEPOIS que a cortina saiu, senão a câmera desce escondida
+  async reveal() {
+    await this.rig.reveal();       // de cima até a foto inicial
+    this.input.enabled = true;     // controle só depois que a câmera assenta
   }
 
   // alterna anel (false) ↔ fita (true) animando o desenrolar com GSAP
@@ -241,9 +256,16 @@ export class Carousel {
     requestAnimationFrame(this.loop);
     this.lenis?.raf(time);
     reflectTime.value = time * 0.001;   // relógio das ondas do reflexo (segundos)
-    this.input.update();          // inércia
-    this.layout();                // aplica rotação/offset/morph
-    this.applyParallax();         // câmera segue o mouse de leve
+
+    // dt em segundos. O primeiro frame vem da chamada manual de run() com
+    // time = 0, então só passa a contar quando há dois timestamps de verdade.
+    const dt = this.lastFrame === null ? 0 : (time - this.lastFrame) / 1000;
+    this.lastFrame = time;
+
+    this.input.update();                   // inércia
+    this.layout();                         // dobra a fita e distribui as fotos
+    this.rig.update(dt, this.viewRadius);  // entrada + parallax; único a mexer na câmera
+    this.backdrop.setReveal(this.rig.revealProgress);
     this.emitActive(this.input.activeIndex);
     this.renderer.render(this.scene, this.camera);
   };

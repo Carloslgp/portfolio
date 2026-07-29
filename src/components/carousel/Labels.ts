@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
+import type { Font } from 'three/examples/jsm/loaders/FontLoader.js';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SECTIONS, LABEL } from './config';
@@ -13,9 +13,8 @@ export class Labels {
   private mats: THREE.MeshPhysicalMaterial[] = [];
   private rests: RibbonRest[] = [];
 
-  async init() {
-    const font = await new FontLoader().loadAsync(LABEL.font);
-
+  // a fonte vem pronta do Carousel — é a mesma do Backdrop, carregada uma vez só
+  init(font: Font) {
     SECTIONS.forEach((s, i) => {
       let geo: THREE.BufferGeometry = new TextGeometry(s.label, {
         font,

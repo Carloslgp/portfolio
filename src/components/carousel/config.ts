@@ -59,6 +59,23 @@ export const LABEL = {
   maxWidth: ARC_WIDTH * 0.72,  // labels longas encolhem pra caber na foto
 };
 
+// --- palavra gigante do fundo, agora dentro da cena (ver Backdrop.ts) ---
+// As medidas saíram do que a versão em DOM ocupava na tela: ~86% da largura
+// visível naquela profundidade e o centro a ~3 unidades acima do eixo.
+export const BACKDROP = {
+  text: 'PORTFOLIO',
+  width: 13.4,        // largura em unidades de mundo (a geometria é escalada pra isto)
+  y: 3.0,             // altura do centro da palavra
+  z: -4.5,            // atrás do anel, que vai de z = -3 a +3
+  color: 0x1a1a1a,    // mesmo cinza da <div> que ela substitui
+  // Faixa do progresso da entrada em que ela acende. Vai no fim de propósito:
+  // enquanto a câmera está alta ela aponta pra DENTRO do anel, e a palavra
+  // (alta e ao fundo) fica fora do enquadramento. Ela só entra no quadro no
+  // trecho final, quando a câmera nivela — então é ali que faz sentido acender,
+  // senão o fade acontece todo com ela invisível e a chegada vira um corte.
+  fade: [0.6, 1],
+};
+
 // --- responsividade da cena ---
 // abaixo desta proporção (largura/altura), a câmera se afasta na mesma medida
 // para o segmento ativo continuar cabendo na largura visível (retrato/estreito)

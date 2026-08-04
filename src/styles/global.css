@@ -27,3 +27,23 @@ body {
   text-rendering: optimizeLegibility;
   overflow: hidden;               /* canvas é fixo; nada de scroll de página */
 }
+
+/* ——— estados da abertura do About (é a MESMA página; ver scripts/main.ts) ———
+
+   .is-diving  → a câmera está mergulhando na foto: a UI do carrossel sai de
+                 cena antes do impacto. As regras dessa fase moram no <style>
+                 do index.astro, junto dos elementos que elas apagam: lá o
+                 escopo do Astro lhes dá a especificidade necessária pra vencer
+                 o `.intro.is-in`, que daqui de fora empataria e perderia.
+   .is-about   → os cacos já caíram: o canvas some, a página ganha altura de
+                 verdade e o Lenis passa a rolar o conteúdo sobre o branco. */
+body.is-about {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+body.is-about #scene,
+body.is-about .overlay,
+body.is-about .intro,
+body.is-about .cursor {
+  display: none;
+}

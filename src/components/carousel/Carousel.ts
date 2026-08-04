@@ -6,13 +6,16 @@ import { CameraRig } from './CameraRig';
 import { Input } from './Input';
 import { Labels } from './Labels';
 import { Backdrop } from './Backdrop';
+import { Shatter } from './Shatter';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import { makeReflectionMaterial, reflectTime } from './Reflection';
 import {
   makeRibbonGeometry, captureRest, bendRibbon, ribbonPose, placeOnRibbon,
   type RibbonRest,
 } from './Ribbon';
-import { SECTIONS, RADIUS, HEIGHT, REFLECT, CAM, BASE_ASPECT, LABEL } from './config';
+import { SECTIONS, RADIUS, HEIGHT, REFLECT, CAM, BASE_ASPECT, LABEL, SEG_ANGLE, SHATTER } from './config';
+
+const ABOUT = SECTIONS.findIndex((s) => s.id === 'about');
 
 const TAU = Math.PI * 2;
 // menor ângulo equivalente, em (-π, π]. É o que embrulha a fita: o segmento que
@@ -36,6 +39,9 @@ export class Carousel {
   private input!: Input;
   private labels = new Labels();       // textos 3D "liquid glass" presos às fotos
   private backdrop = new Backdrop();   // o PORTFOLIO gigante, agora dentro da cena
+  private shatter = new Shatter();     // a foto do About quebrando em cacos de vidro
+  private inAbout = false;             // abertura do About em curso ou aberta
+  private shattered = false;           // cena já apagada: o loop para de mexer nela
 
   private morph = 0;                 // 0 = anel, 1 = fita (tweenado por GSAP)
   private lastK = NaN;               // última curvatura dobrada (evita redobrar à toa)
@@ -121,6 +127,11 @@ export class Carousel {
     this.backdrop.init(font);
     this.scene.add(this.backdrop.mesh);
 
+    // os cacos usam a MESMA textura da foto do About (rotação já aplicada pelo
+    // Segment), então a troca foto→vidro no instante do impacto não pisca
+    this.shatter.init(textures[ABOUT]);
+    this.scene.add(this.shatter.group);
+
     this.layout();  // pose inicial (anel)
 
     // --- UI ↔ carrossel via CustomEvent ---
@@ -153,7 +164,11 @@ export class Carousel {
       // só conta como clique se quase não moveu (senão foi arrasto do carrossel)
       if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) > 6) return;
       const seg = this.pick(e);
-      if (seg) window.location.hash = `#${SECTIONS[seg.index].id}`;
+      if (!seg) return;
+      // quem decide o que abrir é o main.ts: a cena não conhece o DOM do About
+      window.dispatchEvent(new CustomEvent('section:open', {
+        detail: { id: SECTIONS[seg.index].id, index: seg.index },
+      }));
     });
 
     // --- aquecimento: paga o custo do primeiro frame AQUI, atrás da cortina ---
@@ -206,6 +221,80 @@ export class Carousel {
   // alterna anel (false) ↔ fita (true) animando o desenrolar com GSAP
   setMode(flat: boolean) {
     gsap.to(this, { morph: flat ? 1 : 0, duration: 0.9, ease: 'power3.inOut' });
+  }
+
+  // Traz o segmento `i` para a frente da câmera pelo caminho mais curto.
+  //
+  // Tweena target E current juntos: `current` normalmente persegue `target` por
+  // lerp no update(), e esse rastro deixaria a foto alguns graus torta bem na
+  // hora do mergulho — de perto, isso é a diferença entre bater de frente no
+  // vidro e raspar nele de lado.
+  private faceSection(i: number): Promise<void> {
+    const n = SECTIONS.length;
+    const m0 = Math.round((this.input.target + SEG_ANGLE / 2) / SEG_ANGLE);
+    // a seção i fica de frente quando m ≡ -i (mod n); pega o representante mais
+    // próximo do m atual pra girar o mínimo, e não dar a volta inteira
+    let m = m0 + ((((-i - m0) % n) + n) % n);
+    if (m - m0 > n / 2) m -= n;
+
+    gsap.killTweensOf(this.input);
+    const goal = m * SEG_ANGLE - SEG_ANGLE / 2;
+    return gsap.to(this.input, {
+      target: goal,
+      current: goal,
+      duration: SHATTER.alignDur,
+      ease: 'power3.inOut',
+    }).then(() => {});
+  }
+
+  // A abertura do About: alinha a foto, mergulha nela, troca a foto pelos cacos
+  // e os estoura. Resolve quando o último caco sai de quadro — a partir dali a
+  // cena está vazia e o branco da página é tudo que sobra na tela.
+  async enterAbout() {
+    if (this.inAbout) return;
+    this.inAbout = true;
+    this.input.enabled = false;         // o carrossel para de responder ao gesto
+
+    await this.faceSection(ABOUT);
+    await gsap.to(this.rig, { dive: 1, duration: SHATTER.diveDur, ease: 'power2.inOut' });
+
+    // A essa altura a foto do About cobre a tela inteira, então apagar TODO o
+    // resto da cena aqui é invisível — e é o que garante que, quando o vidro
+    // quebrar, atrás dele não haja carrossel nenhum, só o branco.
+    this.shattered = true;   // trava o layout(): daqui em diante ele reacenderia tudo
+    this.setSceneVisible(false);
+    await this.shatter.play();
+  }
+
+  // Entrada direta em /#about (link compartilhado): põe a cena no estado final
+  // sem coreografia nenhuma. Mergulhar e quebrar aqui seria teatro vazio — o
+  // visitante não viu a foto inteira antes, então não há o que quebrar pra ele.
+  enterAboutInstant() {
+    if (this.inAbout) return;
+    this.inAbout = true;
+    this.shattered = true;
+    this.input.enabled = false;
+    this.rig.dive = 1;
+    this.setSceneVisible(false);
+  }
+
+  // volta do About pro carrossel: repõe a cena e a câmera recua de dentro da foto
+  async exitAbout() {
+    if (!this.inAbout) return;
+    this.shatter.reset();
+    this.shattered = false;
+    this.setSceneVisible(true);
+    await gsap.to(this.rig, { dive: 0, duration: SHATTER.diveDur * 0.9, ease: 'power2.inOut' });
+    this.input.enabled = true;
+    this.inAbout = false;
+  }
+
+  // liga/desliga tudo que não são os cacos (fotos, reflexos, labels, backdrop)
+  private setSceneVisible(v: boolean) {
+    for (const s of this.segments) s.mesh.visible = v;
+    this.reflect.visible = v;
+    this.backdrop.mesh.visible = v;
+    for (const m of this.labels.meshes) m.visible = v;
   }
 
   // Uma passada só: dobra a fita na curvatura atual e distribui as fotos ao
@@ -262,11 +351,16 @@ export class Carousel {
     const dt = this.lastFrame === null ? 0 : (time - this.lastFrame) / 1000;
     this.lastFrame = time;
 
-    this.input.update();                   // inércia
-    this.layout();                         // dobra a fita e distribui as fotos
+    // com a cena apagada (About aberto) só os cacos e a câmera seguem vivos:
+    // layout() e setReveal() escrevem .visible todo frame e reacenderiam tudo
+    if (!this.shattered) {
+      this.input.update();                 // inércia
+      this.layout();                       // dobra a fita e distribui as fotos
+      this.backdrop.setReveal(this.rig.revealProgress);
+      this.emitActive(this.input.activeIndex);
+    }
+
     this.rig.update(dt, this.viewRadius);  // entrada + parallax; único a mexer na câmera
-    this.backdrop.setReveal(this.rig.revealProgress);
-    this.emitActive(this.input.activeIndex);
     this.renderer.render(this.scene, this.camera);
   };
 }

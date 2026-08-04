@@ -76,6 +76,32 @@ export const BACKDROP = {
   fade: [0.6, 1],
 };
 
+// --- abertura do About: mergulho da câmera + estilhaçamento da foto ---
+// A coreografia é: a câmera avança até a foto cobrir a tela inteira, a foto
+// trinca a partir do ponto de impacto e os cacos caem, deixando o branco da
+// página aparecer por trás (ver Shatter.ts e Carousel.enterAbout).
+export const SHATTER = {
+  gap: 0.85,        // distância câmera↔foto no fim do mergulho (foto tem 1.6 de altura,
+                    // então aqui ela transborda o enquadramento com folga)
+  diveDur: 1.15,    // segundos do mergulho
+  alignDur: 0.55,   // giro que traz a foto do About pra frente antes de mergulhar
+
+  // padrão de fratura: anéis × setores a partir do ponto de impacto, como o
+  // estrelado de um para-brisa. O jitter é o que separa "vidro trincado" de
+  // "ladrilho" — sem ele as bordas ficam retas demais pra ler como quebra.
+  rings: 4,
+  sectors: 13,      // primo: evita que setores se alinhem com os anéis
+  jitter: 0.42,
+
+  // dispersão dos cacos
+  spread: 2.6,      // afastamento radial (unidades de mundo)
+  toward: 3.4,      // avanço na direção da câmera — os do centro passam por ela
+  fall: 5.2,        // queda: é o que dá o "rolar para baixo" pedido
+  spin: 3.2,        // tombo máximo, em radianos
+  dur: 1.8,         // duração da dispersão
+  stagger: 0.45,    // atraso do centro até a borda (a trinca se propaga)
+};
+
 // --- responsividade da cena ---
 // abaixo desta proporção (largura/altura), a câmera se afasta na mesma medida
 // para o segmento ativo continuar cabendo na largura visível (retrato/estreito)

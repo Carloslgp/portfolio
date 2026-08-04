@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAM, PARALLAX_AMP, PARALLAX_EASE } from './config';
+import { CAM, PARALLAX_AMP, PARALLAX_EASE, RADIUS, SHATTER } from './config';
 
 // Dono ÚNICO da pose da câmera.
 //
@@ -22,6 +22,11 @@ const easeInOutCubic = (t: number) =>
   (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 export class CameraRig {
+  // Mergulho na foto da frente: 0 = pose lateral normal, 1 = colado nela.
+  // Tweenado por GSAP (ver Carousel.enterAbout) — ao contrário da entrada, aqui
+  // um engasgo de frame não estraga nada, porque não há cortina esperando.
+  dive = 0;
+
   // 0 = de cima, olhando o anel de cara; 1 = na lateral, encarando a foto ativa.
   // Nasce em cima: assim o primeiro frame desenhado JÁ é a vista de topo, e a
   // cortina de carregamento abre sobre ela. Quem desce daqui é reveal().
@@ -76,11 +81,20 @@ export class CameraRig {
     this.eased.y += (this.pointer.y - this.eased.y) * PARALLAX_EASE;
 
     // o parallax entra junto com a descida: lá em cima ele vale zero, senão
-    // mexer o mouse durante a entrada empurraria a câmera fora da trajetória
-    const amp = PARALLAX_AMP * p;
+    // mexer o mouse durante a entrada empurraria a câmera fora da trajetória.
+    // No mergulho ele sai de cena de novo: a essa distância da foto, qualquer
+    // deriva do mouse viraria um tranco lateral enorme.
+    const amp = PARALLAX_AMP * p * (1 - this.dive);
 
-    const height = THREE.MathUtils.lerp(CAM.top.height, CAM.side.height, p);
-    const radius = THREE.MathUtils.lerp(CAM.top.radius, viewRadius, p);
+    const height = THREE.MathUtils.lerp(CAM.top.height, CAM.side.height, p) * (1 - this.dive);
+
+    // a distância lateral colapsa até quase encostar na face frontal da fita
+    // (z = RADIUS), que é onde a foto ativa está
+    const radius = THREE.MathUtils.lerp(
+      THREE.MathUtils.lerp(CAM.top.radius, viewRadius, p),
+      RADIUS + SHATTER.gap,
+      this.dive,
+    );
 
     // sinais invertidos: mover a câmera pro lado oposto faz a cena "seguir" o mouse
     this.camera.position.set(

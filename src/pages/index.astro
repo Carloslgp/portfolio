@@ -4,6 +4,14 @@ import Layout from '../layouts/Layout.astro';
 import { SECTIONS } from '../components/carousel/config';
 
 const first = SECTIONS[0];
+
+// CONTEÚDO MOCK do About — tudo abaixo é placeholder pra trocar depois pelo
+// texto real. Está marcado com o selo "placeholder" no próprio layout pra não
+// escapar despercebido numa publicação.
+const skills = [
+  'TypeScript', 'Three.js', 'GSAP', 'React',
+  'Astro', 'WebGL / GLSL', 'Node.js', 'Design de interface',
+];
 ---
 
 <Layout>
@@ -50,6 +58,52 @@ const first = SECTIONS[0];
 
   <!-- cursor sutil que segue o mouse com atraso -->
   <div class="cursor" data-cursor aria-hidden="true"></div>
+
+  <!-- ——— About: MESMA página, revelado quando o vidro termina de cair ———
+       Fica fora de .overlay porque não é HUD sobre o canvas: quando abre, ele
+       É a página (o canvas sai de cena e o corpo volta a rolar). -->
+  <section class="about" data-about hidden>
+    <button class="about-close" data-about-close aria-label="Voltar ao carrossel">‹ Voltar</button>
+
+    <div class="about-inner">
+      <header class="about-head">
+        <span class="tag">Placeholder — conteúdo mock</span>
+        <h2>Sobre mim</h2>
+        <p class="lead">
+          [Espaço reservado] Desenvolvedor de interfaces que gosta de misturar código com
+          teimosia visual. Este parágrafo de abertura é só um substituto até o texto real
+          entrar no lugar.
+        </p>
+      </header>
+
+      <div class="about-body">
+        <p>
+          [Placeholder] Comecei a programar mexendo em coisas que não deveriam ser mexidas e
+          nunca mais parei. Hoje trabalho em algum ponto entre engenharia e design, tentando
+          fazer telas que funcionem bem e que também dêem vontade de ficar olhando.
+        </p>
+        <p>
+          [Placeholder] Fora do teclado, gosto de fotografia, café mal coado e de reescrever a
+          mesma função três vezes até ela ficar simples o suficiente. Este texto, como os
+          outros, é rascunho esperando a versão de verdade.
+        </p>
+      </div>
+
+      <div class="about-skills">
+        <h3>Stack &amp; skills <span class="tag tag-sm">mock</span></h3>
+        <ul>{skills.map((s) => <li>{s}</li>)}</ul>
+      </div>
+
+      <div class="about-cta">
+        <h3>Vamos conversar?</h3>
+        <p>[Placeholder] Disponível para novos projetos e boas conversas sobre interfaces.</p>
+        <div class="cta-actions">
+          <a class="btn btn-solid" href="mailto:placeholder@example.com">Enviar e-mail</a>
+          <button type="button" class="btn btn-glass" disabled>Baixar currículo</button>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- cortina: cobre a cena até fotos, fonte e shaders estarem prontos.
        Sai antes de a câmera começar a descer (ver scripts/loading.ts).
@@ -307,6 +361,169 @@ const first = SECTIONS[0];
   .mode.is-flat svg {
     transform: rotate(180deg);
     transition: transform 0.5s ease;
+  }
+
+  /* Mergulho em curso: a UI do carrossel sai antes do impacto, senão a linha do
+     topo e o card ficam boiando sobre o vidro quebrando. Precisa vir daqui (e
+     não do global.css) por causa do .intro.is-in logo acima: no escopo do Astro
+     estas regras ganham o atributo de escopo e passam à frente dele. */
+  body.is-diving .intro.is-in,
+  body.is-diving .card,
+  body.is-diving .mode,
+  body.is-diving .cursor {
+    opacity: 0;
+    transition: opacity 0.45s ease;
+    pointer-events: none;
+  }
+
+  /* ——— About: a página que nasce quando o vidro cai ———
+     Entra escondido; o main.ts tira o [hidden] e anima a subida. O fundo é o
+     mesmo --paper do resto, então os cacos caem e revelam ISTO, sem emenda. */
+  .about {
+    position: relative;
+    z-index: 5;
+    background: var(--paper);
+    min-height: 100svh;
+  }
+  .about[hidden] {
+    display: none;
+  }
+
+  .about-close {
+    position: fixed;
+    top: 1.5rem;
+    left: 1.5rem;
+    z-index: 6;
+    padding: 0.55rem 1.1rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--ink);
+    background: rgba(90, 90, 90, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(10, 10, 10, 0.1);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .about-close:hover {
+    background: rgba(90, 90, 90, 0.2);
+  }
+
+  .about-inner {
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 7rem 1.5rem 6rem;
+  }
+
+  .tag {
+    display: inline-block;
+    margin-bottom: 1rem;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(10, 10, 10, 0.55);
+    background: rgba(10, 10, 10, 0.05);
+    border: 1px solid rgba(10, 10, 10, 0.12);
+    border-radius: 999px;
+  }
+  .tag-sm {
+    margin: 0 0 0 0.5rem;
+    vertical-align: middle;
+  }
+
+  .about h2 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(2.2rem, 5.5vw, 3.4rem);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin-bottom: 1rem;
+  }
+  .about h3 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.6rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .lead {
+    font-size: 1.05rem;
+    line-height: 1.65;
+    color: rgba(10, 10, 10, 0.7);
+  }
+  .about-body {
+    margin: 3.5rem 0;
+  }
+  .about-body p {
+    line-height: 1.75;
+    color: rgba(10, 10, 10, 0.78);
+    margin-bottom: 1.25rem;
+  }
+
+  .about-skills ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    list-style: none;
+  }
+  .about-skills li {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: rgba(10, 10, 10, 0.8);
+    background: rgba(10, 10, 10, 0.05);
+    border: 1px solid rgba(10, 10, 10, 0.1);
+    border-radius: 999px;
+  }
+
+  .about-cta {
+    margin-top: 4rem;
+    padding-top: 3rem;
+    border-top: 1px solid rgba(10, 10, 10, 0.1);
+    text-align: center;
+  }
+  .about-cta p {
+    color: rgba(10, 10, 10, 0.65);
+    margin-bottom: 2rem;
+  }
+  .cta-actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+  }
+  .btn {
+    padding: 0.75rem 1.5rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: opacity 0.2s, background 0.2s;
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .btn-solid {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .btn-solid:hover {
+    opacity: 0.85;
+  }
+  .btn-glass {
+    color: var(--ink);
+    background: rgba(90, 90, 90, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(10, 10, 10, 0.12);
   }
 
   /* ——— telas estreitas: card ancora à esquerda, toggle à direita ———

@@ -35,15 +35,30 @@ body {
                  do index.astro, junto dos elementos que elas apagam: lá o
                  escopo do Astro lhes dá a especificidade necessária pra vencer
                  o `.intro.is-in`, que daqui de fora empataria e perderia.
-   .is-about   → os cacos já caíram: o canvas some, a página ganha altura de
-                 verdade e o Lenis passa a rolar o conteúdo sobre o branco. */
+   .is-about   → a página ganhou altura de verdade e o Lenis passa a rolar o
+                 conteúdo.
+   .is-descending → a descida automática está em curso. O painel está deslocado
+                 por transform, e sem este overflow: hidden o deslocamento
+                 viraria barra de rolagem — e um salto quando ele zerasse.
+
+   O #scene NÃO entra na lista abaixo, e essa ausência é o efeito inteiro: os
+   cacos assentam num mosaico e seguem vivos no canvas, aparecendo pelo poço
+   transparente no topo do painel (.about-well, em index.astro). Desligar o
+   canvas obrigaria a página a "chegar" depois que o vidro sumisse, e era essa
+   chegada que se lia como carregamento. */
 body.is-about {
   overflow-y: auto;
   overflow-x: hidden;
 }
-body.is-about #scene,
-body.is-about .overlay,
-body.is-about .intro,
-body.is-about .cursor {
+body.is-descending {
+  overflow: hidden;
+}
+/* O :not(.is-descending) existe pra HUD conseguir SAIR com fade. Durante a
+   descida ela já está em opacity 0 por causa do .is-diving, e um display: none
+   aplicado no mesmo tique atropelaria essa transição — a HUD sumiria de um
+   quadro pro outro em vez de se apagar junto com o mergulho. */
+body.is-about:not(.is-descending) .overlay,
+body.is-about:not(.is-descending) .intro,
+body.is-about:not(.is-descending) .cursor {
   display: none;
 }

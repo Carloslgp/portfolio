@@ -77,29 +77,78 @@ export const BACKDROP = {
 };
 
 // --- abertura do About: mergulho da câmera + estilhaçamento da foto ---
-// A coreografia é: a câmera avança até a foto cobrir a tela inteira, a foto
-// trinca a partir do ponto de impacto e os cacos caem, deixando o branco da
-// página aparecer por trás (ver Shatter.ts e Carousel.enterAbout).
+// A coreografia é UMA descida só: a câmera avança até a foto cobrir a tela, a
+// foto se abre em cacos a partir do ponto de impacto, os cacos ASSENTAM num
+// mosaico — e é esse mosaico que vira o cabeçalho do About, enquanto a câmera
+// recua e panoramiza pra baixo e a página sobe por trás.
+// (ver Shatter.ts, CameraRig.descent e Carousel.enterAbout)
 export const SHATTER = {
-  gap: 0.85,        // distância câmera↔foto no fim do mergulho (foto tem 1.6 de altura,
-                    // então aqui ela transborda o enquadramento com folga)
-  diveDur: 1.15,    // segundos do mergulho
-  alignDur: 0.55,   // giro que traz a foto do About pra frente antes de mergulhar
+  // Distância câmera↔foto no fim da aproximação. Ela SÓ chega perto do anel —
+  // não entra na foto. Em 0.85 (como era) o enquadramento mostrava metade da
+  // imagem esticada na curvatura do cilindro, e isso se lia como defeito, não
+  // como zoom. Aqui a foto ocupa ~87% da altura da tela e continua inteira.
+  approach: 2.0,
+  diveDur: 1.0,     // segundos da aproximação
+  alignDur: 0.55,   // giro que traz a foto do About pra frente antes
 
-  // padrão de fratura: anéis × setores a partir do ponto de impacto, como o
-  // estrelado de um para-brisa. O jitter é o que separa "vidro trincado" de
-  // "ladrilho" — sem ele as bordas ficam retas demais pra ler como quebra.
+  // Padrão de fratura: anéis × setores a partir do ponto de impacto, como o
+  // estrelado de um para-brisa.
+  //
+  // O que denunciava o padrão não era o jitter fraco — era os anéis serem
+  // CÍRCULOS. Uma fração radial única por anel, valendo para todos os setores,
+  // desenha aros concêntricos perfeitos, e o olho acha um aro num piscar. Agora
+  // a fronteira de cada anel é uma poligonal ondulada: o raio é sorteado por
+  // ÂNGULO, e as células vizinhas compartilham esses cantos — o ladrilhamento
+  // continua exato e o aro some.
   rings: 4,
   sectors: 13,      // primo: evita que setores se alinhem com os anéis
-  jitter: 0.42,
+  jitter: 0.9,      // ondulação da fronteira de cada anel (era 0.42)
+  ringWander: 0.5,  // o quanto os anéis-base fogem do espaçamento regular
 
-  // dispersão dos cacos
-  spread: 2.6,      // afastamento radial (unidades de mundo)
-  toward: 3.4,      // avanço na direção da câmera — os do centro passam por ela
-  fall: 5.2,        // queda: é o que dá o "rolar para baixo" pedido
-  spin: 3.2,        // tombo máximo, em radianos
-  dur: 1.8,         // duração da dispersão
-  stagger: 0.45,    // atraso do centro até a borda (a trinca se propaga)
+  // A quebra. Menos "explosão", mais "a foto se desfaz": os cacos abrem e já
+  // saem viajando para as bordas da tela, não voltam pro lugar.
+  spread: 1.2,      // afastamento radial (unidades de mundo)
+  toward: 0.9,      // avanço na direção da câmera
+  fall: 1.0,        // queda durante a abertura
+  spin: 1.4,        // tombo máximo, em radianos
+  dur: 0.9,         // duração da abertura
+  stagger: 0.32,    // atraso do centro até a borda (a trinca se propaga)
+};
+
+// Onde os cacos param: uma MOLDURA. Poucos pedaços, jogados em cima e nas duas
+// laterais, com o texto passando no meio.
+//
+// As posições são normalizadas (-1..1) sobre o retângulo visível no plano do
+// vidro, e só viram unidades de mundo quando a câmera assenta — é assim que a
+// borda encosta na beirada da tela em qualquer proporção, do celular ao
+// monitor largo, sem uma constante chutada por breakpoint.
+export const BORDER = {
+  keep: 15,               // quantos cacos sobram ("poucos cacos jogados")
+  topCount: 7,            // destes, quantos vão pra faixa de cima
+  topBand: [0.55, 1.12],  // v da faixa de cima (>1 = meio pra fora da tela)
+  sideBand: [0.84, 1.12], // |u| das laterais
+  sideSpan: [-0.4, 0.7],  // v que as laterais cobrem
+  wander: 0.5,            // bagunça na distribuição ao longo de cada faixa
+  spin: 0.5,              // rotação em repouso, em radianos
+  depth: 0.35,            // desencontro em Z (cada peça pega a luz diferente)
+  dur: 1.05,              // tempo de voar da quebra até a moldura
+};
+
+// A descida: a câmera recua enquanto o painel HTML sobe. Os dois andam na MESMA
+// timeline (ver Carousel.enterAbout → label 'descent').
+export const ABOUT = {
+  frameGap: 4.2,    // distância câmera↔plano do vidro no fim: define a moldura
+  descentDur: 1.2,
+  descentEase: 'power2.inOut',
+  // Quando a descida começa, contada do início da quebra. É o número que mata a
+  // pausa: a câmera parte com o vidro ainda voando, então nunca existe um frame
+  // em que nada se move.
+  overlap: 0.85,
+  fadeDur: 0.45,    // o anel apagando atrás da quebra (a foto do About NÃO
+                    // entra nesse fade: ver Carousel.swapToShards)
+  parallax: 0.8,    // a moldura rola quase junto com a página, e sai de cena
+  fadeOut: 0.1,     // fração da tela rolada antes de a moldura começar a apagar
+  exitScale: 1.7,   // o fechar é a mesma timeline em reverse, mais rápida
 };
 
 // --- responsividade da cena ---

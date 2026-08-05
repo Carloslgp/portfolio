@@ -59,47 +59,60 @@ const skills = [
   <!-- cursor sutil que segue o mouse com atraso -->
   <div class="cursor" data-cursor aria-hidden="true"></div>
 
-  <!-- ——— About: MESMA página, revelado quando o vidro termina de cair ———
-       Fica fora de .overlay porque não é HUD sobre o canvas: quando abre, ele
-       É a página (o canvas sai de cena e o corpo volta a rolar). -->
+  <!-- ——— About: MESMA página, revelada pela descida ———
+       Fica fora de .overlay porque não é HUD sobre o canvas: quando abre, ele É
+       a página.
+
+       Nada aqui tem fundo próprio, e essa ausência é o efeito: o branco do
+       <body> já é o papel, então o canvas fica visível por baixo do painel
+       inteiro e os cacos que sobraram da quebra emolduram o texto — em cima e
+       nas duas laterais. Pôr um fundo em qualquer um destes blocos taparia a
+       moldura.
+
+       .about-well é só o respiro do topo: o espaço onde os cacos de cima ficam,
+       acima da primeira linha de texto. -->
   <section class="about" data-about hidden>
-    <button class="about-close" data-about-close aria-label="Voltar ao carrossel">‹ Voltar</button>
+    <div class="about-well" aria-hidden="true"></div>
 
-    <div class="about-inner">
-      <header class="about-head">
-        <span class="tag">Placeholder — conteúdo mock</span>
-        <h2>Sobre mim</h2>
-        <p class="lead">
-          [Espaço reservado] Desenvolvedor de interfaces que gosta de misturar código com
-          teimosia visual. Este parágrafo de abertura é só um substituto até o texto real
-          entrar no lugar.
-        </p>
-      </header>
+    <div class="about-sheet">
+      <button class="about-close" data-about-close aria-label="Voltar ao carrossel">‹ Voltar</button>
 
-      <div class="about-body">
-        <p>
-          [Placeholder] Comecei a programar mexendo em coisas que não deveriam ser mexidas e
-          nunca mais parei. Hoje trabalho em algum ponto entre engenharia e design, tentando
-          fazer telas que funcionem bem e que também dêem vontade de ficar olhando.
-        </p>
-        <p>
-          [Placeholder] Fora do teclado, gosto de fotografia, café mal coado e de reescrever a
-          mesma função três vezes até ela ficar simples o suficiente. Este texto, como os
-          outros, é rascunho esperando a versão de verdade.
-        </p>
-      </div>
+      <div class="about-inner">
+        <header class="about-head">
+          <span class="tag">Placeholder — conteúdo mock</span>
+          <h2>Sobre mim</h2>
+          <p class="lead">
+            [Espaço reservado] Desenvolvedor de interfaces que gosta de misturar código com
+            teimosia visual. Este parágrafo de abertura é só um substituto até o texto real
+            entrar no lugar.
+          </p>
+        </header>
 
-      <div class="about-skills">
-        <h3>Stack &amp; skills <span class="tag tag-sm">mock</span></h3>
-        <ul>{skills.map((s) => <li>{s}</li>)}</ul>
-      </div>
+        <div class="about-body">
+          <p>
+            [Placeholder] Comecei a programar mexendo em coisas que não deveriam ser mexidas e
+            nunca mais parei. Hoje trabalho em algum ponto entre engenharia e design, tentando
+            fazer telas que funcionem bem e que também dêem vontade de ficar olhando.
+          </p>
+          <p>
+            [Placeholder] Fora do teclado, gosto de fotografia, café mal coado e de reescrever a
+            mesma função três vezes até ela ficar simples o suficiente. Este texto, como os
+            outros, é rascunho esperando a versão de verdade.
+          </p>
+        </div>
 
-      <div class="about-cta">
-        <h3>Vamos conversar?</h3>
-        <p>[Placeholder] Disponível para novos projetos e boas conversas sobre interfaces.</p>
-        <div class="cta-actions">
-          <a class="btn btn-solid" href="mailto:placeholder@example.com">Enviar e-mail</a>
-          <button type="button" class="btn btn-glass" disabled>Baixar currículo</button>
+        <div class="about-skills">
+          <h3>Stack &amp; skills <span class="tag tag-sm">mock</span></h3>
+          <ul>{skills.map((s) => <li>{s}</li>)}</ul>
+        </div>
+
+        <div class="about-cta">
+          <h3>Vamos conversar?</h3>
+          <p>[Placeholder] Disponível para novos projetos e boas conversas sobre interfaces.</p>
+          <div class="cta-actions">
+            <a class="btn btn-solid" href="mailto:placeholder@example.com">Enviar e-mail</a>
+            <button type="button" class="btn btn-glass" disabled>Baixar currículo</button>
+          </div>
         </div>
       </div>
     </div>
@@ -376,17 +389,31 @@ const skills = [
     pointer-events: none;
   }
 
-  /* ——— About: a página que nasce quando o vidro cai ———
-     Entra escondido; o main.ts tira o [hidden] e anima a subida. O fundo é o
-     mesmo --paper do resto, então os cacos caem e revelam ISTO, sem emenda. */
+  /* ——— About: a página que sobe enquanto o vidro assenta ———
+     Entra deslocado pra baixo da dobra e sobe na mesma timeline da câmera
+     (ver scripts/main.ts → label 'descent'). */
   .about {
     position: relative;
     z-index: 5;
-    background: var(--paper);
-    min-height: 100svh;
+    /* SEM fundo, aqui e na .about-sheet: o branco do <body> já é o papel, e
+       qualquer fundo neste caminho taparia a moldura de cacos no canvas. */
+    background: transparent;
+
+    /* respiro do topo: a faixa onde os cacos de cima ficam. Casa com
+       BORDER.topBand, que os põe acima de 55% da meia-altura da tela. */
+    --about-well-h: clamp(150px, 34svh, 340px);
   }
   .about[hidden] {
     display: none;
+  }
+
+  .about-well {
+    height: var(--about-well-h);
+  }
+
+  .about-sheet {
+    background: transparent;
+    min-height: calc(100svh - var(--about-well-h));
   }
 
   .about-close {
@@ -414,7 +441,8 @@ const skills = [
   .about-inner {
     max-width: 42rem;
     margin: 0 auto;
-    padding: 7rem 1.5rem 6rem;
+    /* menos respiro no topo do que antes: o poço acima já dá o ar */
+    padding: 4rem 1.5rem 6rem;
   }
 
   .tag {

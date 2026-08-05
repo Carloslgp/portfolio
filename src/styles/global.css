@@ -59,6 +59,7 @@ body.is-descending {
    quadro pro outro em vez de se apagar junto com o mergulho. */
 body.is-about:not(.is-descending) .overlay,
 body.is-about:not(.is-descending) .intro,
+body.is-about:not(.is-descending) .hud,
 body.is-about:not(.is-descending) .cursor {
   display: none;
 }

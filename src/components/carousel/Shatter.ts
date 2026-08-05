@@ -3,14 +3,14 @@ import gsap from 'gsap';
 import { ARC_WIDTH, BORDER, HEIGHT, RADIUS, SHATTER } from './config';
 import { ribbonPose } from './Ribbon';
 
-// A foto do About se quebrando — e o que sobra virando a MOLDURA da página.
+// A foto do About se quebrando — e o que sobra virando o CABEÇALHO da página.
 //
 // O padrão é o estrelado de para-brisa: anéis cortados por setores a partir do
 // ponto de impacto, que é para onde a câmera está olhando. Por isso a fratura
 // nasce no meio da foto e se abre pra fora, e não numa grade uniforme (grade lê
 // como azulejo caindo, não como vidro quebrando).
 //
-// Duas coisas fazem esse padrão parar de PARECER um padrão:
+// Três coisas fazem esse padrão parar de PARECER um padrão:
 //
 //  1. As fronteiras dos anéis são poligonais onduladas, não círculos. O raio de
 //     cada fronteira é sorteado por ÂNGULO — fracAt[anel][setor] — e as células
@@ -19,6 +19,11 @@ import { ribbonPose } from './Ribbon';
 //     mais jitter que se ponha nos setores.
 //  2. Os anéis-base não são igualmente espaçados: SHATTER.ringWander desloca
 //     cada um, então nem a espessura das faixas se repete.
+//  3. Nem toda fronteira propaga (SHATTER.weld): quando ela morre, as duas
+//     células dos dois lados viram uma peça só. Sem isto, TODA peça tinha
+//     exatamente um anel de comprimento — dezenas de quadriláteros da mesma
+//     ordem de tamanho, que é o que fazia o vidro parecer ladrilho arredondado
+//     em vez de caco. É daqui que vêm as cunhas compridas e as junções em T.
 //
 // O ladrilhamento continua EXATO — sem sobra nem falta — porque cada anel mede
 // a distância até a borda do retângulo no ângulo em que está: as frações são
@@ -30,8 +35,9 @@ import { ribbonPose } from './Ribbon';
 // clearcoat de raspão e dão a leitura de espessura — sem elas o caco é um
 // adesivo, por mais reflexo que o material tenha.
 //
-// No fim, BORDER.keep cacos param nas beiradas da tela e o resto apaga no voo.
-// A moldura não fica imóvel: cada peça flutua no seu próprio tempo (ver pose()).
+// No fim, BORDER.keep cacos param numa faixa no ALTO da tela — o cabeçalho da
+// página — e o resto apaga no voo. A faixa não fica imóvel: cada peça flutua no
+// seu próprio tempo (ver pose()).
 
 // PRNG determinístico: a fratura tem que dar o MESMO desenho a cada abertura e
 // a cada recarga, senão não dá pra calibrar o efeito olhando — cada teste sairia
@@ -100,9 +106,8 @@ type Shard = {
   jig: number;          // variação por caco — a MESMA em todas as fases, senão
                         // a peça muda de personalidade no meio do caminho
   phase: number;        // fase própria da flutuação
-  keep: boolean;        // sobrevive até a moldura, ou apaga no voo?
-  side: boolean;        // lateral (empurrável) ou faixa de cima (fixa)
-  bu: number;           // pose na moldura, normalizada (-1..1) sobre a tela
+  keep: boolean;        // sobrevive até o cabeçalho, ou apaga no voo?
+  bu: number;           // pose na faixa, normalizada (-1..1) sobre a tela
   bv: number;
   settled: Vec3;        // a mesma pose já convertida em unidades de mundo
   settledRot: Vec3;
@@ -174,20 +179,37 @@ export class Shatter {
       }
     }
 
+    // ——— quais fronteiras propagam em cada setor ———
+    // Uma trinca que morre no meio do caminho funde as duas células vizinhas
+    // numa peça só, e é daí que saem as cunhas compridas. O corte some SÓ neste
+    // setor: as arestas laterais da peça continuam nos mesmos dois raios, então
+    // o ladrilhamento segue exato e o setor vizinho não precisa saber de nada —
+    // ele só passa a encostar num T, em vez de num X.
+    const cuts: number[][] = [];
+    for (let j = 0; j < sectors; j++) {
+      const c = [0];
+      for (let i = 1; i < rings; i++) if (rand() >= SHATTER.weld) c.push(i);
+      c.push(rings);
+      cuts.push(c);
+    }
+
     const base = makeGlassPhoto(texture);
     const pt = (f: number, th: number) =>
       new THREE.Vector2(f * edge(th) * Math.cos(th), f * edge(th) * Math.sin(th));
 
-    for (let i = 0; i < rings; i++) {
-      for (let j = 0; j < sectors; j++) {
+    for (let j = 0; j < sectors; j++) {
+      for (let c = 0; c < cuts[j].length - 1; c++) {
+        const i = cuts[j][c];         // fronteira de dentro da peça
+        const o = cuts[j][c + 1];     // fronteira de fora (pode pular anéis)
+
         const A = pt(fracAt[i][j], angles[j]);
         const B = pt(fracAt[i][j + 1], angles[j + 1]);
-        const C = pt(fracAt[i + 1][j + 1], angles[j + 1]);
-        const D = pt(fracAt[i + 1][j], angles[j]);
+        const C = pt(fracAt[o][j + 1], angles[j + 1]);
+        const D = pt(fracAt[o][j], angles[j]);
 
-        // no anel de dentro A e B colapsam no ponto de impacto: a célula é um
-        // triângulo. `raw` é o contorno EM ORDEM, que é o que o arredondamento
-        // e a extrusão percorrem.
+        // na peça que encosta no impacto A e B colapsam no mesmo ponto: a
+        // célula é um triângulo. `raw` é o contorno EM ORDEM, que é o que o
+        // arredondamento e a extrusão percorrem.
         const raw = i === 0 ? [A, D, C] : [A, D, C, B];
 
         // centroide do polígono ORIGINAL: é dele que o outset se afasta, e ele
@@ -199,7 +221,11 @@ export class Shatter {
         const span = raw.reduce((s, p) => s + Math.hypot(p.x - rx, p.y - ry), 0) / raw.length;
         const out = Math.min(SHATTER.outset, span * 0.25);
 
-        const poly = roundPoly(raw, SHATTER.corner, SHATTER.cornerSegs).map((p) => {
+        // raio de canto próprio: umas peças saem em navalha, outras levemente
+        // gastas (ver SHATTER.cornerVary)
+        const cr = SHATTER.corner * (1 + (rand() - 0.5) * SHATTER.cornerVary);
+
+        const poly = roundPoly(raw, cr, SHATTER.cornerSegs).map((p) => {
           const dx = p.x - rx;
           const dy = p.y - ry;
           const l = Math.hypot(dx, dy) || 1e-6;
@@ -280,7 +306,6 @@ export class Shatter {
           jig: 0.6 + rand() * 0.8,
           phase: rand() * Math.PI * 2,
           keep: false,     // decidido logo abaixo
-          side: false,
           bu: 0, bv: 0,
           settled: { x: 0, y: 0, z: 0 },
           settledRot: { x: 0, y: 0, z: 0 },
@@ -307,42 +332,27 @@ export class Shatter {
   // tela. O resto apaga durante o voo.
   //
   // A escolha é por sorteio com chave determinística, e não pelos N primeiros
-  // do laço: os N primeiros seriam todos do anel de dentro, e a moldura sairia
-  // feita só das lascas pequenas do miolo.
+  // do laço: os N primeiros seriam todos do anel de dentro, e o cabeçalho
+  // sairia feito só das lascas pequenas do miolo.
   private pickBorder(rand: () => number) {
     const order = this.shards
       .map((_, i) => ({ i, key: rand() }))
       .sort((p, q) => p.key - q.key)
       .slice(0, Math.min(BORDER.keep, this.shards.length));
 
-    const [tv0, tv1] = BORDER.topBand;
-    const [su0, su1] = BORDER.sideBand;
-    const [sv0, sv1] = BORDER.sideSpan;
-    const nTop = Math.min(BORDER.topCount, order.length);
-    const perSide = Math.max(1, Math.ceil((order.length - nTop) / 2));
+    const [v0, v1] = BORDER.topBand;
+    const n = order.length;
 
-    order.forEach(({ i }, n) => {
+    order.forEach(({ i }, k) => {
       const s = this.shards[i];
       s.keep = true;
 
-      // distribuição em fatias iguais + um empurrão aleatório dentro da fatia:
-      // regular o bastante pra cobrir a faixa toda, bagunçado o bastante pra
-      // não ler como régua
-      const jog = (k: number, total: number) =>
-        (k + 0.5 + (rand() - 0.5) * BORDER.wander) / total;
-
-      if (n < nTop) {
-        s.side = false;
-        s.bu = -1 + 2 * jog(n, nTop);
-        s.bv = tv0 + (tv1 - tv0) * rand();
-      } else {
-        // alterna direita/esquerda pra os dois lados encherem juntos, mesmo se
-        // a conta não fechar redonda
-        const k = n - nTop;
-        s.side = true;
-        s.bu = (k % 2 === 0 ? 1 : -1) * (su0 + (su1 - su0) * rand());
-        s.bv = sv1 - (sv1 - sv0) * jog(Math.floor(k / 2), perSide);
-      }
+      // Fatias iguais na largura + um empurrão aleatório dentro da fatia:
+      // regular o bastante pra cobrir a faixa inteira sem deixar um vão óbvio,
+      // bagunçado o bastante pra não ler como régua. Sorteio puro no lugar
+      // disto amontoaria peças num canto e esvaziaria outro.
+      s.bu = -1 + 2 * ((k + 0.5 + (rand() - 0.5) * BORDER.wander) / n);
+      s.bv = v0 + (v1 - v0) * rand();
 
       s.settledRot = {
         x: (rand() - 0.5) * BORDER.spin,
@@ -368,19 +378,13 @@ export class Shatter {
     }
   }
 
-  // Converte a moldura de coordenadas de tela para unidades de mundo. Só dá pra
+  // Converte a faixa de coordenadas de tela para unidades de mundo. Só dá pra
   // fazer isto quando se sabe onde a câmera vai parar — por isso é um método, e
   // não uma conta no init.
-  //
-  // `sidePush` empurra só os cacos laterais mais pra fora. Numa tela larga há
-  // margem de sobra entre a coluna de texto e a beirada, e ele vale zero; num
-  // celular não há margem nenhuma, e sem o empurrão o vidro ficaria bem debaixo
-  // das palavras.
-  layoutBorder(halfW: number, halfH: number, sidePush = 0) {
+  layoutBorder(halfW: number, halfH: number) {
     for (const s of this.shards) {
       if (!s.keep) continue;
-      const u = s.side ? Math.sign(s.bu) * (Math.abs(s.bu) + sidePush) : s.bu;
-      s.settled.x = u * halfW;
+      s.settled.x = s.bu * halfW;
       s.settled.y = s.bv * halfH;
     }
   }

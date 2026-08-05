@@ -25,7 +25,21 @@ const skills = [
        mix-blend-mode da .intro só enxergaria o próprio .overlay (vazio) em vez
        da cena. Aqui na raiz ela mistura com o canvas. -->
   <p class="intro" data-intro>
-    <a href="#about" class="name">Carlos Leonardo</a> is a developer from Brazil.
+    <!-- o aria-label fixa o nome acessível: o hover (e o Tab) trocam o texto por
+         ruído por meio segundo, e sem ele um leitor de tela leria o ruído -->
+    <a href="#about" class="name" data-scramble aria-label="Carlos Leonardo">Carlos Leonardo</a> is a developer from Brazil.
+  </p>
+
+  <!-- Os dois cantos do topo. Ficam fora do .overlay pelo mesmo motivo do
+       .intro: precisam do mix-blend-mode enxergando o canvas, não o overlay.
+       O conteúdo dos dois é preenchido no cliente (scripts/hud.ts) — vazios no
+       HTML de propósito, já que hora e frase são estado de agora, não de build. -->
+  <p class="hud clock" data-hud>
+    <span data-clock-time></span><span class="clock-place">, <span class="hot" data-scramble>Curitiba</span></span>
+  </p>
+
+  <p class="hud quote" data-hud>
+    <span data-quote></span>
   </p>
 
   <!-- camada 2D sobreposta -->
@@ -65,12 +79,13 @@ const skills = [
 
        Nada aqui tem fundo próprio, e essa ausência é o efeito: o branco do
        <body> já é o papel, então o canvas fica visível por baixo do painel
-       inteiro e os cacos que sobraram da quebra emolduram o texto — em cima e
-       nas duas laterais. Pôr um fundo em qualquer um destes blocos taparia a
-       moldura.
+       inteiro e os cacos que sobraram da quebra formam o cabeçalho, no alto.
+       Pôr um fundo em qualquer um destes blocos taparia o vidro.
 
-       .about-well é só o respiro do topo: o espaço onde os cacos de cima ficam,
-       acima da primeira linha de texto. -->
+       .about-well é o respiro do topo: o espaço onde os cacos ficam, acima da
+       primeira linha de texto. É ele que garante que o texto NUNCA seja lido
+       por cima de um pedaço de foto — os cacos param em v ≥ 0.52 (BORDER.topBand),
+       que na tela é o quarto superior, e o poço é mais alto do que isso. -->
   <section class="about" data-about hidden>
     <div class="about-well" aria-hidden="true"></div>
 
@@ -131,7 +146,11 @@ const skills = [
 <script>
   import { bootstrap } from '../scripts/main';
   import { initUI } from '../scripts/ui';
+  import { initHud } from '../scripts/hud';
+  import { initScramble } from '../scripts/scramble';
   initUI();
+  initHud();
+  initScramble();
   bootstrap();
 </script>
 
@@ -243,6 +262,85 @@ const skills = [
     text-decoration: underline;
     text-underline-offset: 2px;
     pointer-events: auto;
+  }
+
+  /* ——— cantos do topo: hora à esquerda, frase à direita ———
+     Mesmo truque de legibilidade do .intro (difference sobre o canvas) e mesma
+     entrada: nascem apagados e só acendem quando o main.ts põe .is-in, com a
+     cena já parada. Sem is-in eles simplesmente não existem na tela — que é o
+     comportamento certo se o JS não rodar, já que estariam vazios. */
+  .hud {
+    position: fixed;
+    top: 2rem;
+    z-index: 4;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    color: #fff;
+    mix-blend-mode: difference;
+    pointer-events: none;
+
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.9s ease, transform 0.9s ease;
+  }
+  .hud.is-in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .clock {
+    left: 2rem;
+    letter-spacing: 0.06em;
+    /* dígitos de mesma largura: a virada do minuto não empurra o ", Curitiba" */
+    font-variant-numeric: tabular-nums;
+  }
+  .clock-place {
+    color: inherit;
+    opacity: 0.62;
+  }
+
+  .quote {
+    right: 2rem;
+    max-width: min(26ch, 26vw);
+    text-align: right;
+    font-family: "Playfair Display", Georgia, serif;
+    font-style: italic;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  /* o crossfade da troca mora no span de dentro; a opacidade de fora é da
+     entrada, e misturar as duas faria uma cancelar a outra.
+     inline-block (e não block) porque a caixa precisa encolher até o texto: em
+     block ela ocuparia a max-width inteira e sobraria uma área invisível
+     capturando ponteiro em cima do canvas, onde se arrasta o carrossel. */
+  .quote span {
+    display: inline-block;
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .quote span.is-out {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  /* ——— hover de decifração ———
+     Os alvos precisam voltar a capturar ponteiro (o .hud inteiro é furado a
+     clique), e só onde existe ponteiro de verdade: em touch isto seria só uma
+     área morta sobre o canvas. O inline-block é o que deixa o script travar a
+     largura da caixa enquanto o texto é ruído — ver scripts/scramble.ts. */
+  @media (hover: hover) {
+    .clock .hot,
+    .quote span {
+      pointer-events: auto;
+    }
+  }
+  .is-scrambling {
+    display: inline-block;
+    /* a largura está travada e os glifos sorteados podem ser mais largos que a
+       letra que substituem; sem isto, uma linha vazaria a caixa por um frame */
+    overflow: hidden;
+  }
+  .clock .hot {
+    cursor: default;
   }
 
   /* h1 invisível mas acessível (a versão visual é o texto 3D no canvas) */
@@ -381,6 +479,7 @@ const skills = [
      não do global.css) por causa do .intro.is-in logo acima: no escopo do Astro
      estas regras ganham o atributo de escopo e passam à frente dele. */
   body.is-diving .intro.is-in,
+  body.is-diving .hud.is-in,
   body.is-diving .card,
   body.is-diving .mode,
   body.is-diving .cursor {
@@ -396,11 +495,13 @@ const skills = [
     position: relative;
     z-index: 5;
     /* SEM fundo, aqui e na .about-sheet: o branco do <body> já é o papel, e
-       qualquer fundo neste caminho taparia a moldura de cacos no canvas. */
+       qualquer fundo neste caminho taparia o cabeçalho de cacos no canvas. */
     background: transparent;
 
-    /* respiro do topo: a faixa onde os cacos de cima ficam. Casa com
-       BORDER.topBand, que os põe acima de 55% da meia-altura da tela. */
+    /* respiro do topo: a faixa onde os cacos ficam. Casa com BORDER.topBand,
+       que os põe acima de 52% da meia-altura da tela — ou seja, dentro do
+       quarto superior. Encurtar isto joga a primeira linha de texto pra dentro
+       do vidro. */
     --about-well-h: clamp(150px, 34svh, 340px);
   }
   .about[hidden] {
@@ -598,6 +699,24 @@ const skills = [
       width: 48px;
       height: 48px;
     }
+
+    /* No celular o topo é do .intro, que pode quebrar em duas linhas: hora e
+       frase descem para a faixa logo acima do card e do toggle. Ancorados por
+       'bottom', as linhas extras da frase crescem para cima e nunca empurram
+       nada em cima do card. */
+    .hud {
+      top: auto;
+      bottom: calc(5.4rem + env(safe-area-inset-bottom));
+    }
+    .clock {
+      left: 1rem;
+      font-size: 0.72rem;
+    }
+    .quote {
+      right: 1rem;
+      max-width: 56vw;
+      font-size: 0.85rem;
+    }
   }
 
   /* paisagem baixa (celular deitado): comprime os respiros verticais */
@@ -605,5 +724,12 @@ const skills = [
     .bg-portfolio { padding-top: 1.2rem; }
     .intro { top: 0.8rem; }
     .card, .mode { bottom: 1rem; }
+  }
+  /* ...e o mesmo para os cantos, só na faixa larga: abaixo de 700px eles já
+     estão ancorados embaixo pela regra acima, e mexer no 'top' aqui os traria
+     de volta pro topo no meio da tela deitada */
+  @media (max-height: 480px) and (min-width: 701px) {
+    .hud { top: 0.8rem; }
+    .quote { max-width: min(26ch, 22vw); font-size: 0.9rem; }
   }
 </style>

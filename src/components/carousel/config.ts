@@ -74,6 +74,11 @@ export const BACKDROP = {
   // trecho final, quando a câmera nivela — então é ali que faz sentido acender,
   // senão o fade acontece todo com ela invisível e a chegada vira um corte.
   fade: [0.6, 1],
+  // Teto da largura, como fração do que a câmera enxerga NAQUELA profundidade.
+  // A medida acima é fixa em unidades de mundo, e em retrato a janela visível lá
+  // no fundo encolhe para quase metade — a palavra saía pelos dois lados. Isto
+  // só aperta quando não cabe: em tela larga a conta dá 1 e nada muda.
+  maxWidthFrac: 0.94,
 };
 
 // --- abertura do About: mergulho da câmera + estilhaçamento da foto ---
@@ -100,10 +105,25 @@ export const SHATTER = {
   // a fronteira de cada anel é uma poligonal ondulada: o raio é sorteado por
   // ÂNGULO, e as células vizinhas compartilham esses cantos — o ladrilhamento
   // continua exato e o aro some.
-  rings: 5,
-  sectors: 13,      // primo: evita que setores se alinhem com os anéis
+  rings: 6,
+  sectors: 17,      // primo: evita que setores se alinhem com os anéis
   jitter: 0.9,      // ondulação da fronteira de cada anel
   ringWander: 0.5,  // o quanto os anéis-base fogem do espaçamento regular
+
+  // Chance de uma fronteira de anel NÃO propagar num setor — as duas células
+  // dos dois lados dela viram uma peça só.
+  //
+  // É o que faltava pros cacos parecerem cacos. Com todas as fronteiras
+  // inteiras, toda peça tem exatamente um anel de comprimento: 65 quadriláteros
+  // de mesma ordem de tamanho, e nenhuma lasca comprida. Aqui a trinca às vezes
+  // morre no meio do caminho, e o resultado é o que se vê num para-brisa de
+  // verdade — cunhas longas do impacto até a borda ao lado de estilhaços curtos,
+  // e junções em T onde a trinca de um setor bate na peça inteira do vizinho.
+  //
+  // O ladrilhamento continua EXATO: a fronteira que some é uma corda inteira
+  // DENTRO de um setor, e as duas arestas laterais da peça seguem nos mesmos
+  // raios de antes. O vizinho nem fica sabendo.
+  weld: 0.42,
 
   // Espessura do vidro. Os cacos eram planos de uma face só — daí lerem como
   // adesivo, e não como caco. Agora são prismas: a extrusão vai toda pra TRÁS,
@@ -112,15 +132,19 @@ export const SHATTER = {
   // troca daria um pulinho de paralaxe.
   thickness: 0.05,
 
-  // Arredondamento dos cantos. Canto vivo é o que faz a quebra parecer bruta —
-  // e, de perto, denuncia o polígono. O raio é limitado pelo tamanho de cada
-  // caco (ver roundPoly), então as lascas pequenas arredondam menos em vez de
-  // colapsarem. Como os cantos recuam, os cacos deixam de ladrilhar a foto com
-  // exatidão: sobram frestas finas onde três ou quatro peças se encontram, e é
-  // isso que se vê no instante da troca — trincas, que é justamente o que
-  // deveria estar ali.
-  corner: 0.055,
-  cornerSegs: 3,
+  // Arredondamento dos cantos — agora um alívio, não um chanfro.
+  //
+  // Em 0.055 o raio dava uns 30px na tela com a foto cheia, e o resultado era
+  // um monte de seixo: vidro quebrado tem BICO. O que sobra aqui é o mínimo pra
+  // o canto não virar um degrau serrilhado de um pixel na diagonal.
+  //
+  // O raio é limitado pelo tamanho de cada caco (ver roundPoly), então as
+  // lascas finas arredondam menos em vez de colapsarem, e `cornerVary` ainda
+  // sorteia o raio por peça: umas saem em navalha, outras levemente gastas —
+  // um raio idêntico em todas volta a ler como acabamento de fábrica.
+  corner: 0.015,
+  cornerVary: 0.8,
+  cornerSegs: 2,
 
   // Compensação do arredondamento. Os cantos recuam, e com stagger de 0.32 os
   // cacos de fora passam uns 16 frames parados no lugar antes de sair — tempo
@@ -129,7 +153,10 @@ export const SHATTER = {
   // instante da troca elas ainda estão opacas, então sobreposição não se vê,
   // enquanto buraco se vê. Os pontos são grampeados ao retângulo da foto, pra
   // a silhueta de fora continuar reta e a textura não borrar além da borda.
-  outset: 0.04,
+  // Acompanha o `corner`: é ele que diz quanto os cantos recuaram, e com o
+  // arredondamento quase zerado sobrou pouco a devolver — manter os 0.04 de
+  // antes engordaria cada peça sem motivo e engoliria as lascas finas.
+  outset: 0.015,
 
   // Opacidade do vidro DEPOIS de quebrar. No instante da troca eles valem 1,
   // porque ali precisam bater pixel a pixel com a foto opaca que substituem;
@@ -147,20 +174,26 @@ export const SHATTER = {
   stagger: 0.32,    // atraso do centro até a borda (a trinca se propaga)
 };
 
-// Onde os cacos param: uma MOLDURA. Poucos pedaços, jogados em cima e nas duas
-// laterais, com o texto passando no meio.
+// Onde os cacos param: uma FAIXA no alto, que vira o cabeçalho da página.
+//
+// Antes eles também emolduravam os dois lados do texto, e era ali que o efeito
+// se voltava contra a página: o painel do About não tem fundo de propósito
+// (para o vidro aparecer por trás), então caco lateral significa parágrafo
+// lendo-se em cima de pedaço de foto. No celular, onde a coluna de texto ocupa
+// a largura inteira, não havia margem nenhuma pra onde empurrá-los. Só o alto:
+// o vidro é cabeçalho, o texto corre em papel limpo.
 //
 // As posições são normalizadas (-1..1) sobre o retângulo visível no plano do
 // vidro, e só viram unidades de mundo quando a câmera assenta — é assim que a
-// borda encosta na beirada da tela em qualquer proporção, do celular ao
+// faixa encosta na beirada da tela em qualquer proporção, do celular ao
 // monitor largo, sem uma constante chutada por breakpoint.
 export const BORDER = {
-  keep: 26,               // quantos cacos sobram na moldura
-  topCount: 12,           // destes, quantos vão pra faixa de cima
-  topBand: [0.55, 1.12],  // v da faixa de cima (>1 = meio pra fora da tela)
-  sideBand: [0.84, 1.12], // |u| das laterais
-  sideSpan: [-0.4, 0.7],  // v que as laterais cobrem
-  wander: 0.5,            // bagunça na distribuição ao longo de cada faixa
+  keep: 14,               // quantos cacos sobram no cabeçalho
+  // v que a faixa cobre. O topo passa de 1 de propósito: as peças de cima
+  // sangram pela borda em vez de pararem alinhadas nela — mas por pouco, senão
+  // são peças gastas fora do quadro.
+  topBand: [0.52, 1.02],
+  wander: 0.5,            // bagunça na distribuição ao longo da faixa
   spin: 0.5,              // rotação em repouso, em radianos
   depth: 0.35,            // desencontro em Z (cada peça pega a luz diferente)
   dur: 1.05,              // tempo de voar da quebra até a moldura

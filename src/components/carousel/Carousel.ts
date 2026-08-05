@@ -13,9 +13,11 @@ import {
   makeRibbonGeometry, captureRest, bendRibbon, ribbonPose, placeOnRibbon,
   type RibbonRest,
 } from './Ribbon';
-import { SECTIONS, RADIUS, HEIGHT, REFLECT, CAM, BASE_ASPECT, LABEL, SEG_ANGLE, SHATTER } from './config';
+import {
+  SECTIONS, RADIUS, HEIGHT, REFLECT, CAM, BASE_ASPECT, LABEL, SEG_ANGLE, SHATTER, ABOUT,
+} from './config';
 
-const ABOUT = SECTIONS.findIndex((s) => s.id === 'about');
+const ABOUT_INDEX = SECTIONS.findIndex((s) => s.id === 'about');
 
 const TAU = Math.PI * 2;
 // menor ângulo equivalente, em (-π, π]. É o que embrulha a fita: o segmento que
@@ -42,6 +44,7 @@ export class Carousel {
   private shatter = new Shatter();     // a foto do About quebrando em cacos de vidro
   private inAbout = false;             // abertura do About em curso ou aberta
   private shattered = false;           // cena já apagada: o loop para de mexer nela
+  private idle = false;                // mosaico rolou pra fora: nada a desenhar
 
   private morph = 0;                 // 0 = anel, 1 = fita (tweenado por GSAP)
   private lastK = NaN;               // última curvatura dobrada (evita redobrar à toa)
@@ -129,7 +132,7 @@ export class Carousel {
 
     // os cacos usam a MESMA textura da foto do About (rotação já aplicada pelo
     // Segment), então a troca foto→vidro no instante do impacto não pisca
-    this.shatter.init(textures[ABOUT]);
+    this.shatter.init(textures[ABOUT_INDEX]);
     this.scene.add(this.shatter.group);
 
     this.layout();  // pose inicial (anel)
@@ -229,69 +232,229 @@ export class Carousel {
   // lerp no update(), e esse rastro deixaria a foto alguns graus torta bem na
   // hora do mergulho — de perto, isso é a diferença entre bater de frente no
   // vidro e raspar nele de lado.
-  private faceSection(i: number): Promise<void> {
+  private alignGoal(i: number): number {
     const n = SECTIONS.length;
     const m0 = Math.round((this.input.target + SEG_ANGLE / 2) / SEG_ANGLE);
     // a seção i fica de frente quando m ≡ -i (mod n); pega o representante mais
     // próximo do m atual pra girar o mínimo, e não dar a volta inteira
     let m = m0 + ((((-i - m0) % n) + n) % n);
     if (m - m0 > n / 2) m -= n;
-
-    gsap.killTweensOf(this.input);
-    const goal = m * SEG_ANGLE - SEG_ANGLE / 2;
-    return gsap.to(this.input, {
-      target: goal,
-      current: goal,
-      duration: SHATTER.alignDur,
-      ease: 'power3.inOut',
-    }).then(() => {});
+    return m * SEG_ANGLE - SEG_ANGLE / 2;
   }
 
-  // A abertura do About: alinha a foto, mergulha nela, troca a foto pelos cacos
-  // e os estoura. Resolve quando o último caco sai de quadro — a partir dali a
-  // cena está vazia e o branco da página é tudo que sobra na tela.
-  async enterAbout() {
-    if (this.inAbout) return;
+  // A abertura do About, inteira, numa timeline só: alinha a foto, mergulha
+  // nela, troca a foto pelos cacos, os cacos se abrem e assentam no mosaico do
+  // cabeçalho — e no meio disso a câmera já começou a recuar e descer.
+  //
+  // Devolve a timeline em vez de uma Promise, com o label 'descent' marcando o
+  // instante em que a descida começa. Esse label é o CONTRATO com o main.ts:
+  // é lá que ele pendura a subida do painel HTML, e por isso os dois se movem
+  // no mesmo relógio, com o mesmo ease, sem um esperar o outro. A cena continua
+  // sem saber que existe um About em HTML.
+  enterAbout(): gsap.core.Timeline {
+    const tl = gsap.timeline();
+    if (this.inAbout) return tl;
     this.inAbout = true;
     this.input.enabled = false;         // o carrossel para de responder ao gesto
 
-    await this.faceSection(ABOUT);
-    await gsap.to(this.rig, { dive: 1, duration: SHATTER.diveDur, ease: 'power2.inOut' });
+    // O alinhamento só entra se houver o que alinhar. Antes ele custava
+    // SHATTER.alignDur sempre — inclusive no caso comum, que é clicar na foto
+    // que JÁ está de frente. Meio segundo parado bem no começo da coreografia.
+    gsap.killTweensOf(this.input);
+    const goal = this.alignGoal(ABOUT_INDEX);
+    if (Math.abs(goal - this.input.target) > 0.01) {
+      tl.to(this.input, {
+        target: goal, current: goal,
+        duration: SHATTER.alignDur, ease: 'power3.inOut',
+      });
+    }
 
-    // A essa altura a foto do About cobre a tela inteira, então apagar TODO o
-    // resto da cena aqui é invisível — e é o que garante que, quando o vidro
-    // quebrar, atrás dele não haja carrossel nenhum, só o branco.
-    this.shattered = true;   // trava o layout(): daqui em diante ele reacenderia tudo
-    this.setSceneVisible(false);
-    await this.shatter.play();
+    tl.to(this.rig, { dive: 1, duration: SHATTER.diveDur, ease: 'power2.inOut' });
+
+    // Callbacks de GSAP disparam nos DOIS sentidos, então o estado vem de
+    // tl.reversed() em vez de ser fixo: no fechar, estes mesmos pontos repõem
+    // a cena em vez de apagá-la de novo.
+    tl.call(() => this.setShattered(!tl.reversed()));
+
+    // Estas duas ANTES de montar a timeline dos cacos, e não num tl.call: o
+    // burstAndSettle lê a pose de repouso de cada caco na hora de MONTAR os
+    // tweens, não na hora de tocá-los. Num callback, ela ainda não existiria.
+    // A curvatura é lida aqui (e não no init) porque o botão curvo/reto pode
+    // ter mexido nela desde então.
+    this.shatter.layoutRest(1 - this.morph);
+    this.syncFrame();
+
+    tl.add(this.shatter.burstAndSettle(), 'burst');
+
+    // A troca foto↔cacos, no label 'burst' — o único instante em que os cacos
+    // estão TODOS na pose de repouso, ou seja, sobrepostos exatamente à foto.
+    // Instantânea porque os cacos são uma cópia pixel a pixel dela: qualquer
+    // sobreposição mostra as duas imagens, e qualquer folga mostra o buraco.
+    tl.call(() => this.swapToShards(!tl.reversed()), undefined, 'burst');
+
+    // O RESTO do anel apaga junto com a quebra — fotos vizinhas, labels,
+    // reflexos, o PORTFOLIO do fundo. Antes ele era desligado de estalo, e dava
+    // pra fazer isso porque a câmera entrava na foto e ela tapava a tela
+    // inteira; agora que ela para longe, as vizinhas aparecem nas beiradas e um
+    // corte ali seria visível. A foto do About fica de fora desta lista: nela o
+    // fade é justamente o defeito, não a solução.
+    this.addRingFade(tl, 'burst');
+
+    // Aqui mora o fim da pausa: a descida parte com o vidro ainda voando.
+    tl.addLabel('descent', `burst+=${ABOUT.overlap}`);
+    tl.to(this.rig, {
+      descent: 1,
+      duration: ABOUT.descentDur,
+      ease: ABOUT.descentEase,
+    }, 'descent');
+
+    return tl;
   }
 
   // Entrada direta em /#about (link compartilhado): põe a cena no estado final
-  // sem coreografia nenhuma. Mergulhar e quebrar aqui seria teatro vazio — o
+  // sem coreografia nenhuma. Aproximar e quebrar aqui seria teatro vazio — o
   // visitante não viu a foto inteira antes, então não há o que quebrar pra ele.
+  // Mas a moldura precisa ESTAR lá: ela é o enquadramento da página.
   enterAboutInstant() {
     if (this.inAbout) return;
     this.inAbout = true;
-    this.shattered = true;
     this.input.enabled = false;
     this.rig.dive = 1;
+    this.rig.descent = 1;
+    this.shattered = true;
     this.setSceneVisible(false);
+    this.shatter.layoutRest(1 - this.morph);
+    this.syncFrame();
+    this.swapToShards(true);
+    this.shatter.snapToBorder();
   }
 
-  // volta do About pro carrossel: repõe a cena e a câmera recua de dentro da foto
-  async exitAbout() {
+  // Apaga (ou reacende) fotos, reflexos, labels e o PORTFOLIO do fundo.
+  //
+  // As fotos nascem OPACAS de propósito: é isso que as mantém na lista opaca do
+  // three e, com ela, dentro do buffer que o vidro das labels refrata. Virar
+  // `transparent` só durante o apagamento não custa recompilação — o three não
+  // põe esse flag na chave do cache de programas (só muda em que balde o objeto
+  // é desenhado) — e depois o flag volta ao normal no reverse.
+  private addRingFade(tl: gsap.core.Timeline, at: string | number) {
+    // a foto do About e o reflexo dela ficam de fora: quem cuida deles é o
+    // swapToShards, de uma vez só
+    const mats: THREE.Material[] = [
+      ...this.segments.filter((_, i) => i !== ABOUT_INDEX).map((s) => s.mesh.material as THREE.Material),
+      ...this.reflMeshes.filter((_, i) => i !== ABOUT_INDEX).map((m) => m.material as THREE.Material),
+      ...this.labels.meshes.map((m) => m.material as THREE.Material),
+      this.backdrop.mesh.material as THREE.Material,
+    ];
+
+    const wasTransparent = mats.map((m) => m.transparent);
+
+    tl.call(() => {
+      const out = !tl.reversed();
+      mats.forEach((m, i) => { m.transparent = out ? true : wasTransparent[i]; });
+    }, undefined, at);
+
+    for (const m of mats) {
+      tl.to(m, { opacity: 0, duration: ABOUT.fadeDur, ease: 'power2.in' }, at);
+    }
+
+    // no fim do apagamento a cena sai de cena de vez: labels com transmission
+    // custam caro demais pra ficarem sendo desenhadas a zero de opacidade
+    tl.call(() => this.setSceneVisible(tl.reversed()), undefined, `${at}+=${ABOUT.fadeDur}`);
+  }
+
+  // Reenquadra a moldura: converte as poses normalizadas dos cacos em unidades
+  // de mundo pela pose final da câmera. Chamado na abertura e a cada resize.
+  syncFrame() {
+    const { w, h } = this.rig.frameHalf;
+    // Numa tela larga sobra margem entre a coluna de texto e a beirada, e os
+    // cacos laterais cabem ali sem encostar nas palavras. Num celular não sobra
+    // nada, então eles são empurrados pra fora até quase sair de quadro — meio
+    // caco espiando pela borda lê melhor do que um caco inteiro sob o texto.
+    const aspect = window.innerWidth / window.innerHeight;
+    const push = THREE.MathUtils.clamp((1.15 - aspect) * 0.35, 0, 0.2);
+    this.shatter.layoutBorder(w, h, push);
+  }
+
+  // Volta do About pro carrossel.
+  //
+  // No caminho normal quem desfaz câmera e cacos é o .reverse() da timeline lá
+  // no main.ts, e aqui só sobra repor o estado — daí o `animate` nascer false.
+  // Ele existe pro caso sem timeline: quem entrou por /#about nunca teve
+  // coreografia de ida, mas ainda assim merece uma de volta, senão o carrossel
+  // aparece de estalo.
+  async exitAbout(animate = false) {
     if (!this.inAbout) return;
+
+    if (animate) {
+      // a moldura apaga enquanto a câmera volta pro ponto da quebra —
+      // descent vai de 1 a 0, e a opacidade acompanha
+      await gsap.to(this.rig, {
+        descent: 0,
+        duration: ABOUT.descentDur * 0.8,
+        ease: ABOUT.descentEase,
+        onUpdate: () => this.shatter.setScroll(0, this.rig.descent),
+      });
+      // a foto inteira volta ao lugar e a câmera recua dela
+      this.shatter.reset();
+      this.setShattered(false);
+      await gsap.to(this.rig, {
+        dive: 0,
+        duration: SHATTER.diveDur,
+        ease: 'power2.inOut',
+      });
+    }
+
     this.shatter.reset();
-    this.shattered = false;
-    this.setSceneVisible(true);
-    await gsap.to(this.rig, { dive: 0, duration: SHATTER.diveDur * 0.9, ease: 'power2.inOut' });
+    this.setShattered(false);
+    this.rig.dive = 0;
+    this.rig.descent = 0;
+    this.idle = false;
     this.input.enabled = true;
     this.inAbout = false;
   }
 
-  // liga/desliga tudo que não são os cacos (fotos, reflexos, labels, backdrop)
+  // A moldura rolando junto com a página, e apagando ao sair de cena. Quando
+  // apaga de vez, para de renderizar: são ~50 cacos com clearcoat desenhados a
+  // 60fps atrás de uma página que a pessoa está lendo.
+  setBorderScroll(px: number) {
+    if (!this.inAbout) return;
+    const t = px / window.innerHeight;
+    const o = 1 - THREE.MathUtils.smoothstep(t, ABOUT.fadeOut, 1);
+    this.shatter.setScroll(this.rig.pxToWorld(px * ABOUT.parallax), o);
+    this.idle = o <= 0.001;
+  }
+
+  // O flag que trava o layout(), que senão reacenderia labels e reflexos no
+  // frame seguinte (ver Labels.setFacing). Quem apaga a cena de fato é o
+  // addRingFade; aqui só o caminho de volta precisa repor tudo de uma vez.
+  private setShattered(on: boolean) {
+    this.shattered = on;
+    if (!on) {
+      this.setSceneVisible(true);
+      this.swapToShards(false);
+    }
+  }
+
+  // Foto do About ↔ cacos: um OU outro, nunca os dois, nunca nenhum.
+  //
+  // Os cacos ladrilham a foto exatamente, com a mesma textura e o mesmo brilho.
+  // Enquanto ela participava do fade do resto do anel, isso dava os dois
+  // defeitos simétricos: na ida os cacos saíam voando e a foto seguia lá,
+  // apagando por baixo deles; na volta ela reaparecia inteira, subindo de
+  // opacidade, com os cacos ainda a meio caminho de casa. Um fade é a coisa
+  // certa para o que os cacos não substituem, e a coisa errada para o que eles
+  // substituem.
+  private swapToShards(on: boolean) {
+    this.segments[ABOUT_INDEX].mesh.visible = !on;
+    this.reflMeshes[ABOUT_INDEX].visible = !on;
+    this.shatter.group.visible = on;
+  }
+
+  // Liga/desliga a cena — MENOS a foto do About, que é do swapToShards. Se ela
+  // entrasse aqui, o reacendimento no meio do caminho de volta traria a imagem
+  // inteira de volta antes de os cacos chegarem.
   private setSceneVisible(v: boolean) {
-    for (const s of this.segments) s.mesh.visible = v;
+    this.segments.forEach((s, i) => { if (i !== ABOUT_INDEX) s.mesh.visible = v; });
     this.reflect.visible = v;
     this.backdrop.mesh.visible = v;
     for (const m of this.labels.meshes) m.visible = v;
@@ -361,6 +524,11 @@ export class Carousel {
     }
 
     this.rig.update(dt, this.viewRadius);  // entrada + parallax; único a mexer na câmera
+
+    // O lenis.raf lá em cima é inegociável — é ele que rola a página, então o
+    // corte por ociosidade vem só AQUI, depois dele. Cortar antes travaria a
+    // rolagem do About junto com o desenho.
+    if (this.idle) return;
     this.renderer.render(this.scene, this.camera);
   };
 }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAM, PARALLAX_AMP, PARALLAX_EASE, RADIUS, SHATTER } from './config';
+import { ABOUT, CAM, PARALLAX_AMP, PARALLAX_EASE, RADIUS, SHATTER } from './config';
 
 // Dono ÚNICO da pose da câmera.
 //
@@ -22,10 +22,18 @@ const easeInOutCubic = (t: number) =>
   (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 export class CameraRig {
-  // Mergulho na foto da frente: 0 = pose lateral normal, 1 = colado nela.
+  // Aproximação da foto da frente: 0 = pose lateral normal, 1 = perto do anel.
   // Tweenado por GSAP (ver Carousel.enterAbout) — ao contrário da entrada, aqui
   // um engasgo de frame não estraga nada, porque não há cortina esperando.
+  // Ela chega PERTO e para: entrar na foto deformava a imagem, porque a essa
+  // distância a curvatura do cilindro vira distorção em vez de perspectiva.
   dive = 0;
+
+  // A descida que abre o About: 0 = no ponto da quebra, 1 = recuada até
+  // enquadrar a moldura de cacos. Só recuo, sem inclinar e sem escorregar: o
+  // plano do vidro fica paralelo à tela, e é o painel HTML subindo por trás que
+  // dá a leitura de rolagem.
+  descent = 0;
 
   // 0 = de cima, olhando o anel de cara; 1 = na lateral, encarando a foto ativa.
   // Nasce em cima: assim o primeiro frame desenhado JÁ é a vista de topo, e a
@@ -48,6 +56,22 @@ export class CameraRig {
   setPointer(x: number, y: number) {
     this.pointer.x = x;
     this.pointer.y = y;
+  }
+
+  // Metade do retângulo visível no plano do vidro (z = RADIUS) quando a descida
+  // termina. É a régua da moldura: o Shatter guarda as poses em -1..1 e só as
+  // converte pra mundo quando sabe onde a câmera vai parar — por isso a borda
+  // encosta na beirada da tela em qualquer proporção, sem constante por
+  // breakpoint.
+  get frameHalf(): { w: number; h: number } {
+    const h = ABOUT.frameGap * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
+    return { w: h * this.camera.aspect, h };
+  }
+
+  // Quanto vale, em unidades de mundo, um pixel de tela no plano do vidro —
+  // a conversão que faz a moldura rolar junto com a página.
+  pxToWorld(px: number): number {
+    return px * ((this.frameHalf.h * 2) / window.innerHeight);
   }
 
   // Entrada da página: a câmera desce de cima do anel até a lateral.
@@ -88,12 +112,17 @@ export class CameraRig {
 
     const height = THREE.MathUtils.lerp(CAM.top.height, CAM.side.height, p) * (1 - this.dive);
 
-    // a distância lateral colapsa até quase encostar na face frontal da fita
-    // (z = RADIUS), que é onde a foto ativa está
+    // a distância lateral encolhe até chegar perto da face frontal da fita
+    // (z = RADIUS), que é onde a foto ativa está; depois a descida recua dali
+    // até enquadrar a moldura
     const radius = THREE.MathUtils.lerp(
-      THREE.MathUtils.lerp(CAM.top.radius, viewRadius, p),
-      RADIUS + SHATTER.gap,
-      this.dive,
+      THREE.MathUtils.lerp(
+        THREE.MathUtils.lerp(CAM.top.radius, viewRadius, p),
+        RADIUS + SHATTER.approach,
+        this.dive,
+      ),
+      RADIUS + ABOUT.frameGap,
+      this.descent,
     );
 
     // sinais invertidos: mover a câmera pro lado oposto faz a cena "seguir" o mouse

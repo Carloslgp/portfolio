@@ -146,6 +146,7 @@ export class Carousel {
     });
 
     this.updateViewRadius();
+    this.backdrop.fit(this.camera, this.viewRadius);   // depende do viewRadius: vem depois
 
     window.addEventListener('resize', this.onResize);
     window.addEventListener('pointermove', (e) => {
@@ -362,17 +363,16 @@ export class Carousel {
     tl.call(() => this.setSceneVisible(tl.reversed()), undefined, `${at}+=${ABOUT.fadeDur}`);
   }
 
-  // Reenquadra a moldura: converte as poses normalizadas dos cacos em unidades
-  // de mundo pela pose final da câmera. Chamado na abertura e a cada resize.
+  // Reenquadra o cabeçalho de vidro: converte as poses normalizadas dos cacos
+  // em unidades de mundo pela pose final da câmera. Chamado na abertura e a
+  // cada resize.
+  //
+  // Não há mais correção por proporção aqui: com os cacos só no alto, a largura
+  // da tela deixou de ser um problema — a faixa cobre de beirada a beirada em
+  // qualquer formato, e o texto nunca passa por baixo dela.
   syncFrame() {
     const { w, h } = this.rig.frameHalf;
-    // Numa tela larga sobra margem entre a coluna de texto e a beirada, e os
-    // cacos laterais cabem ali sem encostar nas palavras. Num celular não sobra
-    // nada, então eles são empurrados pra fora até quase sair de quadro — meio
-    // caco espiando pela borda lê melhor do que um caco inteiro sob o texto.
-    const aspect = window.innerWidth / window.innerHeight;
-    const push = THREE.MathUtils.clamp((1.15 - aspect) * 0.35, 0, 0.2);
-    this.shatter.layoutBorder(w, h, push);
+    this.shatter.layoutBorder(w, h);
   }
 
   // Volta do About pro carrossel.
@@ -502,6 +502,7 @@ export class Carousel {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.updateViewRadius();
+    this.backdrop.fit(this.camera, this.viewRadius);
   };
 
   private loop = (time = 0) => {

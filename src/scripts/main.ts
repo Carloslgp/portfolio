@@ -27,8 +27,10 @@ export async function bootstrap() {
   await hideLoader();                   // cortina sai, mostrando o anel de cima
   await carousel.reveal();              // câmera desce até a foto inicial
 
-  // a linha do topo entra por último, com a cena já parada
-  document.querySelector('[data-intro]')?.classList.add('is-in');
+  // a linha do topo e os cantos (hora / frase) entram por último, com a cena já parada
+  document
+    .querySelectorAll('[data-intro], [data-hud]')
+    .forEach((el) => el.classList.add('is-in'));
 
   initAbout(carousel, lenis);
 }

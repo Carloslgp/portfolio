@@ -100,17 +100,49 @@ export const SHATTER = {
   // a fronteira de cada anel é uma poligonal ondulada: o raio é sorteado por
   // ÂNGULO, e as células vizinhas compartilham esses cantos — o ladrilhamento
   // continua exato e o aro some.
-  rings: 4,
+  rings: 5,
   sectors: 13,      // primo: evita que setores se alinhem com os anéis
-  jitter: 0.9,      // ondulação da fronteira de cada anel (era 0.42)
+  jitter: 0.9,      // ondulação da fronteira de cada anel
   ringWander: 0.5,  // o quanto os anéis-base fogem do espaçamento regular
+
+  // Espessura do vidro. Os cacos eram planos de uma face só — daí lerem como
+  // adesivo, e não como caco. Agora são prismas: a extrusão vai toda pra TRÁS,
+  // com a face da frente exatamente em z = 0, no plano onde a foto estava.
+  // Extrudar pros dois lados empurraria a face visível pra frente da foto e a
+  // troca daria um pulinho de paralaxe.
+  thickness: 0.05,
+
+  // Arredondamento dos cantos. Canto vivo é o que faz a quebra parecer bruta —
+  // e, de perto, denuncia o polígono. O raio é limitado pelo tamanho de cada
+  // caco (ver roundPoly), então as lascas pequenas arredondam menos em vez de
+  // colapsarem. Como os cantos recuam, os cacos deixam de ladrilhar a foto com
+  // exatidão: sobram frestas finas onde três ou quatro peças se encontram, e é
+  // isso que se vê no instante da troca — trincas, que é justamente o que
+  // deveria estar ali.
+  corner: 0.055,
+  cornerSegs: 3,
+
+  // Compensação do arredondamento. Os cantos recuam, e com stagger de 0.32 os
+  // cacos de fora passam uns 16 frames parados no lugar antes de sair — tempo
+  // de sobra pra se ver um furo em cada encontro de peças. O outset devolve o
+  // que o arredondamento tirou, fazendo as peças se SOBREPOREM um pouco: no
+  // instante da troca elas ainda estão opacas, então sobreposição não se vê,
+  // enquanto buraco se vê. Os pontos são grampeados ao retângulo da foto, pra
+  // a silhueta de fora continuar reta e a textura não borrar além da borda.
+  outset: 0.04,
+
+  // Opacidade do vidro DEPOIS de quebrar. No instante da troca eles valem 1,
+  // porque ali precisam bater pixel a pixel com a foto opaca que substituem;
+  // a translucidez entra durante o voo, como se o caco só virasse vidro ao se
+  // soltar da imagem.
+  glassOpacity: 0.8,
 
   // A quebra. Menos "explosão", mais "a foto se desfaz": os cacos abrem e já
   // saem viajando para as bordas da tela, não voltam pro lugar.
   spread: 1.2,      // afastamento radial (unidades de mundo)
   toward: 0.9,      // avanço na direção da câmera
-  fall: 1.0,        // queda durante a abertura
-  spin: 1.4,        // tombo máximo, em radianos
+  fall: 0.75,       // queda durante a abertura
+  spin: 1.0,        // tombo máximo, em radianos
   dur: 0.9,         // duração da abertura
   stagger: 0.32,    // atraso do centro até a borda (a trinca se propaga)
 };
@@ -123,8 +155,8 @@ export const SHATTER = {
 // borda encosta na beirada da tela em qualquer proporção, do celular ao
 // monitor largo, sem uma constante chutada por breakpoint.
 export const BORDER = {
-  keep: 15,               // quantos cacos sobram ("poucos cacos jogados")
-  topCount: 7,            // destes, quantos vão pra faixa de cima
+  keep: 26,               // quantos cacos sobram na moldura
+  topCount: 12,           // destes, quantos vão pra faixa de cima
   topBand: [0.55, 1.12],  // v da faixa de cima (>1 = meio pra fora da tela)
   sideBand: [0.84, 1.12], // |u| das laterais
   sideSpan: [-0.4, 0.7],  // v que as laterais cobrem
@@ -132,6 +164,15 @@ export const BORDER = {
   spin: 0.5,              // rotação em repouso, em radianos
   depth: 0.35,            // desencontro em Z (cada peça pega a luz diferente)
   dur: 1.05,              // tempo de voar da quebra até a moldura
+
+  // A flutuação da moldura parada. Cada eixo oscila numa frequência diferente e
+  // incomensurável com as outras, e cada caco entra numa fase própria: é isso
+  // que impede o conjunto de respirar junto, que leria como um só objeto
+  // balançando em vez de cacos soltos no ar.
+  floatAmp: 0.055,        // deriva máxima, em unidades de mundo
+  floatSpeed: 0.45,       // velocidade da deriva
+  floatSpin: 0.09,        // giro somado à pose de repouso, em radianos
+  floatSpinSpeed: 0.3,
 };
 
 // A descida: a câmera recua enquanto o painel HTML sobe. Os dois andam na MESMA

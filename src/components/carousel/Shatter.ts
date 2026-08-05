@@ -14,9 +14,9 @@ import { ribbonPose } from './Ribbon';
 //
 //  1. As fronteiras dos anéis são poligonais onduladas, não círculos. O raio de
 //     cada fronteira é sorteado por ÂNGULO — fracAt[anel][setor] — e as células
-//     vizinhas compartilham esses cantos. Com uma fração única por anel (como
-//     era antes) saíam aros concêntricos perfeitos, e o olho acha um aro num
-//     piscar de olhos por mais jitter que se ponha nos setores.
+//     vizinhas compartilham esses cantos. Com uma fração única por anel saíam
+//     aros concêntricos perfeitos, e o olho acha um aro num piscar de olhos por
+//     mais jitter que se ponha nos setores.
 //  2. Os anéis-base não são igualmente espaçados: SHATTER.ringWander desloca
 //     cada um, então nem a espessura das faixas se repete.
 //
@@ -25,9 +25,13 @@ import { ribbonPose } from './Ribbon';
 // dessa distância, não de um raio fixo. Um padrão radial de raio constante
 // deixaria buraco nos cantos e transbordaria nos lados.
 //
-// No fim, poucos cacos (BORDER.keep) param nas beiradas da tela — em cima e nas
-// duas laterais — e o resto apaga no voo. É essa moldura esparsa que emoldura o
-// texto do About, e ela rola junto com a página até sair de cena.
+// Cada caco é um PRISMA, não um plano: a extrusão vai pra trás, deixando a face
+// da frente exatamente onde a foto estava. São as paredes laterais que pegam o
+// clearcoat de raspão e dão a leitura de espessura — sem elas o caco é um
+// adesivo, por mais reflexo que o material tenha.
+//
+// No fim, BORDER.keep cacos param nas beiradas da tela e o resto apaga no voo.
+// A moldura não fica imóvel: cada peça flutua no seu próprio tempo (ver pose()).
 
 // PRNG determinístico: a fratura tem que dar o MESMO desenho a cada abertura e
 // a cada recarga, senão não dá pra calibrar o efeito olhando — cada teste sairia
@@ -45,7 +49,47 @@ function rng(seed: number) {
 // que não aconteça, independente de como os números acima sejam calibrados.
 const MIN_RING_GAP = 0.05;
 
+// Arredonda os cantos de um polígono, substituindo cada vértice por um arco.
+//
+// O arco é uma Bézier quadrática cujo ponto de controle é o próprio canto: é a
+// forma mais barata de tirar o bico e a única que não precisa de trigonometria
+// por vértice. O raio é limitado a 40% da menor aresta adjacente, então uma
+// lasca fina arredonda pouco em vez de se dobrar sobre si mesma.
+function roundPoly(poly: THREE.Vector2[], radius: number, segs: number): THREE.Vector2[] {
+  const out: THREE.Vector2[] = [];
+  const n = poly.length;
+
+  for (let i = 0; i < n; i++) {
+    const cur = poly[i];
+    const v1 = poly[(i - 1 + n) % n].clone().sub(cur);
+    const v2 = poly[(i + 1) % n].clone().sub(cur);
+    const l1 = v1.length() || 1e-6;
+    const l2 = v2.length() || 1e-6;
+    const r = Math.min(radius, l1 * 0.4, l2 * 0.4);
+
+    const p1 = cur.clone().addScaledVector(v1.divideScalar(l1), r);
+    const p2 = cur.clone().addScaledVector(v2.divideScalar(l2), r);
+
+    for (let s = 0; s <= segs; s++) {
+      const t = s / segs;
+      const m = 1 - t;
+      out.push(new THREE.Vector2(
+        m * m * p1.x + 2 * m * t * cur.x + t * t * p2.x,
+        m * m * p1.y + 2 * m * t * cur.y + t * t * p2.y,
+      ));
+    }
+  }
+
+  return out;
+}
+
 type Vec3 = { x: number; y: number; z: number };
+
+// Os escalares que a timeline anima. Ela NÃO escreve mesh.position nem
+// mesh.rotation: quem compõe a pose é o pose(), uma vez por frame. Enquanto o
+// GSAP escrevia a posição direto, não havia onde somar a flutuação — os dois
+// disputariam a propriedade e o último a rodar no frame ganharia.
+type Anim = { burst: number; drop: number; rest: number; rx: number; ry: number; rz: number };
 
 type Shard = {
   mesh: THREE.Mesh;
@@ -55,6 +99,7 @@ type Shard = {
   dist: number;         // distância ao impacto, 0 (centro) a 1 (borda)
   jig: number;          // variação por caco — a MESMA em todas as fases, senão
                         // a peça muda de personalidade no meio do caminho
+  phase: number;        // fase própria da flutuação
   keep: boolean;        // sobrevive até a moldura, ou apaga no voo?
   side: boolean;        // lateral (empurrável) ou faixa de cima (fixa)
   bu: number;           // pose na moldura, normalizada (-1..1) sobre a tela
@@ -62,6 +107,8 @@ type Shard = {
   settled: Vec3;        // a mesma pose já convertida em unidades de mundo
   settledRot: Vec3;
   burstRot: Vec3;       // eixo do tombo no pico da quebra
+  restPose: { x: number; y: number; z: number; yaw: number };
+  anim: Anim;
 };
 
 export class Shatter {
@@ -76,7 +123,7 @@ export class Shatter {
   init(texture: THREE.Texture) {
     const a = ARC_WIDTH / 2;
     const b = HEIGHT / 2;
-    const { rings, sectors, jitter, ringWander } = SHATTER;
+    const { rings, sectors, jitter, ringWander, thickness } = SHATTER;
     const rand = rng(0x5eed1e);
 
     // distância do centro até a borda do retângulo no ângulo th
@@ -104,7 +151,9 @@ export class Shatter {
     bases.push(1);
 
     const fracAt: number[][] = [];
-    for (let i = 0; i <= rings; i++) fracAt.push(new Array(sectors + 1).fill(i === rings ? 1 : 0));
+    for (let i = 0; i <= rings; i++) {
+      fracAt.push(new Array(sectors + 1).fill(i === rings ? 1 : 0));
+    }
     for (let i = 1; i < rings; i++) {
       for (let j = 0; j < sectors; j++) {
         fracAt[i][j] = bases[i] + (rand() - 0.5) * (1 / rings) * jitter;
@@ -137,41 +186,99 @@ export class Shatter {
         const D = pt(fracAt[i + 1][j], angles[j]);
 
         // no anel de dentro A e B colapsam no ponto de impacto: a célula é um
-        // triângulo, e o segundo triângulo do quad seria degenerado
-        const inner = i === 0;
-        const tris = inner ? [[A, D, C]] : [[A, D, C], [A, C, B]];
-        const corners = inner ? [A, D, C] : [A, B, C, D];
+        // triângulo. `raw` é o contorno EM ORDEM, que é o que o arredondamento
+        // e a extrusão percorrem.
+        const raw = i === 0 ? [A, D, C] : [A, D, C, B];
 
-        const cx = corners.reduce((s, p) => s + p.x, 0) / corners.length;
-        const cy = corners.reduce((s, p) => s + p.y, 0) / corners.length;
+        // centroide do polígono ORIGINAL: é dele que o outset se afasta, e ele
+        // não pode vir do arredondado (que já está encolhido)
+        const rx = raw.reduce((s, p) => s + p.x, 0) / raw.length;
+        const ry = raw.reduce((s, p) => s + p.y, 0) / raw.length;
+        // raio típico da célula, pra o outset não engolir as lascas do miolo,
+        // que são muito menores que as peças de fora
+        const span = raw.reduce((s, p) => s + Math.hypot(p.x - rx, p.y - ry), 0) / raw.length;
+        const out = Math.min(SHATTER.outset, span * 0.25);
+
+        const poly = roundPoly(raw, SHATTER.corner, SHATTER.cornerSegs).map((p) => {
+          const dx = p.x - rx;
+          const dy = p.y - ry;
+          const l = Math.hypot(dx, dy) || 1e-6;
+          return new THREE.Vector2(
+            THREE.MathUtils.clamp(p.x + (dx / l) * out, -a, a),
+            THREE.MathUtils.clamp(p.y + (dy / l) * out, -b, b),
+          );
+        });
+
+        const n = poly.length;
+        const cx = poly.reduce((s, p) => s + p.x, 0) / n;
+        const cy = poly.reduce((s, p) => s + p.y, 0) / n;
 
         const pos: number[] = [];
         const uv: number[] = [];
-        for (const tri of tris) {
-          for (const p of tri) {
-            // posições relativas ao centroide → o caco tomba em torno de si
-            // mesmo, e não em torno do centro da foto
-            pos.push(p.x - cx, p.y - cy, 0);
-            uv.push((p.x + a) / (2 * a), (p.y + b) / (2 * b));
-          }
+        const toU = (x: number) => (x + a) / (2 * a);
+        const toV = (y: number) => (y + b) / (2 * b);
+
+        // posições relativas ao centroide → o caco tomba em torno de si mesmo,
+        // e não em torno do centro da foto
+        const put = (px: number, py: number, z: number, u: number, v: number) => {
+          pos.push(px - cx, py - cy, z);
+          uv.push(u, v);
+        };
+        const putFace = (p: THREE.Vector2, z: number) => put(p.x, p.y, z, toU(p.x), toV(p.y));
+        const putMid = (z: number) => put(cx, cy, z, toU(cx), toV(cy));
+
+        // Leque a partir do CENTROIDE, e não de um vértice: com os cantos
+        // arredondados o contorno tem muitos pontos, e um leque preso num
+        // vértice depende do polígono ser convexo visto dali. Do centroide
+        // funciona para qualquer célula que a fratura possa produzir.
+        for (let t = 0; t < n; t++) {              // face da frente, em z = 0
+          putMid(0); putFace(poly[t], 0); putFace(poly[(t + 1) % n], 0);
+        }
+        for (let t = 0; t < n; t++) {              // verso, com a volta invertida
+          putMid(-thickness);
+          putFace(poly[(t + 1) % n], -thickness);
+          putFace(poly[t], -thickness);
+        }
+        for (let t = 0; t < n; t++) {              // paredes: é daqui que vem a espessura
+          const p = poly[t];
+          const q = poly[(t + 1) % n];
+          // UV CONSTANTE em toda a parede, tirada do meio da aresta. Enquanto
+          // ela variava ao longo de p→q e ficava fixa na profundidade, a
+          // parede exibia uma tira de 1 pixel da foto esticada pela espessura
+          // — e era isso que se via de perto como um risco na borda do caco.
+          // Constante, a parede vira um vidro tingido pela cor dali.
+          const u = toU((p.x + q.x) / 2);
+          const v = toV((p.y + q.y) / 2);
+          put(p.x, p.y, 0, u, v); put(q.x, q.y, 0, u, v); put(q.x, q.y, -thickness, u, v);
+          put(p.x, p.y, 0, u, v); put(q.x, q.y, -thickness, u, v); put(p.x, p.y, -thickness, u, v);
         }
 
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
         geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        // sem índices e com vértices próprios por triângulo, isto dá normais
+        // CHAPADAS por face — é o que separa a aresta da parede da face da
+        // frente em vez de arredondar as duas numa coisa só
         geo.computeVertexNormals();
 
-        const mat = base.clone();   // opacidade é por caco (nem todos sobrevivem)
+        // opacidade e acabamento são por caco: nem todos sobrevivem, e um vidro
+        // em que toda peça reflete igual volta a parecer padrão
+        const mat = base.clone();
+        mat.roughness = 0.08 + rand() * 0.16;
+        mat.envMapIntensity = 0.9 + rand() * 0.5;
+
         const mesh = new THREE.Mesh(geo, mat);
         mesh.frustumCulled = false;
 
         const len = Math.hypot(cx, cy) || 1e-6;
+        const dir = new THREE.Vector3(cx / len, cy / len, 0);
+
         this.shards.push({
           mesh,
-          cx, cy,
-          dir: new THREE.Vector3(cx / len, cy / len, 0),
+          cx, cy, dir,
           dist: Math.min(1, len / Math.hypot(a, b)),
           jig: 0.6 + rand() * 0.8,
+          phase: rand() * Math.PI * 2,
           keep: false,     // decidido logo abaixo
           side: false,
           bu: 0, bv: 0,
@@ -182,6 +289,8 @@ export class Shatter {
             y: (rand() - 0.5) * SHATTER.spin,
             z: (rand() - 0.5) * SHATTER.spin,
           },
+          restPose: { x: 0, y: cy, z: RADIUS, yaw: 0 },
+          anim: { burst: 0, drop: 0, rest: 0, rx: 0, ry: 0, rz: 0 },
         });
         this.mats.push(mat);
         this.group.add(mesh);
@@ -195,7 +304,7 @@ export class Shatter {
   }
 
   // Escolhe quem sobrevive e onde cada um para, em coordenadas normalizadas da
-  // tela. "Poucos cacos jogados": o resto apaga durante o voo.
+  // tela. O resto apaga durante o voo.
   //
   // A escolha é por sorteio com chave determinística, e não pelos N primeiros
   // do laço: os N primeiros seriam todos do anel de dentro, e a moldura sairia
@@ -210,8 +319,7 @@ export class Shatter {
     const [su0, su1] = BORDER.sideBand;
     const [sv0, sv1] = BORDER.sideSpan;
     const nTop = Math.min(BORDER.topCount, order.length);
-    const nSide = order.length - nTop;
-    const perSide = Math.max(1, Math.ceil(nSide / 2));
+    const perSide = Math.max(1, Math.ceil((order.length - nTop) / 2));
 
     order.forEach(({ i }, n) => {
       const s = this.shards[i];
@@ -231,10 +339,9 @@ export class Shatter {
         // alterna direita/esquerda pra os dois lados encherem juntos, mesmo se
         // a conta não fechar redonda
         const k = n - nTop;
-        const slot = Math.floor(k / 2);
         s.side = true;
         s.bu = (k % 2 === 0 ? 1 : -1) * (su0 + (su1 - su0) * rand());
-        s.bv = sv1 - (sv1 - sv0) * jog(slot, perSide);
+        s.bv = sv1 - (sv1 - sv0) * jog(Math.floor(k / 2), perSide);
       }
 
       s.settledRot = {
@@ -248,17 +355,16 @@ export class Shatter {
 
   // Põe cada caco no lugar exato que ele ocupa NA SUPERFÍCIE do anel.
   //
-  // Antes os cacos eram um plano reto parado em z = RADIUS. Isso passava
-  // despercebido com a câmera colada na foto, porque só o miolo aparecia; agora
-  // que ela para longe e a foto inteira está no quadro, um plano reto no lugar
-  // de uma superfície curva pisca na troca. Cada caco é pequeno o bastante para
-  // a própria corda dele ser imperceptível (~0.03 de flecha no maior).
+  // Um plano reto no lugar de uma superfície curva piscaria na troca agora que
+  // a câmera para longe e a foto inteira está no quadro. Cada caco é pequeno o
+  // bastante para a própria corda dele ser imperceptível (~0.03 de flecha no
+  // maior deles).
   layoutRest(k: number) {
-    for (const { mesh, cx, cy } of this.shards) {
-      const pose = ribbonPose(cx, k);
-      mesh.position.set(pose.x, cy, pose.z);
-      mesh.rotation.set(0, pose.yaw, 0);
-      mesh.userData.rest = [pose.x, cy, pose.z, pose.yaw];
+    for (const s of this.shards) {
+      const pose = ribbonPose(s.cx, k);
+      s.restPose = { x: pose.x, y: s.cy, z: pose.z, yaw: pose.yaw };
+      s.anim = { burst: 0, drop: 0, rest: 0, rx: 0, ry: pose.yaw, rz: 0 };
+      this.pose(s, 0);
     }
   }
 
@@ -285,66 +391,57 @@ export class Shatter {
   // isto numa timeline maior e pendurar a subida do painel HTML no meio dela
   // (ver Carousel.enterAbout). Com Promise só dava pra esperar terminar, e
   // esperar terminar é exatamente a pausa que estamos tirando.
+  //
   // Note que ela NÃO acende o grupo: quem faz isso é o Carousel.swapToShards,
   // no instante exato da troca. Acender aqui significaria acender na hora de
   // MONTAR a timeline — que é logo no clique, um segundo inteiro antes da
-  // quebra — e os cacos passariam toda a aproximação sobrepostos à foto, no
-  // mesmo lugar em z, disputando cada pixel com ela.
+  // quebra — e os cacos passariam toda a aproximação sobrepostos à foto.
   burstAndSettle(): gsap.core.Timeline {
     this.tl?.kill();
 
-    const { spread, toward, fall, dur, stagger } = SHATTER;
     const tl = gsap.timeline();
     this.tl = tl;
 
-    for (const shard of this.shards) {
-      const { mesh, dir, dist, jig, keep, settled, settledRot, burstRot } = shard;
+    for (const { anim, dist, keep, settledRot, burstRot, restPose, mesh } of this.shards) {
       // a trinca se propaga do impacto pra fora: quem está no centro sai primeiro
-      const at = dist * stagger;
-      const [rx, ry, rz, ryaw] = mesh.userData.rest as number[];
-
-      // Quebra, queda e chegada são movimentos com curvas DIFERENTES somados
-      // nos mesmos eixos. Tweenar position três vezes faria os três brigarem
-      // pela propriedade a cada frame, então cada um anima o próprio escalar e
-      // este apply() compõe a posição final.
-      const s = { burst: 0, drop: 0, rest: 0 };
-      const apply = () => {
-        const w = 1 - s.rest;   // o peso do que veio do anel vai zerando
-        mesh.position.set(
-          (rx + dir.x * spread * jig * s.burst) * w + settled.x * s.rest,
-          (ry + dir.y * spread * jig * 0.7 * s.burst - fall * jig * s.drop) * w + settled.y * s.rest,
-          (rz + toward * (1 - dist * 0.65) * jig * s.burst) * w + settled.z * s.rest,
-        );
-      };
+      const at = dist * SHATTER.stagger;
 
       // — fase 1: a quebra —
-      // afastamento radial + avanço na direção da câmera. Os cacos do centro
-      // vêm mais pra frente e os de fora abrem pros lados — é o que dá a
-      // sensação de a foto se desfazer em vez de deslizar.
-      tl.to(s, { burst: 1, duration: dur, ease: 'power2.out', onUpdate: apply }, at);
-      tl.to(s, { drop: 1, duration: dur, ease: 'power2.in', onUpdate: apply }, at);
-      tl.to(mesh.rotation, {
-        x: burstRot.x, y: ryaw + burstRot.y, z: burstRot.z,
-        duration: dur, ease: 'power1.out',
+      // afastamento radial + avanço na direção da câmera, com curvas diferentes
+      // no mesmo eixo (a abertura desacelera, a queda acelera)
+      tl.to(anim, { burst: 1, duration: SHATTER.dur, ease: 'power2.out' }, at);
+      tl.to(anim, { drop: 1, duration: SHATTER.dur, ease: 'power2.in' }, at);
+      tl.to(anim, {
+        rx: burstRot.x, ry: restPose.yaw + burstRot.y, rz: burstRot.z,
+        duration: SHATTER.dur, ease: 'power1.out',
       }, at);
 
-      const back = at + dur;
+      // O caco só vira vidro ao se soltar. Em repouso ele vale 1, porque ali
+      // precisa bater pixel a pixel com a foto OPACA que substitui; começar
+      // translúcido daria um salto de brilho no instante da troca.
+      tl.to(mesh.material as THREE.Material, {
+        opacity: SHATTER.glassOpacity,
+        duration: SHATTER.dur * 0.7,
+        ease: 'power2.out',
+      }, at);
+
+      const back = at + SHATTER.dur;
 
       if (keep) {
         // — fase 2: a viagem até a moldura —
         // os escalares da quebra vão a zero enquanto `rest` sobe: o caco
-        // descreve um arco do pico até a beirada da tela, sem parar no meio.
-        tl.to(s, {
+        // descreve um arco do pico até a beirada da tela, sem parar no meio
+        tl.to(anim, {
           burst: 0, drop: 0, rest: 1,
-          duration: BORDER.dur, ease: 'power2.inOut', onUpdate: apply,
-        }, back);
-        tl.to(mesh.rotation, {
-          ...settledRot, duration: BORDER.dur, ease: 'power2.inOut',
+          rx: settledRot.x, ry: settledRot.y, rz: settledRot.z,
+          duration: BORDER.dur, ease: 'power2.inOut',
         }, back);
       } else {
         // quem não fica some no ar, ainda em movimento — some no voo, não
         // aterrissa e desaparece
-        tl.to(s, { burst: 1.7, drop: 1.6, duration: BORDER.dur, ease: 'power1.out', onUpdate: apply }, back);
+        tl.to(anim, {
+          burst: 1.7, drop: 1.6, duration: BORDER.dur, ease: 'power1.out',
+        }, back);
         tl.to(mesh.material as THREE.Material, {
           opacity: 0, duration: BORDER.dur * 0.6, ease: 'power2.in',
         }, back);
@@ -354,6 +451,57 @@ export class Shatter {
     return tl;
   }
 
+  // Compõe a pose de UM caco a partir dos escalares + a flutuação. Chamado uma
+  // vez por frame por caco (ver update). É barato: umas dez contas.
+  private pose(s: Shard, t: number) {
+    const { anim, restPose: r, dir, jig, dist, settled, phase } = s;
+    const { spread, toward, fall } = SHATTER;
+    const w = 1 - anim.rest;   // o peso do que veio do anel vai zerando
+
+    let x = (r.x + dir.x * spread * jig * anim.burst) * w + settled.x * anim.rest;
+    let y = (r.y + dir.y * spread * jig * 0.7 * anim.burst - fall * jig * anim.drop) * w
+      + settled.y * anim.rest;
+    let z = (r.z + toward * (1 - dist * 0.65) * jig * anim.burst) * w + settled.z * anim.rest;
+
+    // A flutuação entra escalada por `rest`: durante a quebra ela vale zero e
+    // não atrapalha a trajetória; ela nasce junto com a chegada na moldura.
+    // As três frequências são incomensuráveis entre si, então o caco nunca
+    // repete a mesma volta.
+    const amp = anim.rest * BORDER.floatAmp * jig;
+    if (amp > 1e-4) {
+      const f = BORDER.floatSpeed;
+      x += Math.sin(t * f + phase) * amp;
+      y += Math.sin(t * f * 0.77 + phase * 1.7) * amp * 1.25;
+      z += Math.sin(t * f * 0.61 + phase * 2.3) * amp * 0.7;
+    }
+    s.mesh.position.set(x, y, z);
+
+    const sp = anim.rest * BORDER.floatSpin;
+    const g = BORDER.floatSpinSpeed;
+    s.mesh.rotation.set(
+      anim.rx + Math.sin(t * g + phase) * sp,
+      anim.ry + Math.sin(t * g * 0.83 + phase * 1.9) * sp,
+      anim.rz + Math.sin(t * g * 1.17 + phase * 2.7) * sp,
+    );
+  }
+
+  // Chamado a cada frame pelo render loop. `t` em segundos.
+  update(t: number) {
+    if (!this.group.visible) return;
+    for (const s of this.shards) {
+      // Quem apagou no voo sai da lista de desenho. Opacidade zero não é de
+      // graça: o mesh continua sendo sombreado, e são ~39 peças com clearcoat
+      // e iridescência desenhadas à toa o tempo todo em que o About fica
+      // aberto. O critério é a própria opacidade, então isto se desfaz sozinho
+      // quando a timeline roda ao contrário.
+      if (!s.keep) {
+        s.mesh.visible = (s.mesh.material as THREE.Material).opacity > 0.004;
+        if (!s.mesh.visible) continue;
+      }
+      this.pose(s, t);
+    }
+  }
+
   // Moldura na hora, sem coreografia — deep-link /#about e
   // prefers-reduced-motion, onde não houve foto inteira pra ver quebrar.
   snapToBorder() {
@@ -361,13 +509,16 @@ export class Shatter {
     this.tl = null;
     this.group.visible = true;
     this.group.position.y = 0;
-    for (const { mesh, keep, settled, settledRot } of this.shards) {
-      const mat = mesh.material as THREE.Material;
-      if (!keep) { mat.opacity = 0; mesh.visible = false; continue; }
-      mesh.visible = true;
-      mat.opacity = 1;
-      mesh.position.set(settled.x, settled.y, settled.z);
-      mesh.rotation.set(settledRot.x, settledRot.y, settledRot.z);
+    for (const s of this.shards) {
+      const mat = s.mesh.material as THREE.Material;
+      if (!s.keep) { mat.opacity = 0; s.mesh.visible = false; continue; }
+      s.mesh.visible = true;
+      mat.opacity = SHATTER.glassOpacity;
+      s.anim = {
+        burst: 0, drop: 0, rest: 1,
+        rx: s.settledRot.x, ry: s.settledRot.y, rz: s.settledRot.z,
+      };
+      this.pose(s, 0);
     }
   }
 
@@ -380,7 +531,9 @@ export class Shatter {
   // cena, só com opacity 0, e o primeiro evento de rolagem os traria de volta.
   setScroll(worldY: number, opacity: number) {
     this.group.position.y = worldY;
-    const o = Math.min(Math.max(opacity, 0), 1);
+    // `opacity` aqui é o quanto da moldura ainda está em cena (1 no topo da
+    // página, 0 depois de rolar); a translucidez do vidro entra multiplicando
+    const o = Math.min(Math.max(opacity, 0), 1) * SHATTER.glassOpacity;
     for (const { mesh, keep } of this.shards) {
       if (keep) (mesh.material as THREE.Material).opacity = o;
     }
@@ -393,13 +546,11 @@ export class Shatter {
     this.tl = null;
     this.group.visible = false;
     this.group.position.y = 0;
-    for (const { mesh } of this.shards) {
-      const rest = mesh.userData.rest as number[] | undefined;
-      if (!rest) continue;
-      mesh.position.set(rest[0], rest[1], rest[2]);
-      mesh.rotation.set(0, rest[3], 0);
-      mesh.visible = true;
-      (mesh.material as THREE.Material).opacity = 1;
+    for (const s of this.shards) {
+      s.anim = { burst: 0, drop: 0, rest: 0, rx: 0, ry: s.restPose.yaw, rz: 0 };
+      s.mesh.visible = true;
+      (s.mesh.material as THREE.Material).opacity = 1;
+      this.pose(s, 0);
     }
   }
 
@@ -419,7 +570,11 @@ export class Shatter {
 // ao MeshBasicMaterial da foto original, então a troca foto→cacos não dá salto
 // de brilho. Por cima disso o clearcoat acende os reflexos do ambiente, e é daí
 // que vem a leitura de vidro: o verniz especular, não a transparência.
-// (Transmissão de verdade, como nas labels, seria cara demais para ~50 peças.)
+// (Transmissão de verdade, como nas labels, seria cara demais para ~65 peças.)
+//
+// A iridescência é a camada fina que tira o acabamento de plástico: ela só
+// aparece de raspão, nas arestas e nas peças mais tombadas, que é exatamente
+// onde o vidro de verdade se denuncia.
 function makeGlassPhoto(texture: THREE.Texture): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
     color: 0x000000,
@@ -431,6 +586,9 @@ function makeGlassPhoto(texture: THREE.Texture): THREE.MeshPhysicalMaterial {
     clearcoat: 1,
     clearcoatRoughness: 0.05,
     envMapIntensity: 1.1,
+    iridescence: 0.4,
+    iridescenceIOR: 1.35,
+    iridescenceThicknessRange: [120, 420],
     side: THREE.DoubleSide,   // os cacos tombam e mostram o verso
     transparent: true,        // fade dos que não sobrevivem + da moldura ao rolar
   });

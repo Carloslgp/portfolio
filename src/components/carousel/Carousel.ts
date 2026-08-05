@@ -525,6 +525,12 @@ export class Carousel {
 
     this.rig.update(dt, this.viewRadius);  // entrada + parallax; único a mexer na câmera
 
+    // Os cacos compõem a própria pose aqui, e não dentro dos tweens: a
+    // flutuação da moldura precisa se SOMAR ao que a timeline manda, e duas
+    // coisas escrevendo mesh.position no mesmo frame brigariam. Sai de graça
+    // quando o grupo está apagado.
+    this.shatter.update(time * 0.001);
+
     // O lenis.raf lá em cima é inegociável — é ele que rola a página, então o
     // corte por ociosidade vem só AQUI, depois dele. Cortar antes travaria a
     // rolagem do About junto com o desenho.

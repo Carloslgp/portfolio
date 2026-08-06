@@ -223,6 +223,13 @@ export const ABOUT = {
   parallax: 0.8,    // a moldura rola quase junto com a página, e sai de cena
   fadeOut: 0.1,     // fração da tela rolada antes de a moldura começar a apagar
   exitScale: 1.7,   // o fechar é a mesma timeline em reverse, mais rápida
+  // A subida ao topo antes de fechar. O reverse tem que começar da mesma pose
+  // em que a descida terminou — com a página rolada, a coreografia rodaria por
+  // baixo do texto. A duração escala com a distância, entre estes dois limites:
+  // uma rolagem curta não pode arrastar, e uma página inteira não pode virar
+  // um corte seco.
+  rewindMin: 0.35,
+  rewindMax: 0.9,
 };
 
 // --- responsividade da cena ---

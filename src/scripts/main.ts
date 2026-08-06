@@ -96,7 +96,7 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     panel.hidden = false;
     document.body.classList.add('is-about', 'is-descending');
     lenis.stop();                          // a descida é automática; sem gesto por cima
-    lenis.scrollTo(0, { immediate: true });
+    lenis.scrollTo(0, { immediate: true, force: true });  // force: o stop() acima já vale
     lenis.resize();
 
     tl = carousel.enterAbout();
@@ -119,13 +119,57 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     busy = false;
   }
 
+  // Sobe até o topo ANTES de qualquer outra coisa do fechamento, e espera
+  // chegar. Duas armadilhas moram aqui:
+  //   • o scrollTo do Lenis é ignorado enquanto ele está parado, então a subida
+  //     tem que vir antes do stop() — ou levar force: true;
+  //   • o overflow: hidden do .is-descending trava a rolagem mas NÃO zera a
+  //     posição: sem esta subida a página fica onde estava e só salta pro topo
+  //     no fim, quando o painel some e o documento encolhe.
+  // O listener de scroll segue ligado durante a subida de propósito: a moldura
+  // volta pro lugar junto com o texto, no mesmo movimento.
+  function rewindToTop() {
+    const from = lenis.scroll;
+    if (from <= 1) return Promise.resolve();
+
+    const dur = reduced
+      ? 0
+      : Math.min(ABOUT.rewindMax, ABOUT.rewindMin + (from / window.innerHeight) * 0.28);
+
+    return new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(guard);
+        resolve();
+      };
+      // Se o onComplete não vier (aba em segundo plano, raf pausado), o
+      // fechamento não pode ficar preso em busy pra sempre. O salto forçado
+      // daqui também é o que desfaz o lock: por dentro ele passa pelo reset().
+      const guard = window.setTimeout(() => {
+        lenis.scrollTo(0, { immediate: true, force: true });
+        finish();
+      }, (dur + 0.4) * 1000);
+
+      lenis.scrollTo(0, {
+        force: true,          // pode haver um stop() pendente de outra fase
+        lock: true,           // nada de gesto empurrando pro outro lado no meio
+        immediate: reduced,
+        duration: dur,
+        onComplete: finish,
+      });
+    });
+  }
+
   async function closeAbout(push = true) {
     if (!open || busy) return;
     busy = true;
 
+    await rewindToTop();
+
     lenis.off('scroll', onScroll);
     lenis.stop();
-    lenis.scrollTo(0, { immediate: true });
     carousel.setBorderScroll(0);            // devolve a moldura ao lugar antes de desfazer
 
     // sem timeline (entrou por /#about) não há o que reverter: a saída precisa

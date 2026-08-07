@@ -16,11 +16,17 @@ export type RibbonPose = { x: number; z: number; yaw: number };
 // Pose de um ponto a `s` de comprimento de arco do centro da cena (o ponto da
 // fita que encara a câmera). `yaw` é quanto a superfície girou ali — em k=1 é o
 // ângulo no anel, em k=0 é zero (a fita inteira encara a câmera).
-export function ribbonPose(s: number, k: number): RibbonPose {
-  if (k < EPS) return { x: s, z: RADIUS, yaw: 0 };
-  const r = RADIUS / k;
+//
+// `radius` é o raio mais fechado (o de k=1) e `front` é o plano ao qual a fita
+// fica tangente no centro. Os dois nascem em RADIUS porque no anel da home eles
+// são a mesma medida: a face frontal do cilindro É o raio dele. Quem separa os
+// dois é o carrossel do About (ver Reel.ts), que usa uma fita muito mais aberta
+// e tangente a z = 0.
+export function ribbonPose(s: number, k: number, radius = RADIUS, front = radius): RibbonPose {
+  if (k < EPS) return { x: s, z: front, yaw: 0 };
+  const r = radius / k;
   const a = s / r;
-  return { x: r * Math.sin(a), z: RADIUS - r * (1 - Math.cos(a)), yaw: a };
+  return { x: r * Math.sin(a), z: front - r * (1 - Math.cos(a)), yaw: a };
 }
 
 // aplica a pose num mesh (a fita é toda no plano y=0; só x, z e a guinada mudam)
@@ -34,8 +40,14 @@ export function placeOnRibbon(o: THREE.Object3D, pose: RibbonPose) {
 // dobrar em cima do que já está dobrado acumularia erro até deformar tudo.
 export type RibbonRest = { position: Float32Array; normal: Float32Array | null };
 
-export function makeRibbonGeometry(): THREE.PlaneGeometry {
-  return new THREE.PlaneGeometry(ARC_WIDTH, HEIGHT, RIBBON_SEGMENTS, 1);
+// As medidas nascem nas do anel; quem passa outras é o carrossel do About, que
+// tem contagem de fotos e proporção próprias.
+export function makeRibbonGeometry(
+  width = ARC_WIDTH,
+  height = HEIGHT,
+  segments = RIBBON_SEGMENTS,
+): THREE.PlaneGeometry {
+  return new THREE.PlaneGeometry(width, height, segments, 1);
 }
 
 export function captureRest(geo: THREE.BufferGeometry): RibbonRest {
@@ -61,13 +73,14 @@ export function bendRibbon(
   rest: RibbonRest,
   k: number,
   lift = 0,
+  radius = RADIUS,
 ) {
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const nor = geo.attributes.normal as THREE.BufferAttribute | undefined;
   const src = rest.position;
   const srcN = rest.normal;
   const straight = k < EPS;
-  const r0 = straight ? 0 : RADIUS / k;
+  const r0 = straight ? 0 : radius / k;
 
   for (let i = 0; i < pos.count; i++) {
     const j = i * 3;

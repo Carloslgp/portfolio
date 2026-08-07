@@ -144,7 +144,7 @@ const skills = [
     <!-- O portão. A cortina não sai enquanto não houver escolha (ver
          scripts/loading.ts → awaitGate). role="dialog" porque é exatamente
          isto: uma pergunta que bloqueia o resto da página até ser respondida. -->
-    <div class="gate" data-gate role="dialog" aria-modal="true" aria-labelledby="gate-q">
+    <div class="gate" data-gate role="dialog" aria-modal="true" aria-labelledby="gate-q" tabindex="-1">
       <p class="gate-q" id="gate-q">Como você prefere ver este site?</p>
 
       <div class="gate-opts">
@@ -234,6 +234,9 @@ const skills = [
     align-items: center;
     gap: 1.25rem;
     text-align: center;
+    /* recebe o foco de entrada (tabindex="-1"), mas é um contêiner: desenhar
+       um anel nele não diria nada a ninguém */
+    outline: none;
   }
   /* some assim que a escolha é feita, e não junto com a cortina: a resposta
      precisa sumir antes, senão os botões ficariam por cima da cena descendo */
@@ -376,6 +379,9 @@ const skills = [
     text-decoration: underline;
     text-underline-offset: 2px;
     pointer-events: auto;
+    /* mesmo motivo do .clock .hot: nada de trocar de modo de layout no hover.
+       O .intro é white-space: nowrap, então a caixa segue numa linha só. */
+    display: inline-block;
   }
 
   /* ——— cantos do topo: hora à esquerda, frase à direita ———
@@ -447,14 +453,62 @@ const skills = [
       pointer-events: auto;
     }
   }
+  /* ——— as duas camadas do scramble (ver scripts/scramble.ts) ———
+     O efeito NÃO mexe na caixa: o texto original segue no fluxo segurando as
+     medidas, e os glifos são pintados fora do fluxo por cima dele. */
   .is-scrambling {
-    display: inline-block;
-    /* a largura está travada e os glifos sorteados podem ser mais largos que a
-       letra que substituem; sem isto, uma linha vazaria a caixa por um frame */
-    overflow: hidden;
+    /* âncora pro overlay. position: relative sem deslocamento não altera
+       medida nenhuma — nem a do próprio elemento, nem a da linha */
+    position: relative;
+  }
+  /* :global nos dois abaixo porque estes spans nascem no JS
+     (document.createElement) e nunca recebem o data-astro-cid que o Astro usa
+     pra escopar — sem :global as regras simplesmente não pegariam, o fantasma
+     apareceria com tinta e o overlay cairia dentro do fluxo. */
+  :global(.scramble-ghost) {
+    /* O texto de verdade, sem tinta. É ele que continua definindo a caixa,
+       então largura, altura, linha de base e subpixel ficam exatamente como
+       estavam antes do hover.
+       color: transparent, e não visibility: hidden — assim ele continua no
+       acessível e um leitor de tela lê "Curitiba" durante todo o efeito.
+       Quem é aria-hidden é o overlay. */
+    color: transparent;
+  }
+  :global(.scramble-live) {
+    position: absolute;
+    left: 0;
+    top: 0;
+    /* Os glifos sorteados são mais largos que as letras que substituem
+       ("Curitiba" é quase toda estreita: dois 'i', um 't', um 'r'). Sem isto
+       eles quebrariam numa segunda linha dentro do overlay. Fora do fluxo,
+       vazar pra direita não move nada. */
+    white-space: nowrap;
+  }
+  /* A frase da direita é multilinha por natureza: ali o overlay tem que
+     reembrulhar dentro da mesma largura do fantasma, não virar uma linha só. */
+  .quote :global(.scramble-live) {
+    width: 100%;
+    white-space: normal;
+  }
+  /* O .name é o único que vive no meio de uma frase ("…is a developer from
+     Brazil."), então o vazamento dele precisa ser cortado pra não entrar por
+     cima do texto seguinte.
+     O clip fica no elemento, e não no .scramble-live: o overlay cortaria
+     contra a própria caixa, que já é a do texto vazado, e não cortaria nada.
+     É o único alvo que ainda ganha e perde clip-path no hover — o relógio e a
+     frase não passam mais por isso. */
+  .name.is-scrambling {
+    clip-path: inset(0);
   }
   .clock .hot {
     cursor: default;
+    /* Já nasce inline-block, em vez de virar um no hover. Alternar o modo de
+       layout no meio do efeito reescrevia o arredondamento subpixel da largura
+       (aqui tem letter-spacing: 0.06em), e isso dava um tranco de uma frame na
+       entrada e outro no release() — rápido, mas visível.
+       A frase da direita já era inline-block pelo mesmo motivo; isto só põe o
+       relógio na mesma regra. */
+    display: inline-block;
   }
 
   /* h1 invisível mas acessível (a versão visual é o texto 3D no canvas) */

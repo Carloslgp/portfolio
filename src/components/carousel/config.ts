@@ -220,6 +220,11 @@ export const ABOUT = {
   overlap: 0.85,
   fadeDur: 0.45,    // o anel apagando atrás da quebra (a foto do About NÃO
                     // entra nesse fade: ver Carousel.swapToShards)
+  // As LABELS saem antes do resto do anel, logo no começo do mergulho. Elas
+  // ficam ENTRE a câmera e a foto de destino: presas até o 'burst' como o resto
+  // era, a palavra crescia na tela até quase encostar na lente e só então
+  // sumia. Curto de propósito — quem entra quer ver a foto, não o rótulo dela.
+  labelFadeDur: 0.3,
   parallax: 0.8,    // a moldura rola quase junto com a página, e sai de cena
   fadeOut: 0.1,     // fração da tela rolada antes de a moldura começar a apagar
   exitScale: 1.7,   // o fechar é a mesma timeline em reverse, mais rápida

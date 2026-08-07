@@ -31,11 +31,15 @@ export function scrambleOnHover(el: HTMLElement): ScrambleHandle {
   const canHover = window.matchMedia('(hover: hover)').matches;
 
   let raf = 0;
+  let live: HTMLElement | null = null;   // a camada dos glifos (fora do fluxo)
+  let original = '';
 
   function release() {
+    if (!live) return;
+    live = null;
     el.classList.remove('is-scrambling');
-    el.style.width = '';
-    el.style.minHeight = '';
+    // volta a ser um nó de texto puro: some o par fantasma/overlay
+    el.textContent = original;
   }
 
   function cancel() {
@@ -53,15 +57,36 @@ export function scrambleOnHover(el: HTMLElement): ScrambleHandle {
     const text = el.textContent ?? '';
     if (!text.trim()) return;
 
-    // A caixa é travada ANTES do texto mudar. Os glifos aleatórios têm larguras
-    // diferentes das letras que substituem, então sem isto o resto da linha
-    // dançaria junto (e a frase da direita rebobinaria as quebras a cada frame).
-    // A classe vem primeiro porque é ela que põe o inline-block — sem ele, um
-    // elemento inline ignora width.
+    // DUAS CAMADAS, e nenhuma medida travada no braço.
+    //
+    // A tentativa anterior media a caixa e prendia width/height nela. Isso
+    // parecia equivalente, mas não é: medir devolve um fracionário
+    // (54.328125px), e prender esse valor faz o motor rearredondar o subpixel —
+    // uma vez ao entrar e outra ao soltar. Era o tranco no "Curitiba", e nenhum
+    // ajuste de clip ia curar, porque o problema era mexer na caixa.
+    //
+    // Aqui a caixa simplesmente não é tocada. O texto de verdade continua no
+    // fluxo, sem tinta (o fantasma), segurando exatamente as medidas que já
+    // tinha; os glifos são pintados por cima, fora do fluxo. Layout, linha de
+    // base e subpixel ficam idênticos do primeiro ao último frame — não há o
+    // que ressnapar.
+    original = text;
+
+    const ghost = document.createElement('span');
+    ghost.className = 'scramble-ghost';
+    ghost.textContent = text;
+
+    live = document.createElement('span');
+    live.className = 'scramble-live';
+    // o fantasma é quem responde a leitor de tela; esta camada é só pintura
+    live.setAttribute('aria-hidden', 'true');
+    // nasce com o texto certo: assim o frame entre montar e o primeiro rAF
+    // desenha exatamente o que já estava na tela
+    live.textContent = text;
+
+    el.textContent = '';
+    el.append(ghost, live);
     el.classList.add('is-scrambling');
-    const box = el.getBoundingClientRect();
-    el.style.width = `${box.width}px`;
-    el.style.minHeight = `${box.height}px`;
 
     // o +1 é pra primeira letra também nascer embaralhada: com i * step ela já
     // entraria resolvida no frame zero
@@ -84,7 +109,7 @@ export function scrambleOnHover(el: HTMLElement): ScrambleHandle {
         out += glyph(i, tick);
       }
 
-      el.textContent = out;
+      live!.textContent = out;
 
       if (done) { raf = 0; release(); return; }
       raf = requestAnimationFrame(frame);

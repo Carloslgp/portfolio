@@ -276,7 +276,21 @@ export class Carousel {
       });
     }
 
+    tl.addLabel('dive');
     tl.to(this.rig, { dive: 1, duration: SHATTER.diveDur, ease: 'power2.inOut' });
+
+    // As labels apagam JÁ no começo do mergulho, e não com o resto do anel lá
+    // no 'burst'. Elas ficam entre a câmera e a foto de destino, então segurá-las
+    // acesas durante o mergulho inteiro fazia a palavra crescer até quase
+    // encostar na lente antes de sumir.
+    // Vai por labels.fade, e não pela opacidade dos materiais: setFacing()
+    // reescreve mats[i].opacity todo frame enquanto layout() estiver rodando —
+    // e ele roda até o 'burst', que é justamente o que queremos anteceder.
+    tl.to(this.labels, {
+      fade: 0,
+      duration: ABOUT.labelFadeDur,
+      ease: 'power2.in',
+    }, 'dive');
 
     // Callbacks de GSAP disparam nos DOIS sentidos, então o estado vem de
     // tl.reversed() em vez de ser fixo: no fechar, estes mesmos pontos repõem
@@ -299,8 +313,9 @@ export class Carousel {
     // sobreposição mostra as duas imagens, e qualquer folga mostra o buraco.
     tl.call(() => this.swapToShards(!tl.reversed()), undefined, 'burst');
 
-    // O RESTO do anel apaga junto com a quebra — fotos vizinhas, labels,
-    // reflexos, o PORTFOLIO do fundo. Antes ele era desligado de estalo, e dava
+    // O RESTO do anel apaga junto com a quebra — fotos vizinhas, reflexos, o
+    // PORTFOLIO do fundo (as labels já saíram no mergulho, bem antes daqui, e
+    // por isso não estão nesta lista). Antes ele era desligado de estalo, e dava
     // pra fazer isso porque a câmera entrava na foto e ela tapava a tela
     // inteira; agora que ela para longe, as vizinhas aparecem nas beiradas e um
     // corte ali seria visível. A foto do About fica de fora desta lista: nela o
@@ -330,13 +345,15 @@ export class Carousel {
     this.rig.descent = 1;
     this.shattered = true;
     this.setSceneVisible(false);
+    this.labels.hideAll();      // as labels saíram do setSceneVisible
     this.shatter.layoutRest(1 - this.morph);
     this.syncFrame();
     this.swapToShards(true);
     this.shatter.snapToBorder();
   }
 
-  // Apaga (ou reacende) fotos, reflexos, labels e o PORTFOLIO do fundo.
+  // Apaga (ou reacende) fotos, reflexos e o PORTFOLIO do fundo. As labels NÃO
+  // passam por aqui — quem manda nelas é o Labels.fade (ver o corpo abaixo).
   //
   // As fotos nascem OPACAS de propósito: é isso que as mantém na lista opaca do
   // three e, com ela, dentro do buffer que o vidro das labels refrata. Virar
@@ -349,7 +366,8 @@ export class Carousel {
     const mats: THREE.Material[] = [
       ...this.segments.filter((_, i) => i !== ABOUT_INDEX).map((s) => s.mesh.material as THREE.Material),
       ...this.reflMeshes.filter((_, i) => i !== ABOUT_INDEX).map((m) => m.material as THREE.Material),
-      ...this.labels.meshes.map((m) => m.material as THREE.Material),
+      // as labels NÃO entram mais aqui: elas já saíram no começo do mergulho
+      // (ver enterAbout → label 'dive')
       this.backdrop.mesh.material as THREE.Material,
     ];
 
@@ -364,8 +382,9 @@ export class Carousel {
       tl.to(m, { opacity: 0, duration: ABOUT.fadeDur, ease: 'power2.in' }, at);
     }
 
-    // no fim do apagamento a cena sai de cena de vez: labels com transmission
-    // custam caro demais pra ficarem sendo desenhadas a zero de opacidade
+    // no fim do apagamento a cena sai de cena de vez, em vez de seguir sendo
+    // desenhada a zero de opacidade. As labels não dependem mais disto: com
+    // fade 0 o próprio setFacing já as tira do desenho, lá no mergulho.
     tl.call(() => this.setSceneVisible(tl.reversed()), undefined, `${at}+=${ABOUT.fadeDur}`);
   }
 
@@ -403,6 +422,9 @@ export class Carousel {
       // a foto inteira volta ao lugar e a câmera recua dela
       this.shatter.reset();
       this.setShattered(false);
+      // as labels voltam junto com a câmera recuando, espelhando a ida — e só
+      // AQUI, com a foto já remontada pelo swapToShards de setShattered
+      gsap.to(this.labels, { fade: 1, duration: ABOUT.labelFadeDur, ease: 'power2.out' });
       await gsap.to(this.rig, {
         dive: 0,
         duration: SHATTER.diveDur,
@@ -412,6 +434,10 @@ export class Carousel {
 
     this.shatter.reset();
     this.setShattered(false);
+    // rede: no caminho da timeline o reverse já repôs isto, mas quem entrou
+    // por /#about (ou em baixa animação) teve o fade zerado no braço pelo
+    // hideAll() e não tem tween pra desfazer
+    this.labels.fade = 1;
     this.rig.dive = 0;
     this.rig.descent = 0;
     this.idle = false;
@@ -433,6 +459,10 @@ export class Carousel {
   // O flag que trava o layout(), que senão reacenderia labels e reflexos no
   // frame seguinte (ver Labels.setFacing). Quem apaga a cena de fato é o
   // addRingFade; aqui só o caminho de volta precisa repor tudo de uma vez.
+  //
+  // Este é também o portão que segura as labels na volta: elas só podem
+  // reacender quando layout() volta a rodar, e isso é aqui — depois do
+  // swapToShards abaixo, ou seja, com a foto já inteira.
   private setShattered(on: boolean) {
     this.shattered = on;
     if (!on) {
@@ -463,7 +493,18 @@ export class Carousel {
     this.segments.forEach((s, i) => { if (i !== ABOUT_INDEX) s.mesh.visible = v; });
     this.reflect.visible = v;
     this.backdrop.mesh.visible = v;
-    for (const m of this.labels.meshes) m.visible = v;
+    // As LABELS não entram aqui, e é isso que conserta a volta.
+    //
+    // Este método é chamado com `true` no reverse em burst+fadeDur — que, de
+    // trás pra frente, cai ANTES de os cacos terminarem o caminho de casa e
+    // antes do swapToShards. Acender as labels aqui punha a palavra de volta na
+    // tela com a foto ainda desmontada.
+    //
+    // Agora quem manda na visibilidade delas é só o setFacing(), via `fade`.
+    // Como o setFacing só roda dentro de layout(), e layout() só volta quando
+    // shattered vira false (depois da foto remontada), a palavra não tem COMO
+    // aparecer antes da imagem. O apagar continua de graça: com fade 0 o
+    // próprio setFacing põe visible = false.
   }
 
   // Uma passada só: dobra a fita na curvatura atual e distribui as fotos ao

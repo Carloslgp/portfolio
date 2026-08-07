@@ -50,14 +50,20 @@ export async function bootstrap() {
 // Tudo aqui é DOM e histórico; quem faz o 3D é o Carousel. A divisão importa:
 // a cena não sabe que existe um About em HTML, e este arquivo não sabe como um
 // caco de vidro voa. O que os dois compartilham é UM RELÓGIO: enterAbout()
-// devolve a timeline da coreografia com o label 'descent', e é nele que a
-// subida do painel se pendura.
+// devolve a timeline da coreografia, e a subida do painel é pendurada nela.
 //
-// A ordem aqui é o ponto todo da coisa. Antes o painel só existia DEPOIS que o
-// estilhaço acabava, e aquele corte era lido como carregamento. Agora ele entra
-// no começo, já deslocado pra fora da tela, e sobe enquanto o vidro ainda está
-// assentando — nenhum frame em que nada se move, e nada de opacidade, que é o
-// que faz uma coisa parecer "chegando" em vez de "rolando".
+// A ORDEM: o painel sobe DEPOIS que o estilhaço termina, não junto. Ele já
+// existe desde o começo, mas parado fora da tela (y = innerHeight), então o
+// vidro quebra e assenta num quadro limpo — sem o conteúdo do About passando
+// por cima e lavando a cena de branco.
+//
+// A subida ficar na MESMA timeline (e não num gsap.to solto depois do await) é
+// o que mantém o fechamento de graça: closeAbout() só roda tl.reverse(), e o
+// painel desce junto com o vidro se recolhendo, na ordem inversa exata.
+//
+// O custo é a abertura ficar mais longa — as duas fases agora são sequenciais.
+// O que não pode voltar é um vão parado no meio: a subida começa no quadro
+// seguinte ao fim do vidro, então nunca há um frame em que nada se move.
 function initAbout(carousel: Carousel, lenis: Lenis) {
   const panel = document.querySelector<HTMLElement>('[data-about]');
   if (!panel) return;
@@ -100,10 +106,15 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     // a UI do carrossel sai antes do impacto (ver index.astro .is-diving)
     document.body.classList.add('is-diving');
 
-    // O painel entra AQUI, no começo — só que empurrado pra baixo da dobra.
+    // O painel é montado AQUI, no começo, mas parado embaixo da dobra: ele
+    // precisa estar no fluxo pro GSAP medir e pro Lenis dimensionar a página,
+    // e y = innerHeight garante que fique inteiro fora da tela até a hora dele.
     // is-descending segura o overflow enquanto o transform está ativo: sem ele
     // o deslocamento viraria barra de rolagem e um salto no fim.
-    gsap.set(panel, { y: window.innerHeight });
+    // visibility (e não opacity nem hidden): some de verdade da tela, mas
+    // continua ocupando layout — o Lenis precisa da altura pra dimensionar a
+    // página, e display: none tiraria isso do fluxo.
+    gsap.set(panel, { y: window.innerHeight, visibility: 'hidden' });
     panel.hidden = false;
     document.body.classList.add('is-about', 'is-descending');
     lenis.stop();                          // a descida é automática; sem gesto por cima
@@ -111,11 +122,19 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     lenis.resize();
 
     tl = carousel.enterAbout();
+    // Sem posição: entra na fila DEPOIS de toda a coreografia do vidro. Antes
+    // isto vinha ancorado no label 'descent', que roda junto com o estilhaço —
+    // e era isso que punha o conteúdo do About por cima dos cacos ainda no ar,
+    // lavando a cena de branco.
+    // volta a existir só no quadro em que começa a subir. Como é um .set()
+    // dentro da timeline, o reverse do fechamento o desfaz sozinho: o painel
+    // some de novo assim que os cacos começam a se recolher.
+    tl.set(panel, { visibility: 'visible' });
     tl.to(panel, {
       y: 0,
       duration: ABOUT.descentDur,
       ease: ABOUT.descentEase,
-    }, 'descent');
+    });
     await tl;
 
     // o painel já está em y:0 com scrollTop 0, então soltar o overflow aqui não

@@ -62,13 +62,28 @@ export class Labels {
     }
   }
 
+  // Multiplicador global do conjunto, por cima do fade por orientação.
+  //
+  // Existe porque setFacing() reescreve mats[i].opacity a CADA frame: um tween
+  // direto na opacidade do material seria apagado no frame seguinte. Quem quer
+  // apagar as labels inteiras (a entrada do About) tweena isto.
+  fade = 1;
+
+  // Apaga o conjunto de uma vez, sem tween — o caminho instantâneo (deep-link
+  // /#about e baixa animação), onde não há mergulho pra acompanhar. Zera o
+  // fade junto: senão o primeiro layout() da volta reacenderia tudo.
+  hideAll() {
+    this.fade = 0;
+    for (const m of this.meshes) m.visible = false;
+  }
+
   // esmaece a label conforme a foto dela sai da frente — de perfil o vidro
   // viraria um borrão fosco na borda do anel. `facing` é o cosseno da guinada
   // da fita ali: 1 encarando a câmera, 0 de perfil. Na fita reta a guinada é
   // zero em todo mundo, então todas as labels ficam cheias, como devem ficar.
   setFacing(i: number, facing: number) {
     // visível cheia até ~26° do centro, some de vez perto de ~50°
-    const o = THREE.MathUtils.smoothstep(facing, 0.64, 0.9);
+    const o = THREE.MathUtils.smoothstep(facing, 0.64, 0.9) * this.fade;
     this.mats[i].opacity = o;
     this.meshes[i].visible = o > 0.001;
   }

@@ -31,9 +31,11 @@ export function awaitGate(): Promise<void> {
       });
     });
 
-    // o foco entra no portão: quem chega por teclado ou leitor de tela precisa
-    // achar a pergunta, e não uma cortina muda sem saída aparente
-    gate.querySelector<HTMLButtonElement>('[data-gate-motion]')?.focus();
+    // O foco entra no PORTÃO, não no primeiro botão: quem chega por teclado ou
+    // leitor de tela precisa achar a pergunta, mas focar uma das opções pinta
+    // ela de anel de foco e ela passa a parecer já escolhida — as duas têm que
+    // chegar iguais, porque nenhuma é o padrão.
+    gate.focus();
   });
 }
 

@@ -237,6 +237,80 @@ export const ABOUT = {
   rewindMax: 0.9,
 };
 
+// --- carrossel do About: a MESMA fita, aberta (ver Reel.ts) ---
+//
+// É a segunda forma do anel — a fita — e não o anel: aqui ela nunca fecha. Isso
+// muda uma coisa de fundo em relação ao carrossel da home: a fita tem PONTAS.
+// Não há como dar a volta, então o gesto bate no fim e volta (ver `rubber`), e a
+// primeira e a última foto existem de verdade em vez de serem a mesma.
+//
+// Cena própria, canvas próprio, relógio próprio: este carrossel vive dentro do
+// texto do About, e não pode depender do loop do anel — que a essa altura já
+// está parado, com a cena apagada.
+export const REEL = {
+  photoH: 1.0,          // altura da foto em unidades de mundo (a régua de tudo aqui)
+  aspect: 16 / 9,       // as capas/prints são todas paisagem 16:9
+  gap: 0.16,            // respiro entre fotos, em frações da largura
+
+  // Curvatura da fita, em 1/unidades de mundo — é o `k` do Ribbon.ts com raio de
+  // referência 1, ou seja, o raio de curvatura é 1/curve (aqui, ~5.6).
+  //
+  // Este número é o que separa "fita" de "anel". Em 0 ela fica perfeitamente
+  // reta e o 3D some: sem nada girando, sobra uma tira de fotos que poderia ser
+  // um <div> com overflow. O suficiente pras pontas RECUAREM da câmera (aqui, uns
+  // 20° na beirada do quadro) devolve o volume da home sem começar a fechar.
+  curve: 0.18,
+  segments: 32,         // subdivisões na largura = lisura da curva
+
+  // --- enquadramento ---
+  // A câmera não tem distância fixa: ela é DERIVADA do que precisa caber, então
+  // a mesma composição vale do celular ao monitor largo sem constante por
+  // breakpoint. As medidas abaixo são o que o quadro tem que conter.
+  fov: 30,              // estreito de propósito: perspectiva discreta, sem deformar as capas
+  padTop: 0.12,         // ar acima da foto
+  reflectGap: 0.09,     // respiro entre a foto e o reflexo (0 deixa os dois colados)
+  // Quanto do reflexo entra no quadro. Anda junto com REEL_REFLECT.fade, e o par
+  // é escolhido pra imagem já ter apagado quando a borda de baixo do canvas
+  // chega: aqui o quadro TEM beirada visível no meio do papel, então um reflexo
+  // ainda opaco ali vira uma linha reta atravessando a página. Na home isso não
+  // aparecia porque o corte cai fora da tela.
+  reflectShow: 0.42,
+  // Teto da largura da foto ativa, como fração da largura visível. Só aperta
+  // quando o canvas fica estreito demais (celular): aí a câmera recua em vez de
+  // deixar a foto sangrar pelos lados.
+  fill: 0.74,
+
+  // Brilho das fotos fora do centro. MeshBasicMaterial multiplica o mapa pela
+  // cor, então isto é literalmente "só a ativa está acesa" — é o que dá foco sem
+  // precisar de vinheta nem de blur.
+  dim: 0.58,
+  cull: 3,              // fotos além de N passos do centro nem são desenhadas
+
+  // --- gesto ---
+  lerp: 0.15,           // suavização current → target (por frame a 60fps)
+  wheelGain: 0.9,       // ganho do gesto lateral do trackpad (1 = anda junto com o dedo)
+  momentum: 1.4,        // quanto a velocidade do arrasto "arremessa" ao soltar
+  rubber: 0.35,         // resistência ao passar das pontas (0 = parede, 1 = sem limite)
+  snapDelay: 140,       // ms de ociosidade antes de travar na foto
+  snapDur: 0.7,
+  clickSlop: 6,         // px: acima disso o gesto foi arrasto, não clique
+};
+
+export const REEL_PHOTO_W = REEL.photoH * REEL.aspect;
+export const REEL_STEP = REEL_PHOTO_W * (1 + REEL.gap);
+
+// O reflexo do carrossel usa a mesma água do anel com números próprios: as
+// constantes de REFLECT foram calibradas para a foto de 1.6 de altura, e as
+// mesmas 46 cristas numa foto de 1.0 (menor ainda na tela, dentro da coluna de
+// texto) viram chiado em vez de marola.
+export const REEL_REFLECT = {
+  opacity: 0.42,
+  freq: 26,
+  amp: 0.016,
+  fade: 3.4,       // ver REEL.reflectShow: os dois formam um par
+  shimmer: 0.12,
+};
+
 // --- responsividade da cena ---
 // abaixo desta proporção (largura/altura), a câmera se afasta na mesma medida
 // para o segmento ativo continuar cabendo na largura visível (retrato/estreito)

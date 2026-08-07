@@ -2,16 +2,13 @@
 // index.astro — frontmatter roda no build. Three.js NÃO vem aqui.
 import Layout from '../layouts/Layout.astro';
 import { SECTIONS } from '../components/carousel/config';
+// O texto do About mora em src/data/about.ts. Aqui embaixo só existe a forma
+// de desenhar cada tipo de bloco — nenhuma frase da página passa por este
+// arquivo, então editar o conteúdo é sempre lá.
+import { LEAD, TOPICS, isPhoto, isCarousel } from '../data/about';
+import Reel from '../components/about/Reel.astro';
 
 const first = SECTIONS[0];
-
-// CONTEÚDO MOCK do About — tudo abaixo é placeholder pra trocar depois pelo
-// texto real. Está marcado com o selo "placeholder" no próprio layout pra não
-// escapar despercebido numa publicação.
-const skills = [
-  'TypeScript', 'Three.js', 'GSAP', 'React',
-  'Astro', 'WebGL / GLSL', 'Node.js', 'Design de interface',
-];
 ---
 
 <Layout>
@@ -94,38 +91,46 @@ const skills = [
 
       <div class="about-inner">
         <header class="about-head">
-          <span class="tag">Placeholder — conteúdo mock</span>
-          <h2>Sobre mim</h2>
-          <p class="lead">
-            [Espaço reservado] Desenvolvedor de interfaces que gosta de misturar código com
-            teimosia visual. Este parágrafo de abertura é só um substituto até o texto real
-            entrar no lugar.
-          </p>
+          <h2>About</h2>
+          <p class="lead">{LEAD}</p>
         </header>
 
+        <!-- Um <section> por tópico, na ordem de TOPICS. Cada bloco é um
+             parágrafo, uma foto ou um espaço reservado; o formato do bloco é
+             que decide, não a posição. -->
         <div class="about-body">
-          <p>
-            [Placeholder] Comecei a programar mexendo em coisas que não deveriam ser mexidas e
-            nunca mais parei. Hoje trabalho em algum ponto entre engenharia e design, tentando
-            fazer telas que funcionem bem e que também dêem vontade de ficar olhando.
-          </p>
-          <p>
-            [Placeholder] Fora do teclado, gosto de fotografia, café mal coado e de reescrever a
-            mesma função três vezes até ela ficar simples o suficiente. Este texto, como os
-            outros, é rascunho esperando a versão de verdade.
-          </p>
-        </div>
+          {TOPICS.map((topic) => (
+            <section class="topic" id={`about-${topic.id}`}>
+              <h3>{topic.title}</h3>
 
-        <div class="about-skills">
-          <h3>Stack &amp; skills <span class="tag tag-sm">mock</span></h3>
-          <ul>{skills.map((s) => <li>{s}</li>)}</ul>
+              {topic.blocks.map((block) => (
+                <Fragment>
+                  {typeof block === 'string' && <p>{block}</p>}
+
+                  {/* Sem src, a mesma moldura fica vazia com o rótulo — a
+                      medida é a da foto, então pôr a imagem depois não mexe
+                      em nada do que está em volta. */}
+                  {isPhoto(block) && (
+                    <figure class:list={['shot', { 'is-empty': !block.src }]}>
+                      {block.src
+                        ? <img src={block.src} alt={block.photo} loading="lazy" />
+                        : <span class="slot-note">Foto — {block.photo}</span>}
+                    </figure>
+                  )}
+
+                  {/* a fita 3D — a mesma superfície do anel da home, aberta
+                      (components/about/Reel.astro + carousel/Reel.ts) */}
+                  {isCarousel(block) && <Reel title={block.carousel} items={block.items} />}
+                </Fragment>
+              ))}
+            </section>
+          ))}
         </div>
 
         <div class="about-cta">
-          <h3>Vamos conversar?</h3>
-          <p>[Placeholder] Disponível para novos projetos e boas conversas sobre interfaces.</p>
+          <h3>Let’s talk</h3>
           <div class="cta-actions">
-            <a class="btn btn-solid" href="mailto:placeholder@example.com">Enviar e-mail</a>
+            <a class="btn btn-solid" href="mailto:carloslgp3585@gmail.com">Send a message</a>
             <button type="button" class="btn btn-glass" disabled>Baixar currículo</button>
           </div>
         </div>
@@ -714,24 +719,6 @@ const skills = [
     padding: 4rem 1.5rem 6rem;
   }
 
-  .tag {
-    display: inline-block;
-    margin-bottom: 1rem;
-    padding: 0.3rem 0.7rem;
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(10, 10, 10, 0.55);
-    background: rgba(10, 10, 10, 0.05);
-    border: 1px solid rgba(10, 10, 10, 0.12);
-    border-radius: 999px;
-  }
-  .tag-sm {
-    margin: 0 0 0 0.5rem;
-    vertical-align: middle;
-  }
-
   .about h2 {
     font-family: "Playfair Display", Georgia, serif;
     font-weight: 600;
@@ -761,20 +748,57 @@ const skills = [
     margin-bottom: 1.25rem;
   }
 
-  .about-skills ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-    list-style: none;
+  /* ——— tópicos (ver src/data/about.ts) ———
+     Um bloco por assunto. O espaço entre eles é o que separa: sem linha, sem
+     caixa — o título já é a fronteira. */
+  .topic + .topic {
+    margin-top: 3.5rem;
   }
-  .about-skills li {
-    padding: 0.45rem 0.9rem;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: rgba(10, 10, 10, 0.8);
-    background: rgba(10, 10, 10, 0.05);
-    border: 1px solid rgba(10, 10, 10, 0.1);
-    border-radius: 999px;
+  .topic h3 {
+    /* mais discreto que os títulos de fora (Stack, Let's talk): estes são
+       divisórias dentro de um texto corrido, não seções da página */
+    font-size: 1.35rem;
+    margin-bottom: 0.9rem;
+  }
+  /* o último parágrafo do tópico não precisa de respiro embaixo: quem dá o
+     intervalo até o próximo título é o .topic + .topic */
+  .topic > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* ——— fotos e espaços reservados ———
+     A moldura tem medida própria (aspect-ratio), então ela ocupa o mesmo
+     lugar vazia ou com a imagem: acrescentar o src depois não empurra o texto
+     em volta nem muda a altura da página. */
+  .shot {
+    margin: 2rem 0;
+    overflow: hidden;
+    border-radius: 2px;
+    aspect-ratio: 3 / 2;
+  }
+  .shot img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Só enquanto está vazio. O tracejado é de propósito: um retângulo cinza
+     liso passaria por decisão de design e escaparia numa publicação. */
+  .shot.is-empty {
+    display: grid;
+    place-items: center;
+    border: 1px dashed rgba(10, 10, 10, 0.22);
+    background: rgba(10, 10, 10, 0.02);
+  }
+  .slot-note {
+    padding: 0 1rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: center;
+    color: rgba(10, 10, 10, 0.4);
   }
 
   .about-cta {

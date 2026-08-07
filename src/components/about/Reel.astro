@@ -1,0 +1,228 @@
+---
+// src/components/about/Reel.astro — a casca em HTML da fita 3D.
+//
+// O 3D em si é components/carousel/Reel.ts; aqui mora só o que ele NÃO faz:
+// a caixa que dá a medida, a legenda que diz qual foto está de frente, e a
+// lista de imagens que fica no lugar dele quando não há JS ou WebGL.
+//
+// Essa lista é também a FONTE dos dados do canvas: o script lê src, alt e
+// título dela em vez de receber uma cópia em JSON. Um conteúdo só, num lugar
+// só — e o caminho sem JS é o que o navegador já tinha desenhado.
+import type { ReelPhoto } from '../../data/about';
+
+interface Props {
+  title: string;
+  items: ReelPhoto[];
+}
+
+const { title, items } = Astro.props;
+const pad = (n: number) => String(n).padStart(2, '0');
+---
+
+<figure class="reel" data-reel aria-roledescription="carrossel" aria-label={title}>
+  <div class="reel-stage">
+    <!-- tabindex vem do script, quando o 3D existe de fato: sem ele isto é um
+         canvas vazio e invisível, e uma parada de Tab em cima de nada -->
+    <canvas
+      class="reel-canvas"
+      data-reel-canvas
+      role="img"
+      aria-label={items[0]?.title}
+      tabindex="-1"></canvas>
+
+    <ul class="reel-fallback" data-reel-fallback>
+      {items.map((it) => (
+        <li>
+          <img src={it.src} alt={it.alt} loading="lazy" />
+          <span data-reel-item-title>{it.title}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+
+  <figcaption class="reel-bar">
+    <button
+      type="button" class="reel-nav" data-reel-prev
+      aria-label="Jogo anterior" disabled>‹</button>
+
+    <!-- aria-live: quem navega pelas setas ouve o título trocar -->
+    <span class="reel-title" data-reel-title aria-live="polite">{items[0]?.title}</span>
+
+    <span class="reel-count" data-reel-count>{pad(1)} / {pad(items.length)}</span>
+
+    <button
+      type="button" class="reel-nav" data-reel-next
+      aria-label="Próximo jogo">›</button>
+  </figcaption>
+</figure>
+
+<script>
+  import { initReels } from '../../scripts/reel';
+  initReels();
+</script>
+
+<style>
+  /* ——— TESTE: a fita sangra até as bordas da janela ———
+     Ela nasce dentro da coluna de texto (.about-inner, 42rem), e estas margens
+     negativas a devolvem à largura da tela: a conta dá exatamente 100vw,
+     centrado, sem depender de saber a largura da coluna.
+     Pra trazer de volta pra dentro da coluna é só voltar a `margin: 2.5rem 0` —
+     o resto (legenda, fallback) já se alinha sozinho pelos max-width abaixo. */
+  .reel {
+    margin: 3.5rem calc(50% - 50vw);
+  }
+
+  /* A caixa que segura a medida — e, na largura cheia, a única que ainda decide
+     o TAMANHO das fotos.
+     A proporção fixa saiu: 16/7 de janela inteira seriam uns 630px de bloco no
+     meio de um texto. A altura é fixada aqui, e o enquadramento da cena é
+     derivado dela (ver Reel.ts → frame()) — caixa mais alta, foto maior, e mais
+     estreita a faixa de vizinhas que aparece dos lados.
+     touch-action: pan-y — o dedo na vertical continua rolando a PÁGINA; só o
+     arrasto lateral é do carrossel. */
+  .reel-stage {
+    position: relative;
+    height: clamp(260px, 42vw, 62svh);
+    touch-action: pan-y;
+  }
+
+  .reel-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+
+    /* As pontas se dissolvem no papel.
+       Sem isto a foto vizinha é FATIADA pela borda do canvas, e no meio de uma
+       coluna de texto um corte reto assim lê como recorte errado, não como
+       continuação. Na home o mesmo corte passa despercebido porque o canvas é a
+       tela inteira — aqui ele tem beirada visível, e a beirada precisa sumir.
+       Só na horizontal: em cima e embaixo o quadro já termina em ar e em água. */
+    mask-image: linear-gradient(90deg,
+      transparent 0, #000 8%, #000 92%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg,
+      transparent 0, #000 8%, #000 92%, transparent 100%);
+
+    /* nasce apagado e só acende quando as texturas chegaram: sem isto o primeiro
+       quadro entra com metade das fotos */
+    opacity: 0;
+    transition: opacity 0.7s ease;
+  }
+  .reel-canvas:active {
+    cursor: grabbing;
+  }
+  .reel.is-live .reel-canvas {
+    opacity: 1;
+  }
+  :global(html[data-motion='reduced']) .reel-canvas {
+    transition: none;
+  }
+
+  /* ——— o caminho sem JS ———
+     Uma tira rolável de verdade: sem script nenhum isto já é um carrossel, só
+     que em CSS. O script a esconde ANTES de começar a carregar as texturas, e
+     como as <img> são lazy elas nem chegam a ser baixadas duas vezes. */
+  .reel-fallback {
+    display: flex;
+    gap: 0.75rem;
+    height: 100%;
+    margin: 0;
+    padding: 0 1.5rem 0.5rem;
+    list-style: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+  .reel.is-js .reel-fallback {
+    display: none;
+  }
+  .reel-fallback li {
+    /* teto em rem: na largura cheia, 68% da janela viraria uma capa gigante */
+    flex: 0 0 min(68%, 30rem);
+    scroll-snap-align: center;
+  }
+  .reel-fallback img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: 2px;
+  }
+  .reel-fallback span {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.68rem;
+    color: rgba(10, 10, 10, 0.5);
+  }
+
+  /* ——— legenda ——— */
+  /* A fita sangra, a legenda não: ela volta pra largura e pro recuo da coluna de
+     texto (os mesmos 42rem / 1.5rem do .about-inner), senão o título e a
+     contagem ficariam boiando nas beiradas da tela, longe de tudo que se lê. */
+  .reel-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    max-width: 42rem;
+    margin: 0.9rem auto 0;
+    padding: 0 1.5rem;
+  }
+  .reel-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(10, 10, 10, 0.62);
+    /* título longo não pode quebrar a linha da legenda em duas e empurrar o
+       texto do tópico pra baixo a cada troca de foto */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .reel-count {
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;   /* a contagem não dança ao trocar de foto */
+    color: rgba(10, 10, 10, 0.35);
+  }
+  .reel-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    font: inherit;
+    font-size: 1.05rem;
+    line-height: 1;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid rgba(10, 10, 10, 0.16);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+  }
+  .reel-nav:hover:not(:disabled) {
+    background: rgba(10, 10, 10, 0.05);
+    border-color: rgba(10, 10, 10, 0.32);
+  }
+  /* as pontas da fita: ela não dá a volta, e o botão diz isso */
+  .reel-nav:disabled {
+    opacity: 0.28;
+    cursor: default;
+  }
+
+  @media (max-width: 700px) {
+    /* a altura da caixa já é governada pelo piso do clamp() lá em cima, que no
+       celular é quem vale — e um piso alto é justamente a foto ocupando mais da
+       largura, que é o que se quer aqui (ver Reel.ts → frame()) */
+    .reel {
+      margin-block: 2.5rem;
+    }
+    .reel-title {
+      letter-spacing: 0.08em;
+    }
+  }
+</style>

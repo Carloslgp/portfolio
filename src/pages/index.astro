@@ -140,6 +140,32 @@ const skills = [
   <div class="loader" data-loader>
     <div class="bg-portfolio" aria-hidden="true">PORTFOLIO</div>
     <span class="loader-track"><i data-loader-bar></i></span>
+
+    <!-- O portão. A cortina não sai enquanto não houver escolha (ver
+         scripts/loading.ts → awaitGate). role="dialog" porque é exatamente
+         isto: uma pergunta que bloqueia o resto da página até ser respondida. -->
+    <div class="gate" data-gate role="dialog" aria-modal="true" aria-labelledby="gate-q">
+      <p class="gate-q" id="gate-q">Como você prefere ver este site?</p>
+
+      <div class="gate-opts">
+        <button type="button" class="gate-btn" data-gate-motion="full">
+          Com animação
+          <small>a experiência completa: câmera, vidro e transições</small>
+        </button>
+        <button type="button" class="gate-btn" data-gate-motion="reduced">
+          Baixa animação
+          <small>sem mergulho de câmera nem estilhaço — o conteúdo direto</small>
+        </button>
+      </div>
+
+      <!-- Ainda sem função: o destino (versão simples, navegável por Tab) não
+           existe. Fica desabilitado e dizendo "em breve" de propósito — um
+           botão vivo que não leva a lugar nenhum seria pior justamente pra
+           quem depende dele. Pra ligar: trocar por <a href> pro site simples. -->
+      <button type="button" class="gate-help" data-gate-a11y disabled aria-disabled="true">
+        Precisa de auxílio para navegação? <span>em breve</span>
+      </button>
+    </div>
   </div>
 </Layout>
 
@@ -194,6 +220,94 @@ const skills = [
     transform: scaleX(0);
     transform-origin: left;
     transition: transform 0.3s ease;
+  }
+
+  /* ——— portão de entrada (ver scripts/loading.ts) ——— */
+  .gate {
+    position: absolute;
+    top: 54%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(560px, 88vw);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    text-align: center;
+  }
+  /* some assim que a escolha é feita, e não junto com a cortina: a resposta
+     precisa sumir antes, senão os botões ficariam por cima da cena descendo */
+  .gate.is-chosen {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .gate-q {
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+  }
+  .gate-opts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+  }
+  .gate-btn {
+    flex: 1 1 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.85rem 1.1rem;
+    background: transparent;
+    border: 1px solid rgba(10, 10, 10, 0.22);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  .gate-btn:hover,
+  .gate-btn:focus-visible {
+    border-color: var(--ink);
+    background: rgba(10, 10, 10, 0.04);
+  }
+  .gate-btn small {
+    font-size: 0.7rem;
+    line-height: 1.35;
+    opacity: 0.55;
+  }
+  .gate-help {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    font-size: 0.72rem;
+    color: rgba(10, 10, 10, 0.45);
+    cursor: not-allowed;
+  }
+  .gate-help span {
+    margin-left: 0.35rem;
+    padding: 0 0.3rem;
+    border: 1px solid currentColor;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Escolheu baixa animação: as transições puramente decorativas do DOM saem
+     junto com as do canvas. O seletor mora no <html> (ver scripts/motion.ts),
+     então isto vale pra página inteira sem o JS ter de tocar em cada elemento.
+     A cortina fica de fora — ela ainda precisa sumir com fade, senão o site
+     aparece num corte seco. */
+  :global(html[data-motion='reduced']) .quote span,
+  :global(html[data-motion='reduced']) .card,
+  :global(html[data-motion='reduced']) .cursor {
+    transition: none;
+  }
+  :global(html[data-motion='reduced']) .cursor {
+    display: none;
   }
 
   /* fundo gigante atrás do canvas */

@@ -84,6 +84,17 @@ export class CameraRig {
     return new Promise((resolve) => { this.onArrive = resolve; });
   }
 
+  // A mesma chegada, sem a descida — baixa animação. Vai direto pra pose final
+  // em vez de encurtar a duração: um mergulho rápido ainda é um mergulho, e é
+  // exatamente o movimento de câmera que quem escolheu isto pediu pra não ver.
+  revealInstant() {
+    this.entering = false;
+    this.elapsed = CAM.top.revealDur;
+    this.progress = 1;
+    this.onArrive?.();
+    this.onArrive = null;
+  }
+
   // Chamado todo frame. `dt` em segundos; `viewRadius` é a distância lateral já
   // ajustada à proporção da tela (entra no lerp, então a entrada termina no
   // enquadramento certo mesmo em retrato).

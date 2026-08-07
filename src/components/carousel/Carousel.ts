@@ -222,6 +222,12 @@ export class Carousel {
     this.input.enabled = true;     // controle só depois que a câmera assenta
   }
 
+  // entrada sem descida (baixa animação): já assentado na foto inicial
+  revealInstant() {
+    this.rig.revealInstant();
+    this.input.enabled = true;
+  }
+
   // alterna anel (false) ↔ fita (true) animando o desenrolar com GSAP
   setMode(flat: boolean) {
     gsap.to(this, { morph: flat ? 1 : 0, duration: 0.9, ease: 'power3.inOut' });

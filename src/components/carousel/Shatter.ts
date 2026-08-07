@@ -506,8 +506,8 @@ export class Shatter {
     }
   }
 
-  // Moldura na hora, sem coreografia — deep-link /#about e
-  // prefers-reduced-motion, onde não houve foto inteira pra ver quebrar.
+  // Moldura na hora, sem coreografia — o deep-link /#about, onde não houve
+  // foto inteira pra ver quebrar, e a baixa animação, onde não se quer vê-la.
   snapToBorder() {
     this.tl?.kill();
     this.tl = null;

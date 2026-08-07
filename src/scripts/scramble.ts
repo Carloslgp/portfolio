@@ -6,6 +6,8 @@
 // pior, o alvo do hover viraria uma área morta em cima do canvas, que é por
 // onde se arrasta o carrossel.
 
+import { reducedMotion } from './motion';
+
 const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789#%&/\\<>*+=?$';
 
 const ROLL = 48;         // ms que cada letra ainda não resolvida segura um glifo
@@ -26,7 +28,6 @@ function glyph(i: number, tick: number) {
 }
 
 export function scrambleOnHover(el: HTMLElement): ScrambleHandle {
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const canHover = window.matchMedia('(hover: hover)').matches;
 
   let raf = 0;
@@ -45,6 +46,9 @@ export function scrambleOnHover(el: HTMLElement): ScrambleHandle {
   }
 
   function run() {
+    // Perguntado AQUI, e não lá embaixo junto do addEventListener: os listeners
+    // são registrados no carregamento do script, antes de o portão resolver.
+    if (reducedMotion()) return;
     if (raf) return;                       // já rodando: hover repetido não reinicia
     const text = el.textContent ?? '';
     if (!text.trim()) return;
@@ -89,7 +93,7 @@ export function scrambleOnHover(el: HTMLElement): ScrambleHandle {
     raf = requestAnimationFrame(frame);
   }
 
-  if (canHover && !reduced) {
+  if (canHover) {
     el.addEventListener('mouseenter', run);
     // teclado também: o "Carlos Leonardo" é link e chega por Tab
     el.addEventListener('focus', run);

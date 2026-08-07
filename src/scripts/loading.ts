@@ -6,7 +6,36 @@
 // no primeiro frame enquanto o relógio do GSAP seguia correndo por baixo, e
 // quando o próximo frame saía a animação já tinha acabado. Dava exatamente a
 // impressão de que a câmera não desce: ela descia, sem ninguém ver.
+import { setMotionMode, type MotionMode } from './motion';
+
 const el = () => document.querySelector<HTMLElement>('[data-loader]');
+
+// O portão: a cortina não sai enquanto a pessoa não disser como quer ver o
+// site. Fica DENTRO da cortina de propósito — a escolha acontece enquanto as
+// fotos ainda baixam, então perguntar não custa nada ao tempo de carregamento.
+//
+// Sem elemento no HTML isto resolve na hora, e o site segue no modo completo:
+// um portão quebrado não pode ser uma porta trancada.
+export function awaitGate(): Promise<void> {
+  const gate = document.querySelector<HTMLElement>('[data-gate]');
+  if (!gate) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    gate.querySelectorAll<HTMLButtonElement>('[data-gate-motion]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        setMotionMode(btn.dataset.gateMotion as MotionMode);
+        // trava o portão antes de resolver: um segundo clique depois daqui
+        // trocaria o modo com a coreografia de abertura já em curso
+        gate.classList.add('is-chosen');
+        resolve();
+      });
+    });
+
+    // o foco entra no portão: quem chega por teclado ou leitor de tela precisa
+    // achar a pergunta, e não uma cortina muda sem saída aparente
+    gate.querySelector<HTMLButtonElement>('[data-gate-motion]')?.focus();
+  });
+}
 
 export function setProgress(v: number) {
   const bar = document.querySelector<HTMLElement>('[data-loader-bar]');

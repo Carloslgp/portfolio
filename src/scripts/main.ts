@@ -4,11 +4,17 @@ import Lenis from 'lenis';
 import gsap from 'gsap';
 import { Carousel } from '../components/carousel/Carousel';
 import { ABOUT } from '../components/carousel/config';
-import { setProgress, hideLoader } from './loading';
+import { setProgress, hideLoader, awaitGate } from './loading';
+import { reducedMotion } from './motion';
 
 export async function bootstrap() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
   if (!canvas) return;
+
+  // O portão é armado ANTES do carregamento e só esperado depois: a pergunta
+  // fica na tela enquanto as fotos baixam, então a escolha corre em paralelo e
+  // não vira tempo de espera somado.
+  const gate = awaitGate();
 
   window.addEventListener('carousel:progress', (e) => {
     const { loaded, total } = (e as CustomEvent).detail;
@@ -24,8 +30,12 @@ export async function bootstrap() {
   // A ordem aqui é a coreografia da abertura, e cada passo espera o anterior:
   await carousel.init(canvas, lenis);   // fotos, fonte e shaders — atrás da cortina
   carousel.run();                       // cena viva na pose de topo
+  await gate;                           // a cortina não sai sem a escolha feita
   await hideLoader();                   // cortina sai, mostrando o anel de cima
-  await carousel.reveal();              // câmera desce até a foto inicial
+
+  // câmera desce até a foto inicial — ou já nasce lá, em baixa animação
+  if (reducedMotion()) carousel.revealInstant();
+  else await carousel.reveal();
 
   // a linha do topo e os cantos (hora / frase) entram por último, com a cena já parada
   document
@@ -52,8 +62,6 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
   const panel = document.querySelector<HTMLElement>('[data-about]');
   if (!panel) return;
 
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
   let open = false;
   let busy = false;   // trava a coreografia enquanto ela roda (clique duplo, hash, etc.)
   let tl: gsap.core.Timeline | null = null;
@@ -64,7 +72,8 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
   // dele evita ainda forçar um layout a cada evento.
   const onScroll = () => carousel.setBorderScroll(lenis.scroll);
 
-  // estado final sem coreografia: deep-link e prefers-reduced-motion
+  // estado final sem coreografia: o deep-link (/#about), onde não há foto na
+  // tela pra mergulhar, e a baixa animação, onde não se quer o mergulho
   function settleOpen() {
     document.body.classList.add('is-about');
     panel.hidden = false;
@@ -79,7 +88,9 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
 
     if (push && location.hash !== '#about') history.pushState(null, '', '#about');
 
-    if (reduced) {
+    // baixa animação: o About simplesmente está aberto. Sem mergulho de câmera,
+    // sem estilhaço — a moldura aparece montada e o texto já está lá.
+    if (reducedMotion()) {
       carousel.enterAboutInstant();
       settleOpen();
       busy = false;
@@ -132,6 +143,7 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     const from = lenis.scroll;
     if (from <= 1) return Promise.resolve();
 
+    const reduced = reducedMotion();
     const dur = reduced
       ? 0
       : Math.min(ABOUT.rewindMax, ABOUT.rewindMin + (from / window.innerHeight) * 0.28);
@@ -172,8 +184,9 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     lenis.stop();
     carousel.setBorderScroll(0);            // devolve a moldura ao lugar antes de desfazer
 
-    // sem timeline (entrou por /#about) não há o que reverter: a saída precisa
-    // ser animada aqui, no braço
+    // sem timeline (entrou por /#about, ou abriu em baixa animação) não há o
+    // que reverter: a saída precisa ser animada aqui, no braço
+    const reduced = reducedMotion();
     const manual = !tl && !reduced;
 
     if (!reduced) document.body.classList.add('is-diving', 'is-descending');

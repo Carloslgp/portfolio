@@ -3,6 +3,7 @@
 // sozinho. Quem decide QUANDO os dois aparecem é o main.ts (classe .is-in),
 // junto com a linha do topo.
 import { scrambleOnHover } from './scramble';
+import { reducedMotion } from './motion';
 
 // Curitiba segue o mesmo fuso de São Paulo. Deixar o nome da zona (e não um
 // offset fixo tipo -03:00) é o que faz isto sobreviver a um eventual retorno do
@@ -58,8 +59,6 @@ function initQuotes() {
   const el = document.querySelector<HTMLElement>('[data-quote]');
   if (!el) return;
 
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
   // o hover desta é ligado aqui, e não pelo initScramble(): guardar o handle é
   // o que permite abortar a decifração quando a frase vai ser trocada
   const scramble = scrambleOnHover(el);
@@ -77,7 +76,8 @@ function initQuotes() {
 
     i = (i + 1) % QUOTES.length;
 
-    if (reduced) {
+    // baixa animação: a frase troca seca, sem o crossfade
+    if (reducedMotion()) {
       el.textContent = QUOTES[i];
       return;
     }

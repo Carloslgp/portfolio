@@ -1,6 +1,7 @@
 // src/scripts/ui.ts — a camada 2D. Só DOM: ouve 'carousel:change' e reflete a
 // seção ativa; dispara 'carousel:step' / 'carousel:mode' de volta pro Carousel.
 import { SECTIONS } from '../components/carousel/config';
+import { reducedMotion } from './motion';
 
 export function initUI() {
   const label = document.querySelector<HTMLElement>('[data-active-label]');
@@ -59,6 +60,12 @@ function initCursor() {
   });
 
   const tick = () => {
+    // O portão resolve DEPOIS que este loop já começou (o padrão é movimento
+    // completo), então a saída é aqui dentro: escolhida a baixa animação, o
+    // laço morre no frame seguinte em vez de perseguir um cursor que o CSS já
+    // escondeu. A escolha é feita uma vez só, então não há volta a esperar.
+    if (reducedMotion()) return;
+
     pos.x += (mouse.x - pos.x) * 0.1;
     pos.y += (mouse.y - pos.y) * 0.1;
     cursor.style.transform = `translate(${pos.x}px, ${pos.y}px) translate(-50%, -50%)`;

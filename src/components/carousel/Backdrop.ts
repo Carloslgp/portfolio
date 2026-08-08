@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import gsap from 'gsap';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 import type { Font } from 'three/examples/jsm/loaders/FontLoader.js';
 import { BACKDROP, CAM } from './config';
+import { reducedMotion } from '../../scripts/motion';
 
 // A palavra gigante do fundo.
 //
@@ -41,6 +43,36 @@ export class Backdrop {
 
     this.mesh = new THREE.Mesh(geo, this.mat);
     this.mesh.position.set(0, BACKDROP.y, BACKDROP.z);
+
+    // Tema. O fundo atrás da palavra é o --paper do <body> (o canvas é
+    // transparente), então quando o CSS inverte a página, a palavra tem que
+    // inverter junto — quase-preta sobre quase-preto simplesmente some.
+    // O estado mora no <html> (data-theme, ver scripts/theme.ts); aqui só se
+    // lê na criação e se ouve a troca.
+    this.applyTheme(document.documentElement.dataset.theme === 'dark');
+    window.addEventListener('theme:change', (e) => {
+      this.applyTheme((e as CustomEvent).detail.dark, true);
+    });
+  }
+
+  // A troca ao vivo atravessa em tween, não num corte: o resto da página faz o
+  // fade pelo --theme-fade do CSS (0.6s, global.css), e a palavra trocando de
+  // cor num frame no meio dele leria como um defeito. Mesma dupla de números lá
+  // e aqui, de propósito.
+  private applyTheme(dark: boolean, animate = false) {
+    const target = new THREE.Color(dark ? BACKDROP.colorDark : BACKDROP.color);
+    gsap.killTweensOf(this.mat.color);
+    if (!animate || reducedMotion()) {
+      this.mat.color.copy(target);
+      return;
+    }
+    gsap.to(this.mat.color, {
+      r: target.r,
+      g: target.g,
+      b: target.b,
+      duration: 0.6,
+      ease: 'power1.inOut',
+    });
   }
 
   // Encaixa a palavra na tela. Chamado na abertura e a cada resize, com o

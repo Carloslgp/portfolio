@@ -26,7 +26,7 @@ type Paragraph = string;
 
 /** Uma foto. Sem `src`, é a moldura vazia com a descrição de rótulo; com
  *  `src`, a mesma descrição vira o alt da imagem. */
-type Photo = { photo: string; src?: string };
+type Photo = { photo: string; src?: string; fit?: 'cover' | 'contain' };
 
 /** Uma foto da fita 3D. `title` é o que aparece na legenda embaixo (e o que um
  *  leitor de tela anuncia ao trocar de foto); `alt` descreve a imagem. */
@@ -57,12 +57,12 @@ export const GAMES: ReelPhoto[] = [
   {
     src: '/images/about/zelda_totk.jpg',
     title: 'The Legend of Zelda: Tears of the Kingdom',
-    alt: 'Link planando sobre as ilhas celestes de Hyrule',
+    alt: 'Link olhando sobre as ilhas celestes de Hyrule',
   },
   {
     src: '/images/about/rdr2.jpg',
     title: 'Red Dead Redemption 2',
-    alt: 'Arthur Morgan a cavalo no oeste de Red Dead Redemption 2',
+    alt: 'Arthur Morgan e gangue em Red Dead Redemption 2 em preto, vermelho e laranja',
   },
   {
     src: '/images/about/ark.avif',
@@ -109,7 +109,10 @@ export const TOPICS: Topic[] = [
       { carousel: 'Favorite games', items: GAMES },
       'Dark Souls, Monster Hunter, Zelda, Forza Horizon, ARK, Hades: if it hands me a corridor and calls it a game, it’s not my type.',
       'Zelda taught me the obstacle usually isn’t the obstacle, it’s the angle. Turn it enough times and “ugh, I have to go to college” becomes “wait, I get to go to the place I used to dream about.”',
-      { photo: 'games' },
+      {
+        photo: 'Princess Zelda holding the Master Sword in Tears of the Kingdom',
+        src: '/images/about_main_photos/games.JPG',
+      },
     ],
   },
 
@@ -118,8 +121,11 @@ export const TOPICS: Topic[] = [
     title: 'Sound',
     blocks: [
       'Music’s been part of my life a lot longer than I’ve had the tools for it. As a kid, lessons were never really in the cards, so I just listened, over and over and over… and waited. My first paycheck from the internship went straight to an Arturia KeyLab, closing out a plan that had been open for about fifteen years.',
-      'These days I chase atmospheres somewhere between C418 and EDEN, though “finished song” is still more of an aspiration than something real. The muse and I have a standing meeting; attendance is inconsistent on both sides. But long before I ever touched a key, I was a listener first, and I still am one: lyrics (or meaning) before melody, always — except if it has no singer.',
-      { photo: 'música' },
+      'These days I chase atmospheres somewhere between C418 and EDEN, though “finished song” is still more of an aspiration than something real. The muse and I have a standing meeting; attendance is inconsistent on both sides. But long before I ever touched a key, I was a listener first, and I still am one: lyrics (or meaning) before melody, always(except if it has no singer.)',
+      {
+        photo: 'Arturia KeyLab Essential keyboard on my desk',
+        src: '/images/about_main_photos/music.JPG',
+      },
     ],
   },
 
@@ -128,7 +134,11 @@ export const TOPICS: Topic[] = [
     title: 'Art',
     blocks: [
       'I care about design in pretty much everything: this portfolio, the terminal glow on Grimoire, the small choices most people don’t consciously notice but would definitely notice the absence of. Notable exception: my YouTube thumbnails (don’t ask me why, I don’t know either).',
-      { photo: 'arte' },
+      {
+        photo: 'Grimoire terminal interface glowing green on a black screen',
+        src: '/images/about_main_photos/art.gif',
+        fit: 'contain',
+      },
     ],
   },
 
@@ -137,7 +147,10 @@ export const TOPICS: Topic[] = [
     title: 'Nature',
     blocks: [
       'Give me a trail, a tent, and a few good friends and I’m happy for days. I’d love to study biology properly one day. For now I just try to learn what I can about it on the side.',
-      { photo: 'natureza' },
+      {
+        photo: 'Tents at a campsite surrounded by forest and mountains',
+        src: '/images/about_main_photos/nature.jpg',
+      },
     ],
   },
 
@@ -154,7 +167,10 @@ export const TOPICS: Topic[] = [
     title: 'Collect',
     blocks: [
       'I collect physical Nintendo media. “Collect” is a strong word: collector’s prices and intern money don’t really get along, so it’s more of a slow, expensive courtship.',
-      { photo: 'coleção' },
+      {
+        photo: 'My collection of physical Nintendo 3DS and Switch games',
+        src: '/images/about_main_photos/collection.jpg',
+      },
     ],
   },
 

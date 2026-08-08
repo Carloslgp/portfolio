@@ -69,7 +69,29 @@ const pad = (n: number) => String(n).padStart(2, '0');
      Pra trazer de volta pra dentro da coluna é só voltar a `margin: 2.5rem 0` —
      o resto (legenda, fallback) já se alinha sozinho pelos max-width abaixo. */
   .reel {
-    margin: 3.5rem calc(50% - 50vw);
+    /* A medida da caixa virou variável porque o canvas agora precisa dela: ele
+       não tem mais o mesmo tamanho da caixa (ver --reel-bleed logo abaixo). */
+    --reel-h: clamp(260px, 42vw, 62svh);
+
+    /* ——— TESTE: o reflexo inteiro, sem corte ———
+       O quadro da cena cresceu pra caber a poça toda (config.ts → reflectShow),
+       de 1.63 pra 2.21 unidades de altura. Se o canvas continuasse do tamanho da
+       caixa, essa altura a mais sairia do tamanho da FOTO — a mesma composição,
+       só que 26% menor. Então quem cresce é o canvas, os mesmos 36%, e a sobra
+       vaza pra baixo da caixa: a foto fica exatamente do tamanho que estava e o
+       que aparece a mais é só reflexo.
+       Pra desligar o teste: --reel-bleed: 0px (e os dois números do config). */
+    --reel-bleed: calc(var(--reel-h) * 0.36);
+
+    /* margens laterais: a fita sangra até as bordas da janela — a conta dá
+       exatamente 100vw, centrado, sem depender de saber a largura da coluna.
+       Embaixo, o respiro de sempre MAIS o que sobrar da cauda depois da legenda
+       (que já cobre uns 3rem dela): o parágrafo seguinte não pode nascer debaixo
+       do canvas, que é quem pega o arrasto. */
+    margin:
+      3.5rem
+      calc(50% - 50vw)
+      calc(3.5rem + max(0px, var(--reel-bleed) - 3rem));
   }
 
   /* A caixa que segura a medida — e, na largura cheia, a única que ainda decide
@@ -82,16 +104,18 @@ const pad = (n: number) => String(n).padStart(2, '0');
      arrasto lateral é do carrossel. */
   .reel-stage {
     position: relative;
-    height: clamp(260px, 42vw, 62svh);
+    height: var(--reel-h);
     touch-action: pan-y;
   }
 
   .reel-canvas {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
     display: block;
     width: 100%;
-    height: 100%;
+    /* passa do fim da caixa: é aqui que a cauda do reflexo cabe (ver .reel) */
+    height: calc(var(--reel-h) + var(--reel-bleed));
     cursor: grab;
 
     /* As pontas se dissolvem no papel.
@@ -153,7 +177,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
     display: block;
     margin-top: 0.4rem;
     font-size: 0.68rem;
-    color: rgba(10, 10, 10, 0.5);
+    color: rgba(var(--ink-rgb), 0.5);
   }
 
   /* ——— legenda ——— */
@@ -167,6 +191,12 @@ const pad = (n: number) => String(n).padStart(2, '0');
     max-width: 42rem;
     margin: 0.9rem auto 0;
     padding: 0 1.5rem;
+
+    /* A legenda ficou POR CIMA da cauda do reflexo — o canvas é posicionado e,
+       sem isto, pintaria em cima dela (e comeria os cliques das setas). Não é
+       acidente do teste: é a única coisa que ainda desenha nessa faixa. */
+    position: relative;
+    z-index: 1;
   }
   .reel-title {
     flex: 1;
@@ -175,7 +205,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: rgba(10, 10, 10, 0.62);
+    color: rgba(var(--ink-rgb), 0.62);
     /* título longo não pode quebrar a linha da legenda em duas e empurrar o
        texto do tópico pra baixo a cada troca de foto */
     overflow: hidden;
@@ -185,7 +215,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
   .reel-count {
     font-size: 0.68rem;
     font-variant-numeric: tabular-nums;   /* a contagem não dança ao trocar de foto */
-    color: rgba(10, 10, 10, 0.35);
+    color: rgba(var(--ink-rgb), 0.35);
   }
   .reel-nav {
     display: flex;
@@ -199,14 +229,15 @@ const pad = (n: number) => String(n).padStart(2, '0');
     line-height: 1;
     color: var(--ink);
     background: transparent;
-    border: 1px solid rgba(10, 10, 10, 0.16);
+    border: 1px solid rgba(var(--ink-rgb), 0.16);
     border-radius: 999px;
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+    transition: background 0.2s, border-color 0.2s, opacity 0.2s,
+      color var(--theme-fade);
   }
   .reel-nav:hover:not(:disabled) {
-    background: rgba(10, 10, 10, 0.05);
-    border-color: rgba(10, 10, 10, 0.32);
+    background: rgba(var(--ink-rgb), 0.05);
+    border-color: rgba(var(--ink-rgb), 0.32);
   }
   /* as pontas da fita: ela não dá a volta, e o botão diz isso */
   .reel-nav:disabled {
@@ -214,12 +245,20 @@ const pad = (n: number) => String(n).padStart(2, '0');
     cursor: default;
   }
 
+  /* troca de tema: os textos da legenda têm cor própria (não herdada), então
+     precisam do próprio fade — ver o bloco equivalente no index.astro */
+  .reel-fallback span,
+  .reel-title,
+  .reel-count {
+    transition: color var(--theme-fade);
+  }
+
   @media (max-width: 700px) {
     /* a altura da caixa já é governada pelo piso do clamp() lá em cima, que no
        celular é quem vale — e um piso alto é justamente a foto ocupando mais da
        largura, que é o que se quer aqui (ver Reel.ts → frame()) */
     .reel {
-      margin-block: 2.5rem;
+      margin-block: 2.5rem calc(2.5rem + max(0px, var(--reel-bleed) - 3rem));
     }
     .reel-title {
       letter-spacing: 0.08em;

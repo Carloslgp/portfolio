@@ -70,6 +70,21 @@ const first = SECTIONS[0];
   <!-- cursor sutil que segue o mouse com atraso -->
   <div class="cursor" data-cursor aria-hidden="true"></div>
 
+  <!-- toggle de tema claro/escuro (ver scripts/theme.ts). Fica FORA do .overlay
+       de propósito: o overlay some no About (body.is-about) e o tema é da página
+       inteira, não HUD do carrossel. O z-index acima da cortina deixa escolher
+       o tema já no portão de entrada. -->
+  <button class="theme" data-theme-toggle aria-pressed="false" aria-label="Alternar tema escuro" title="Tema claro / escuro">
+    <!-- lua no claro (o que o clique traz), sol no escuro — o CSS troca os dois -->
+    <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+    </svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  </button>
+
   <!-- ——— About: MESMA página, revelada pela descida ———
        Fica fora de .overlay porque não é HUD sobre o canvas: quando abre, ele É
        a página.
@@ -113,7 +128,12 @@ const first = SECTIONS[0];
                   {isPhoto(block) && (
                     <figure class:list={['shot', { 'is-empty': !block.src }]}>
                       {block.src
-                        ? <img src={block.src} alt={block.photo} loading="lazy" />
+                        ? <img
+                            class:list={{ 'is-contained': block.fit === 'contain' }}
+                            src={block.src}
+                            alt={block.photo}
+                            loading="lazy"
+                          />
                         : <span class="slot-note">Foto — {block.photo}</span>}
                     </figure>
                   )}
@@ -179,6 +199,8 @@ const first = SECTIONS[0];
   import { initUI } from '../scripts/ui';
   import { initHud } from '../scripts/hud';
   import { initScramble } from '../scripts/scramble';
+  import { initTheme } from '../scripts/theme';
+  initTheme();
   initUI();
   initHud();
   initScramble();
@@ -202,7 +224,7 @@ const first = SECTIONS[0];
     inset: 0;
     z-index: 10;
     background: var(--paper);
-    transition: opacity 0.6s ease;
+    transition: opacity 0.6s ease, background-color var(--theme-fade);
   }
   .loader.is-done {
     opacity: 0;
@@ -215,7 +237,7 @@ const first = SECTIONS[0];
     transform: translateX(-50%);
     width: min(220px, 42vw);
     height: 1px;
-    background: rgba(10, 10, 10, 0.14);
+    background: rgba(var(--ink-rgb), 0.14);
     overflow: hidden;
   }
   .loader-track i {
@@ -224,7 +246,7 @@ const first = SECTIONS[0];
     background: var(--ink);
     transform: scaleX(0);
     transform-origin: left;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, background-color var(--theme-fade);
   }
 
   /* ——— portão de entrada (ver scripts/loading.ts) ——— */
@@ -268,18 +290,18 @@ const first = SECTIONS[0];
     gap: 0.35rem;
     padding: 0.85rem 1.1rem;
     background: transparent;
-    border: 1px solid rgba(10, 10, 10, 0.22);
+    border: 1px solid rgba(var(--ink-rgb), 0.22);
     color: var(--ink);
     font: inherit;
     font-size: 0.85rem;
     text-align: left;
     cursor: pointer;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    transition: border-color 0.2s ease, background 0.2s ease, color var(--theme-fade);
   }
   .gate-btn:hover,
   .gate-btn:focus-visible {
     border-color: var(--ink);
-    background: rgba(10, 10, 10, 0.04);
+    background: rgba(var(--ink-rgb), 0.04);
   }
   .gate-btn small {
     font-size: 0.7rem;
@@ -292,7 +314,7 @@ const first = SECTIONS[0];
     padding: 0;
     font: inherit;
     font-size: 0.72rem;
-    color: rgba(10, 10, 10, 0.45);
+    color: rgba(var(--ink-rgb), 0.45);
     cursor: not-allowed;
   }
   .gate-help span {
@@ -332,7 +354,7 @@ const first = SECTIONS[0];
     font-size: 15.5vw;           /* cabe na largura da tela com folga */
     letter-spacing: -0.02em;
     line-height: 1;
-    color: #1a1a1a;
+    color: var(--word);
     user-select: none;
     white-space: nowrap;
   }
@@ -616,6 +638,23 @@ const first = SECTIONS[0];
     .cursor { display: none; }   /* sem luz em touch */
   }
 
+  /* No About o painel (.about) tem z-index 5 — acima do 2 da luz — porque
+     precisa cobrir o carrossel por trás. Sem subir a luz aqui, ela ficaria
+     escondida atrás do texto e das fotos do About; com o z-index acima do
+     painel, o blend screen volta a valer e ela ilumina os cacos e as fotos.
+     Mas MUITO mais fraca do que no carrossel, e por causa do que existe
+     embaixo: lá a luz cai sobre foto escura, onde o screen quase não soma;
+     aqui embaixo é o papel branco com TEXTO em cima — o mesmo brilho virava um
+     borrão claro passeando justamente por cima do que se está lendo.
+     O corte vem no filter, e não na propriedade opacity: aquela é escrita
+     inline pelo ui.ts (é o fade de entrada da luz) e ganha de qualquer regra
+     daqui — o mesmo motivo pelo qual o body.is-diving .cursor lá embaixo tem
+     efeito nenhum. O blur repetido não é sobra: filter substitui, não soma. */
+  body.is-about .cursor {
+    z-index: 6;
+    filter: blur(8px) opacity(0.18);
+  }
+
   /* toggle redondo, encostado à direita do card */
   .mode {
     position: absolute;
@@ -645,6 +684,73 @@ const first = SECTIONS[0];
   .mode.is-flat svg {
     transform: rotate(180deg);
     transition: transform 0.5s ease;
+  }
+
+  /* ——— toggle de tema claro/escuro (ver scripts/theme.ts) ———
+     A mesma pílula de vidro do .mode, no canto de baixo à direita. position:
+     fixed (e não absolute no .overlay): ele sobrevive ao display: none que o
+     body.is-about aplica na UI do carrossel — o tema é da página inteira.
+     z-index 11 = acima da cortina (10): dá pra escolher o tema já no portão. */
+  .theme {
+    position: fixed;
+    right: 2rem;
+    bottom: 2.2rem;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    color: #fff;
+    background: rgba(90, 90, 90, 0.28);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .theme:hover {
+    background: rgba(90, 90, 90, 0.42);
+  }
+  /* lua no claro, sol no escuro — os dois empilhados no centro, trocando em
+     crossfade com um giro curto, no mesmo tempo do fade do tema. :global
+     porque o data-theme mora no <html>, fora do escopo do Astro */
+  .theme svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    transition: opacity var(--theme-fade), transform var(--theme-fade);
+  }
+  .theme .icon-sun {
+    opacity: 0;
+    transform: rotate(-90deg);
+  }
+  :global(html[data-theme='dark']) .theme .icon-moon {
+    opacity: 0;
+    transform: rotate(90deg);
+  }
+  :global(html[data-theme='dark']) .theme .icon-sun {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ——— troca de tema: quem tem cor PRÓPRIA derivada da tinta atravessa em
+     fade junto com o body (global.css). Só os sem transição própria — os que
+     já têm uma ganharam o var(--theme-fade) dentro dela, senão esta regra
+     atropelaria a que já existe. Texto que só herda a cor não precisa de
+     nada: segue o valor interpolado do body sozinho. ——— */
+  .bg-portfolio,
+  .loader-track,
+  .gate-help,
+  .lead,
+  .about-body p,
+  .slot-note,
+  .shot.is-empty,
+  .about-cta,
+  .about-cta p {
+    transition: color var(--theme-fade), background-color var(--theme-fade),
+      border-color var(--theme-fade);
   }
 
   /* Mergulho em curso: a UI do carrossel sai antes do impacto, senão a linha do
@@ -703,10 +809,10 @@ const first = SECTIONS[0];
     background: rgba(90, 90, 90, 0.12);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(10, 10, 10, 0.1);
+    border: 1px solid rgba(var(--ink-rgb), 0.1);
     border-radius: 999px;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.2s, color var(--theme-fade), border-color var(--theme-fade);
   }
   .about-close:hover {
     background: rgba(90, 90, 90, 0.2);
@@ -737,14 +843,14 @@ const first = SECTIONS[0];
   .lead {
     font-size: 1.05rem;
     line-height: 1.65;
-    color: rgba(10, 10, 10, 0.7);
+    color: rgba(var(--ink-rgb), 0.7);
   }
   .about-body {
     margin: 3.5rem 0;
   }
   .about-body p {
     line-height: 1.75;
-    color: rgba(10, 10, 10, 0.78);
+    color: rgba(var(--ink-rgb), 0.78);
     margin-bottom: 1.25rem;
   }
 
@@ -782,14 +888,18 @@ const first = SECTIONS[0];
     height: 100%;
     object-fit: cover;
   }
+  .shot img.is-contained {
+    object-fit: contain;
+    background: #000;
+  }
 
   /* Só enquanto está vazio. O tracejado é de propósito: um retângulo cinza
      liso passaria por decisão de design e escaparia numa publicação. */
   .shot.is-empty {
     display: grid;
     place-items: center;
-    border: 1px dashed rgba(10, 10, 10, 0.22);
-    background: rgba(10, 10, 10, 0.02);
+    border: 1px dashed rgba(var(--ink-rgb), 0.22);
+    background: rgba(var(--ink-rgb), 0.02);
   }
   .slot-note {
     padding: 0 1rem;
@@ -798,17 +908,17 @@ const first = SECTIONS[0];
     letter-spacing: 0.14em;
     text-transform: uppercase;
     text-align: center;
-    color: rgba(10, 10, 10, 0.4);
+    color: rgba(var(--ink-rgb), 0.4);
   }
 
   .about-cta {
     margin-top: 4rem;
     padding-top: 3rem;
-    border-top: 1px solid rgba(10, 10, 10, 0.1);
+    border-top: 1px solid rgba(var(--ink-rgb), 0.1);
     text-align: center;
   }
   .about-cta p {
-    color: rgba(10, 10, 10, 0.65);
+    color: rgba(var(--ink-rgb), 0.65);
     margin-bottom: 2rem;
   }
   .cta-actions {
@@ -835,6 +945,9 @@ const first = SECTIONS[0];
   .btn-solid {
     background: var(--ink);
     color: var(--paper);
+    /* o botão que INVERTE (tinta vira papel): trocando num corte no meio do
+       fade da página, ele piscaria — atravessa no mesmo tempo do resto */
+    transition: opacity 0.2s, background-color var(--theme-fade), color var(--theme-fade);
   }
   .btn-solid:hover {
     opacity: 0.85;
@@ -844,7 +957,8 @@ const first = SECTIONS[0];
     background: rgba(90, 90, 90, 0.12);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(10, 10, 10, 0.12);
+    border: 1px solid rgba(var(--ink-rgb), 0.12);
+    transition: opacity 0.2s, background 0.2s, color var(--theme-fade), border-color var(--theme-fade);
   }
 
   /* ——— telas estreitas: card ancora à esquerda, toggle à direita ———
@@ -892,6 +1006,15 @@ const first = SECTIONS[0];
       height: 48px;
     }
 
+    /* encosta à esquerda do .mode, na mesma faixa de baixo: o canto direito já
+       é dele, e subir o tema pra cima do .mode invadiria a faixa da .quote */
+    .theme {
+      right: calc(1rem + 48px + 0.6rem);
+      bottom: calc(1.2rem + env(safe-area-inset-bottom));
+      width: 48px;
+      height: 48px;
+    }
+
     /* No celular o topo é do .intro, que pode quebrar em duas linhas: hora e
        frase descem para a faixa logo acima do card e do toggle. Ancorados por
        'bottom', as linhas extras da frase crescem para cima e nunca empurram
@@ -915,7 +1038,7 @@ const first = SECTIONS[0];
   @media (max-height: 480px) {
     .bg-portfolio { padding-top: 1.2rem; }
     .intro { top: 0.8rem; }
-    .card, .mode { bottom: 1rem; }
+    .card, .mode, .theme { bottom: 1rem; }
   }
   /* ...e o mesmo para os cantos, só na faixa larga: abaixo de 700px eles já
      estão ancorados embaixo pela regra acima, e mexer no 'top' aqui os traria

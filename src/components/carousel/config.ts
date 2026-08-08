@@ -68,6 +68,12 @@ export const BACKDROP = {
   y: 3.0,             // altura do centro da palavra
   z: -4.5,            // atrás do anel, que vai de z = -3 a +3
   color: 0x1a1a1a,    // mesmo cinza da <div> que ela substitui
+  // A palavra no tema escuro. Precisa existir aqui (e não só no CSS --word):
+  // o Backdrop é geometria com MeshBasicMaterial, não lê variável de CSS — ele
+  // troca de cor ouvindo o 'theme:change' do scripts/theme.ts. Os dois valores
+  // espelham os --word do global.css de propósito: a palavra da cortina e a da
+  // cena são "a mesma", e uma divergência entre elas aparece no crossfade.
+  colorDark: 0xe4e4e4,
   // Faixa do progresso da entrada em que ela acende. Vai no fim de propósito:
   // enquanto a câmera está alta ela aponta pra DENTRO do anel, e a palavra
   // (alta e ao fundo) fica fora do enquadramento. Ela só entra no quadro no
@@ -274,7 +280,13 @@ export const REEL = {
   // chega: aqui o quadro TEM beirada visível no meio do papel, então um reflexo
   // ainda opaco ali vira uma linha reta atravessando a página. Na home isso não
   // aparecia porque o corte cai fora da tela.
-  reflectShow: 0.42,
+  //
+  // TESTE: reflexo INTEIRO no quadro (= photoH), sem corte nenhum. O que era
+  // 0.42 mostrava só o topo da poça; agora a foto espelhada aparece até o fim e
+  // quem termina a imagem é o apagamento do shader, não a borda do canvas.
+  // Pra voltar: reflectShow: 0.42 + REEL_REFLECT.fade: 3.4 + o --reel-bleed do
+  // Reel.astro de volta a 0 — os três formam um conjunto só.
+  reflectShow: 1.0,
   // Teto da largura da foto ativa, como fração da largura visível. Só aperta
   // quando o canvas fica estreito demais (celular): aí a câmera recua em vez de
   // deixar a foto sangrar pelos lados.
@@ -307,7 +319,11 @@ export const REEL_REFLECT = {
   opacity: 0.42,
   freq: 26,
   amp: 0.016,
-  fade: 3.4,       // ver REEL.reflectShow: os dois formam um par
+  // TESTE (era 3.4): com o reflexo inteiro no quadro, o expoente antigo apagava
+  // a imagem lá pelos 40% da altura espelhada — a poça toda estaria lá, e mais
+  // da metade dela invisível. Mais baixo = o apagamento se espalha pela altura
+  // nova em vez de acabar no primeiro terço.
+  fade: 1.8,       // ver REEL.reflectShow: os dois formam um par
   shimmer: 0.12,
 };
 

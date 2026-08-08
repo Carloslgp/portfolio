@@ -3,6 +3,38 @@
 :root {
   --ink: #0a0a0a;
   --paper: #ffffff;
+  /* a mesma tinta em forma de canais, pra todos os rgba(--ink-rgb, x) da página:
+     é isso que faz TODA cor derivada (bordas, cinzas de texto) virar do tema
+     junto com a tinta principal, sem uma regra dark pra cada uma */
+  --ink-rgb: 10, 10, 10;
+  /* a palavra gigante (a .bg-portfolio da cortina E o Backdrop 3D via
+     scripts/theme.ts) — quase-preto no claro, quase-branco no escuro */
+  --word: #1a1a1a;
+  /* seleção de alto contraste: preta com texto branco no tema claro */
+  --select-bg: #0a0a0a;
+  --select-fg: #ffffff;
+  /* a duração/curva da TROCA DE TEMA, num lugar só: todo elemento com cor
+     derivada da tinta transiciona com isto, senão cada um atravessa num tempo
+     e o fade vira uma colcha. O Backdrop 3D usa o mesmo 0.6s via GSAP
+     (Backdrop.ts) — mudar aqui pede mudar lá. */
+  --theme-fade: 0.6s ease;
+  color-scheme: light;
+}
+
+/* baixa animação: o tema troca num corte, como todo o resto dos enfeites */
+html[data-motion='reduced'] {
+  --theme-fade: 0s;
+}
+
+html[data-theme='dark'] {
+  --ink: #f2f2f2;
+  --paper: #0e0e10;
+  --ink-rgb: 242, 242, 242;
+  --word: #e4e4e4;
+  /* no tema escuro, inverte: seleção branca com texto preto */
+  --select-bg: #f2f2f2;
+  --select-fg: #0e0e10;
+  color-scheme: dark;
 }
 
 * {
@@ -22,10 +54,30 @@ body {
 body {
   background: var(--paper);
   color: var(--ink);
+  /* O grosso do fade de tema mora AQUI: além do fundo, todo texto que herda a
+     cor (títulos, parágrafos sem cor própria) segue o valor interpolado do
+     body frame a frame — só quem declara cor própria precisa da sua transição. */
+  transition: background-color var(--theme-fade), color var(--theme-fade);
   font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow: hidden;               /* canvas é fixo; nada de scroll de página */
+
+  /* o irmão de toque do ::selection abaixo: o flash azulado que o WebKit pinta
+     sobre link e botão tocados. Herda, então basta declarar aqui uma vez. */
+  -webkit-tap-highlight-color: rgba(var(--ink-rgb), 0.08);
+}
+
+/* ——— seleção de texto ———
+   background-color, e não o atalho background: ::selection aceita só um punhado
+   de propriedades, e as bordas/imagem que o atalho reescreveria de tabela são
+   justamente as que os navegadores tratam de forma menos previsível aqui.
+   Sem var(--theme-fade): ::selection não transiciona em navegador nenhum, e o
+   realce nasce e morre com o arrasto do mouse, não com a troca de tema — nos
+   0.6s do fade não existe nada selecionado pra atravessar. */
+::selection {
+  background-color: var(--select-bg);
+  color: var(--select-fg);
 }
 
 /* ——— estados da abertura do About (é a MESMA página; ver scripts/main.ts) ———
@@ -56,10 +108,13 @@ body.is-descending {
 /* O :not(.is-descending) existe pra HUD conseguir SAIR com fade. Durante a
    descida ela já está em opacity 0 por causa do .is-diving, e um display: none
    aplicado no mesmo tique atropelaria essa transição — a HUD sumiria de um
-   quadro pro outro em vez de se apagar junto com o mergulho. */
+   quadro pro outro em vez de se apagar junto com o mergulho.
+   O .cursor fica de fora desta lista de propósito: é HUD do carrossel (hora,
+   frase, card), mas a luz que segue o mouse não é — ela ilumina o About do
+   mesmo jeito que ilumina o carrossel (ver body.is-about .cursor, em
+   index.astro, que sobe o z-index dela por cima do painel). */
 body.is-about:not(.is-descending) .overlay,
 body.is-about:not(.is-descending) .intro,
-body.is-about:not(.is-descending) .hud,
-body.is-about:not(.is-descending) .cursor {
+body.is-about:not(.is-descending) .hud {
   display: none;
 }

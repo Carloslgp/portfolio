@@ -15,11 +15,17 @@
 //                             src: '/about/keylab.jpg' }
 //                         O arquivo vai em public/about/ (public/ é a raiz do
 //                         site: public/about/x.jpg → /about/x.jpg).
+//   • músicas           → { songs: 'título', items: SONGS } desenha as capas em
+//                         fila, e cada capa abre um modal com o texto da música.
+//                         O conteúdo das cinco mora em data/songs.ts — este
+//                         arquivo só diz ONDE o bloco entra na página.
 //   • carrossel         → { carousel: 'título', items: [...] } desenha a fita 3D
 //                         (a mesma superfície do anel da home, aberta — ver
 //                         components/carousel/Reel.ts). A ordem de `items` é a
 //                         ordem na fita; mexer nela é só reordenar a lista.
 //                         As imagens vão em public/images/about/.
+
+import { SONGS, type Song } from './songs';
 
 /** Um parágrafo. */
 type Paragraph = string;
@@ -35,7 +41,11 @@ export type ReelPhoto = { src: string; title: string; alt: string };
 /** A fita 3D: um título pro conjunto e as fotos que correm nela. */
 type Carousel = { carousel: string; items: ReelPhoto[] };
 
-export type Block = Paragraph | Photo | Carousel;
+/** As capas de música: um título pro conjunto e as músicas que giram nele.
+ *  O que cada uma tem dentro é assunto de data/songs.ts. */
+type Songs = { songs: string; items: Song[] };
+
+export type Block = Paragraph | Photo | Carousel | Songs;
 
 export type Topic = {
   /** vira o id da âncora: about-play, about-sound… */
@@ -51,6 +61,9 @@ export const isPhoto = (b: Block): b is Photo =>
 
 export const isCarousel = (b: Block): b is Carousel =>
   typeof b === 'object' && 'carousel' in b;
+
+export const isSongs = (b: Block): b is Songs =>
+  typeof b === 'object' && 'songs' in b;
 
 /** Os jogos que correm na fita 3D do tópico "Play". */
 export const GAMES: ReelPhoto[] = [
@@ -121,11 +134,15 @@ export const TOPICS: Topic[] = [
     title: 'Sound',
     blocks: [
       'Music’s been part of my life a lot longer than I’ve had the tools for it. As a kid, lessons were never really in the cards, so I just listened, over and over and over… and waited. My first paycheck from the internship went straight to an Arturia KeyLab, closing out a plan that had been open for about fifteen years.',
-      'These days I chase atmospheres somewhere between C418 and EDEN, though “finished song” is still more of an aspiration than something real. The muse and I have a standing meeting; attendance is inconsistent on both sides. But long before I ever touched a key, I was a listener first, and I still am one: lyrics (or meaning) before melody, always(except if it has no singer.)',
+      // logo abaixo do parágrafo que termina no KeyLab: a foto é o fim da frase
       {
         photo: 'Arturia KeyLab Essential keyboard on my desk',
         src: '/images/about_main_photos/music.JPG',
       },
+      'These days I chase atmospheres somewhere between C418 and EDEN, though “finished song” is still more of an aspiration than something real. The muse and I have a standing meeting; attendance is inconsistent on both sides. But long before I ever touched a key, I was a listener first, and I still am one: lyrics (or meaning) before melody, always(except if it has no singer.)',
+      // fecha o tópico, logo depois do "I was a listener first": as cinco são a
+      // prova disso. O texto daqui é o título VISÍVEL do bloco (ver Songs.astro).
+      { songs: 'Top 5 Songs of My Life', items: SONGS },
     ],
   },
 

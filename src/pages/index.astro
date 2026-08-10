@@ -5,8 +5,9 @@ import { SECTIONS } from '../components/carousel/config';
 // O texto do About mora em src/data/about.ts. Aqui embaixo só existe a forma
 // de desenhar cada tipo de bloco — nenhuma frase da página passa por este
 // arquivo, então editar o conteúdo é sempre lá.
-import { LEAD, TOPICS, isPhoto, isCarousel } from '../data/about';
+import { LEAD, TOPICS, isPhoto, isCarousel, isSongs } from '../data/about';
 import Reel from '../components/about/Reel.astro';
+import Songs from '../components/about/Songs.astro';
 
 const first = SECTIONS[0];
 ---
@@ -141,6 +142,10 @@ const first = SECTIONS[0];
                   {/* a fita 3D — a mesma superfície do anel da home, aberta
                       (components/about/Reel.astro + carousel/Reel.ts) */}
                   {isCarousel(block) && <Reel title={block.carousel} items={block.items} />}
+
+                  {/* as capas de música — cada uma abre um modal com o texto
+                      (components/about/Songs.astro + scripts/songs.ts) */}
+                  {isSongs(block) && <Songs title={block.songs} items={block.items} />}
                 </Fragment>
               ))}
             </section>

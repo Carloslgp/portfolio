@@ -1,0 +1,487 @@
+---
+// src/components/about/Songs.astro — o Top 5 de músicas: as capas em fila e,
+// atrás de cada uma, um modal com o texto.
+//
+// O conteúdo vem inteiro de src/data/songs.ts e é desenhado AQUI, no servidor:
+// os cinco <dialog> nascem no HTML com o texto dentro. O script (scripts/songs.ts)
+// só gira as capas e chama showModal() — ele não carrega nem monta nenhum texto.
+// É a mesma escolha do carrossel de jogos: um conteúdo só, num lugar só.
+//
+// Sem JS, o que fica é a tira rolável de capas com título e artista à mostra —
+// o texto de cada música é o que se perde, porque <dialog> fechado não existe
+// na tela. É o único custo do bloco.
+import type { Song } from '../../data/songs';
+
+interface Props {
+  title: string;
+  items: Song[];
+}
+
+const { title, items } = Astro.props;
+const pad = (n: number) => String(n).padStart(2, '0');
+
+// o título é escrito na página E nomeia o carrossel pra quem não o vê: um texto
+// só, então é o próprio <h4> que rotula a região (aria-labelledby, não label)
+const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`;
+---
+
+<figure class="songs" data-songs aria-roledescription="carrossel" aria-labelledby={headingId}>
+  <h4 class="songs-heading" id={headingId}>{title}</h4>
+
+  <div class="songs-stage" data-songs-stage>
+    <ul class="songs-track">
+      {items.map((song) => (
+        <li class="songs-item" data-songs-item data-songs-label={`${song.title} — ${song.artist}`}>
+          <button
+            type="button"
+            class="songs-card"
+            data-songs-open={`song-${song.id}`}
+            aria-haspopup="dialog"
+          >
+            {/* draggable: sem isto o arrasto da fila esbarra no arrasto NATIVO
+                da imagem, e o navegador sai carregando uma capa fantasma */}
+            <img
+              src={song.cover} alt={song.alt}
+              width="640" height="640" loading="lazy" draggable="false"
+            />
+
+            {/* o rótulo do card serve o caminho sem JS: com o palco 3D de pé
+                quem diz o nome é a legenda embaixo, e ele sai de cena */}
+            <span class="songs-meta">
+              <span class="songs-name">{song.title}</span>
+              <span class="songs-artist">{song.artist}</span>
+            </span>
+
+            {/* a única pista de que a capa abre alguma coisa; só na da frente */}
+            <span class="songs-open" aria-hidden="true">Ler</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  </div>
+
+  <figcaption class="songs-bar">
+    <button
+      type="button" class="songs-nav" data-songs-prev
+      aria-label="Música anterior" disabled>‹</button>
+
+    <!-- aria-live: quem navega pelas setas ouve o título trocar -->
+    <span class="songs-title" data-songs-title aria-live="polite">
+      {items[0] && `${items[0].title} — ${items[0].artist}`}
+    </span>
+
+    <span class="songs-count" data-songs-count>{pad(1)} / {pad(items.length)}</span>
+
+    <button
+      type="button" class="songs-nav" data-songs-next
+      aria-label="Próxima música">›</button>
+  </figcaption>
+</figure>
+
+{items.map((song) => (
+  <dialog class="song-modal" id={`song-${song.id}`} aria-labelledby={`song-${song.id}-title`}>
+    {/* Todo o conteúdo mora neste filho, e é isso que faz o clique no fundo
+        funcionar: só o backdrop chega ao <dialog> como alvo (ver songs.ts). */}
+    <div class="song-modal-inner">
+      <button type="button" class="song-close" data-songs-close aria-label="Fechar">×</button>
+
+      <div class="song-head">
+        <img class="song-cover" src={song.cover} alt={song.alt} width="640" height="640" />
+        <div class="song-ident">
+          <h4 id={`song-${song.id}-title`}>{song.title}</h4>
+          <p class="song-credit">{song.artist}</p>
+          <p class="song-credit song-credit-dim">{song.album} · {song.year}</p>
+        </div>
+      </div>
+
+      {song.line && <p class="song-line">“{song.line}”</p>}
+      {song.note.map((paragraph) => <p class="song-note">{paragraph}</p>)}
+    </div>
+  </dialog>
+))}
+
+<script>
+  import { initSongs } from '../../scripts/songs';
+  initSongs();
+</script>
+
+<style>
+  /* ——— a fila sangra até as bordas da janela ———
+     Nasce dentro da coluna de texto (.about-inner, 42rem) e volta à largura da
+     tela pela mesma conta da fita 3D: 100vw exatos, centrado, sem precisar
+     saber a largura da coluna. Pra trazer de volta pra dentro do texto é só
+     voltar a `margin: 3.5rem 0` — a legenda já se alinha sozinha pelo
+     max-width dela. */
+  .songs {
+    /* a medida do card, e a régua de todo o resto do bloco */
+    --cover: clamp(150px, 32vw, 250px);
+    margin: 3.5rem calc(50% - 50vw);
+  }
+
+  /* O título volta pra coluna de texto (os mesmos 42rem / 1.5rem do
+     .about-inner e da legenda) enquanto as capas sangram: ele é uma linha de
+     leitura, e leitura não acontece na borda da janela.
+     A fonte é declarada inteira aqui porque o `.about h3` do index.astro é
+     escopado lá — nada dele atravessa pra dentro deste componente. */
+  .songs-heading {
+    max-width: 42rem;
+    margin: 0 auto 1.3rem;
+    padding: 0 1.5rem;
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.15rem;
+    line-height: 1.25;
+    color: rgba(var(--ink-rgb), 0.85);
+    transition: color var(--theme-fade);
+  }
+
+  /* O palco recorta e dissolve as pontas.
+     A máscara vive AQUI e não no trilho de propósito: máscara é propriedade de
+     agrupamento, e no mesmo elemento que abre a perspectiva ela achataria o 3D
+     inteiro. Aqui em cima ela só apaga as beiradas — sem isso a capa do fundo
+     seria fatiada por um corte reto no meio da página. */
+  .songs-stage {
+    overflow: hidden;
+    mask-image: linear-gradient(90deg,
+      transparent 0, #000 9%, #000 91%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg,
+      transparent 0, #000 9%, #000 91%, transparent 100%);
+    /* o dedo na vertical continua rolando a PÁGINA; só o lateral é do carrossel */
+    touch-action: pan-y;
+  }
+
+  /* ——— o caminho sem JS ———
+     Uma tira rolável de verdade: sem script nenhum isto já é um carrossel, em
+     CSS. O script a converte em palco antes de qualquer coisa, e como as <img>
+     são as MESMAS nada é baixado duas vezes. */
+  .songs-track {
+    display: flex;
+    gap: 1rem;
+    margin: 0;
+    padding: 1.5rem;
+    list-style: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+  .songs-item {
+    flex: 0 0 var(--cover);
+    scroll-snap-align: center;
+  }
+
+  /* ——— o palco 3D ——— */
+  .songs.is-js .songs-track {
+    display: block;
+    position: relative;
+    height: calc(var(--cover) + 3rem);
+    padding: 0;
+    overflow: visible;
+    perspective: 1200px;
+  }
+  .songs.is-js .songs-item {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--cover);
+    margin: calc(var(--cover) / -2) 0 0 calc(var(--cover) / -2);
+    /* a pose (translate/rotate/opacity) vem do script — ela depende de quantas
+       capas existem, então não cabe numa regra por posição aqui */
+    transition: transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1),
+      opacity 0.55s ease;
+    will-change: transform;
+  }
+  /* o seletor repete `.songs.is-js` de propósito: a transição acima tem duas
+     classes de vantagem, e uma regra mais curta aqui perderia calada */
+  :global(html[data-motion='reduced']) .songs.is-js .songs-item {
+    transition: none;
+  }
+
+  .songs-card {
+    display: block;
+    position: relative;
+    width: 100%;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    /* arrastar a fila não pode virar seleção de texto no meio do caminho */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .songs-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;         /* capa é quadrada, venha do arquivo o que vier */
+    object-fit: cover;
+    border-radius: 2px;
+    transition: box-shadow 0.4s ease;
+  }
+  /* a capa da frente é a única que se descola do papel */
+  .songs.is-js .songs-item.is-active .songs-card img {
+    box-shadow: 0 22px 45px -20px rgba(0, 0, 0, 0.55);
+  }
+
+  .songs-meta {
+    display: block;
+    margin-top: 0.5rem;
+  }
+  .songs-name,
+  .songs-artist {
+    display: block;
+    font-size: 0.68rem;
+    line-height: 1.5;
+    transition: color var(--theme-fade);
+  }
+  .songs-name {
+    font-weight: 600;
+    color: rgba(var(--ink-rgb), 0.6);
+  }
+  .songs-artist {
+    color: rgba(var(--ink-rgb), 0.35);
+  }
+  /* com o palco de pé quem diz o nome é a legenda de baixo */
+  .songs.is-js .songs-meta {
+    display: none;
+  }
+
+  /* A pista de que a capa abre algo. Só existe na capa da frente, e só quando
+     o ponteiro (ou o Tab) chega nela: parada, ela seria um selo permanente em
+     cima da arte. */
+  .songs-open {
+    position: absolute;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 999px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+  }
+  .songs:not(.is-js) .songs-open {
+    display: none;
+  }
+  .songs-item.is-active .songs-card:hover .songs-open,
+  .songs-item.is-active .songs-card:focus-visible .songs-open {
+    opacity: 1;
+  }
+
+  /* ——— legenda ———
+     A fila sangra, a legenda não: ela volta pra largura e pro recuo da coluna
+     de texto (os mesmos 42rem / 1.5rem do .about-inner). É a mesma barra da
+     fita 3D, de propósito — dois carrosséis na mesma página não podem falar
+     duas línguas. */
+  .songs-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    max-width: 42rem;
+    margin: 1rem auto 0;
+    padding: 0 1.5rem;
+  }
+  .songs-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(var(--ink-rgb), 0.62);
+    /* título longo não pode quebrar a legenda em duas linhas e empurrar o
+       texto do tópico a cada troca de capa */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color var(--theme-fade);
+  }
+  .songs-count {
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;   /* a contagem não dança ao trocar */
+    color: rgba(var(--ink-rgb), 0.35);
+    transition: color var(--theme-fade);
+  }
+  .songs-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    font: inherit;
+    font-size: 1.05rem;
+    line-height: 1;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid rgba(var(--ink-rgb), 0.16);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, opacity 0.2s,
+      color var(--theme-fade);
+  }
+  .songs-nav:hover:not(:disabled) {
+    background: rgba(var(--ink-rgb), 0.05);
+    border-color: rgba(var(--ink-rgb), 0.32);
+  }
+  /* as pontas da fila: ela não dá a volta, e o botão diz isso */
+  .songs-nav:disabled {
+    opacity: 0.28;
+    cursor: default;
+  }
+
+  /* ——— o modal ———
+     Ao contrário do resto do About, ESTE bloco tem fundo próprio: o painel
+     inteiro é transparente pra deixar os cacos aparecerem por baixo, e um
+     modal transparente por cima do vidro seria ilegível. */
+  .song-modal {
+    /* É ISTO que centraliza, e por isso está declarado à mão: o navegador já dá
+       `inset: 0` + `margin: auto` a um dialog modal, mas o `* { margin: 0 }` do
+       global.css passa por cima dele (estilo de autor vence o do navegador,
+       especificidade à parte). Sem esta linha a caixa fica presa nos quatro
+       lados com margem zero — ou seja, no canto superior esquerdo. */
+    margin: auto;
+
+    width: min(36rem, calc(100vw - 2rem));
+    max-height: min(84svh, 46rem);
+    padding: 0;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid rgba(var(--ink-rgb), 0.12);
+    border-radius: 4px;
+    overflow: hidden;                 /* quem rola é o miolo, não a caixa */
+  }
+  .song-modal[open] {
+    display: flex;                    /* pro miolo poder rolar sozinho */
+    flex-direction: column;
+    animation: song-in 0.28s ease both;
+  }
+  .song-modal::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: song-fade 0.28s ease both;
+  }
+  @keyframes song-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  }
+  @keyframes song-fade {
+    from { opacity: 0; }
+  }
+  :global(html[data-motion='reduced']) .song-modal[open],
+  :global(html[data-motion='reduced']) .song-modal::backdrop {
+    animation: none;
+  }
+
+  .song-modal-inner {
+    position: relative;
+    padding: 2rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;     /* chegar ao fim aqui não empurra a página */
+  }
+
+  .song-close {
+    position: absolute;
+    top: 0.9rem;
+    right: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    font: inherit;
+    font-size: 1.2rem;
+    line-height: 1;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid rgba(var(--ink-rgb), 0.16);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .song-close:hover {
+    background: rgba(var(--ink-rgb), 0.06);
+    border-color: rgba(var(--ink-rgb), 0.32);
+  }
+
+  .song-head {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    margin-bottom: 1.6rem;
+    padding-right: 2.5rem;            /* o X não pisa no título */
+  }
+  .song-cover {
+    flex: none;
+    width: 5.5rem;
+    height: 5.5rem;
+    object-fit: cover;
+    border-radius: 2px;
+  }
+  .song-ident h4 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1.15;
+    margin-bottom: 0.35rem;
+  }
+  .song-credit {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: rgba(var(--ink-rgb), 0.62);
+  }
+  .song-credit-dim {
+    font-size: 0.72rem;
+    color: rgba(var(--ink-rgb), 0.38);
+  }
+
+  /* o verso: o único itálico serifado da página, e é ele que separa a citação
+     do texto que vem depois — sem aspas desenhadas nem caixa em volta */
+  .song-line {
+    margin-bottom: 1.4rem;
+    padding-left: 1rem;
+    font-family: "Playfair Display", Georgia, serif;
+    font-style: italic;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: rgba(var(--ink-rgb), 0.72);
+    border-left: 1px solid rgba(var(--ink-rgb), 0.18);
+  }
+  .song-note {
+    line-height: 1.75;
+    color: rgba(var(--ink-rgb), 0.78);
+  }
+  .song-note + .song-note {
+    margin-top: 1rem;
+  }
+
+  @media (max-width: 700px) {
+    .songs {
+      margin-block: 2.5rem;
+    }
+    .songs-title {
+      letter-spacing: 0.08em;
+    }
+    .song-modal-inner {
+      padding: 1.5rem;
+    }
+    .song-head {
+      gap: 0.9rem;
+    }
+    .song-cover {
+      width: 4.25rem;
+      height: 4.25rem;
+    }
+    .song-ident h4 {
+      font-size: 1.25rem;
+    }
+  }
+</style>

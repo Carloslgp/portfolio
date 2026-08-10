@@ -6,6 +6,7 @@ import { Carousel } from '../components/carousel/Carousel';
 import { ABOUT } from '../components/carousel/config';
 import { setProgress, hideLoader, awaitGate } from './loading';
 import { reducedMotion } from './motion';
+import { registerScroll } from './scroll';
 
 export async function bootstrap() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
@@ -24,6 +25,10 @@ export async function bootstrap() {
   // Lenis vive aqui (um só dono). O render loop do Carousel chama lenis.raf,
   // então não precisamos de um requestAnimationFrame separado só pra ele.
   const lenis = new Lenis();
+
+  // O modal das músicas precisa PARAR a rolagem enquanto está aberto, e não tem
+  // (nem deve ter) o Lenis na mão — ver scripts/scroll.ts.
+  registerScroll(lenis);
 
   const carousel = new Carousel();
 

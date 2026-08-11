@@ -1,5 +1,73 @@
 @import "tailwindcss";
 
+/* ——— as fontes, servidas por este domínio ———
+
+   Antes elas vinham de fonts.googleapis.com, e isso custava caro por dois
+   motivos que não aparecem no tamanho do arquivo: a folha do Google é
+   render-blocking (o primeiro pixel da página esperava uma viagem a um
+   servidor de terceiros, com DNS + TLS próprios), e o pedido trazia 11
+   variantes — 5 pesos de Inter e 6 de Playfair — das quais a página usa três.
+
+   Aqui há exatamente o que o CSS deste site pede: Inter VARIÁVEL (um arquivo
+   cobre 400–700, e sai menor que os quatro estáticos que substituiu), Playfair
+   600 e Playfair itálico 400.
+
+   O unicode-range é o que mantém isto barato: o navegador só baixa o arquivo
+   de uma faixa se um caractere dela aparecer na página. Português e inglês
+   moram inteiros em `latin` (os acentos vão até U+00FF), então o latin-ext ao
+   lado quase nunca é pedido — ele existe pro dia em que uma palavra precisar.
+
+   font-display: swap — o texto aparece na fonte do sistema e troca quando a
+   fonte chega. Nunca uma tela em branco esperando letra. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/playfair-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/playfair-600-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/playfair-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/playfair-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 :root {
   --ink: #0a0a0a;
   --paper: #ffffff;
@@ -35,6 +103,25 @@ html[data-theme='dark'] {
   --select-bg: #f2f2f2;
   --select-fg: #0e0e10;
   color-scheme: dark;
+}
+
+/* ——— view transitions entre PÁGINAS (home ↔ /photos) ———
+   Cross-document e nativo, sem router SPA: a navegação é MPA de verdade — o
+   que destrói o render loop do Three.js e o Lenis de graça ao sair da home —
+   e o navegador costura as duas páginas num cross-fade. Chromium e Safari
+   fazem a transição; onde não há suporte, sobra uma navegação normal, que é
+   a degradação certa. Esta regra precisa existir nos DOIS documentos (e
+   existe: os dois importam este arquivo via Layout). */
+@view-transition {
+  navigation: auto;
+}
+/* preferência do SISTEMA por menos movimento corta a transição na raiz — a
+   escolha do portão não alcança aqui (CSS não lê sessionStorage), mas o
+   cross-fade é discreto o bastante pra valer como padrão */
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
 }
 
 * {

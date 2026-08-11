@@ -42,7 +42,7 @@ export const SONGS: Song[] = [
     artist: 'EDEN',
     album: 'i think you think too much of me',
     year: 2016,
-    cover: '/images/about_albuns_photos/1.jpeg',
+    cover: '/images/about_albuns_photos/1.webp',
     alt: 'Cover of EDEN’s i think you think too much of me: the title typed over and over in grey until the letters break apart',
     note: [
       'The one that opened the door. Before it I listened to music; after it I started listening *to* music — to what was left out, to how much room a producer can leave empty and still fill the whole song.',
@@ -55,7 +55,7 @@ export const SONGS: Song[] = [
     artist: 'EDEN',
     album: 'no future',
     year: 2020,
-    cover: '/images/about_albuns_photos/2.jpg',
+    cover: '/images/about_albuns_photos/2.webp',
     alt: 'Cover of EDEN’s vertigo: a pale blue sky with thin clouds and a small crescent moon',
     note: [
       'Same artist, four years later, and almost nothing in common with the one above — which is the reason both are here. One is the sound; this one is the words.',
@@ -68,7 +68,7 @@ export const SONGS: Song[] = [
     artist: 'Syd Matters',
     album: 'Someday We Will Foresee Obstacles',
     year: 2005,
-    cover: '/images/about_albuns_photos/3.jpeg',
+    cover: '/images/about_albuns_photos/3.webp',
     alt: 'Cover of Syd Matters’ Someday We Will Foresee Obstacles: green and teal light with small comet-like streaks',
     note: [
       'This one arrived attached to a place, the way songs do — they take a room hostage and never give it back. I cannot hear it without the room coming with it.',

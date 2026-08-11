@@ -1,0 +1,390 @@
+---
+// photos.astro — o mural infinito de fotos, atrás do segmento "Photos" do anel.
+//
+// A pasta src/assets/photos/ é a fonte da verdade: o glob descobre os arquivos
+// no build, o pipeline do Astro gera as duas variantes (thumb leve pro mural,
+// full grande pro lightbox) e mede width/height — o layout do mural depende
+// dessas medidas e por isso elas viajam no JSON, nunca de um onload no cliente.
+// Jogar uma foto na pasta e buildar é TODO o fluxo de publicação.
+import type { ImageMetadata } from 'astro';
+import { getImage } from 'astro:assets';
+import Layout from '../layouts/Layout.astro';
+import { PHOTO_META } from '../data/photos';
+
+const modules = import.meta.glob<{ default: ImageMetadata }>(
+  '../assets/photos/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG}',
+  { eager: true },
+);
+
+// ordem alfabética de arquivo: estável entre builds (a "bagunça" visual do
+// mural vem do embaralhado por semente no layout.ts, não daqui)
+const entries = Object.entries(modules).sort(([a], [b]) => a.localeCompare(b));
+
+const photos = await Promise.all(
+  entries.map(async ([path, mod]) => {
+    const src = mod.default;
+    const file = path.split('/').pop() ?? path;
+    const meta = PHOTO_META[file] ?? {};
+
+    // duas variantes por foto. O sharp não amplia: pedir 2400 numa foto menor
+    // devolve a largura original — o teto só vale pra quem passa dele.
+    //
+    // 800 no thumb é a medida do mural: as linhas são justificadas em torno de
+    // TARGET_ROW_HEIGHT (300px), então um tile passa raspando dos 400px de
+    // largura — 800 é isso em tela densa, e nada além.
+    //
+    // A `full` desceu de 85 pra 80 de qualidade: numa foto de 2400px a
+    // diferença não se vê e são ~20% de bytes a menos, num arquivo que só é
+    // baixado quando alguém abre o lightbox de fato. (AVIF cortaria uns 45%
+    // aqui, mas custa ~19s de encode POR FOTO no build — é a troca a fazer no
+    // dia em que a pasta crescer e o peso passar a doer mais que o build.)
+    const [thumb, full] = await Promise.all([
+      getImage({ src, width: 800, format: 'webp', quality: 75 }),
+      getImage({ src, width: 2400, format: 'webp', quality: 80 }),
+    ]);
+
+    // alt: metadado > título > nome do arquivo limpo. Nunca vazio.
+    const alt =
+      meta.alt ?? meta.title ?? file.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+
+    return {
+      id: file,
+      thumb: thumb.src,
+      full: full.src,
+      w: src.width,
+      h: src.height,
+      alt,
+      title: meta.title ?? null,
+      place: meta.place ?? null,
+      year: meta.year ?? null,
+    };
+  }),
+);
+---
+
+<Layout>
+  <Fragment slot="head">
+    <title>Photos — Carlos Leonardo</title>
+
+    {/* O caminho de volta. Quem veio da home volta pela HISTÓRIA (e o BFCache
+        costuma servi-la viva, sem custo nenhum), mas quem entrou direto aqui
+        por link vai pelo href e paga a home inteira no clique. */}
+    <link rel="prefetch" href="/" />
+  </Fragment>
+
+  <!-- o plano infinito: o viewport é fixo e o gesto mora nele; quem se move é
+       só o .mural-plane, com UM translate3d por frame (ver infiniteCanvas.ts) -->
+  <main class="mural" data-mural aria-label="Mural de fotos — arraste para navegar">
+    <div class="mural-plane" data-mural-plane></div>
+  </main>
+
+  {photos.length === 0 && (
+    <p class="mural-empty">Sem fotos por enquanto — jogue arquivos em <code>src/assets/photos/</code>.</p>
+  )}
+
+  <!-- ——— HUD mínima por cima do mural ———
+       Vocabulário do site: texto em blend difference (legível sobre qualquer
+       foto, como o .intro da home), sem cápsulas de vidro — aqui não há
+       carrossel, só papel de fotos. -->
+  <a class="mural-back" href="/" data-back>‹ Voltar</a>
+  <h1 class="mural-title">Photos</h1>
+  <p class="mural-hint" aria-hidden="true">arraste · role · setas</p>
+
+  <!-- O filtro do motion blur (ver motionBlur.ts). O stdDeviation de dois
+       eixos é o que torna o borrão direcional; o JS o reescreve por frame e
+       REMOVE o filter em repouso. A região apertada (±8%) limita quanto
+       viewport extra o navegador rasteriza por passada. -->
+  <svg class="mural-defs" width="0" height="0" aria-hidden="true">
+    <defs>
+      <filter id="motion-blur" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
+        <feGaussianBlur data-blur-gaussian stdDeviation="0 0" edgeMode="duplicate" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- ——— lightbox: <dialog> nativo, mesmo padrão do modal das músicas ———
+       O conteúdo mora na .lightbox-inner; clique que não acerta figura nem
+       botão é backdrop e fecha (ver lightbox.ts). A figura recebe o FLIP. -->
+  <dialog class="lightbox" data-lightbox aria-label="Foto ampliada">
+    <div class="lightbox-inner">
+      <button type="button" class="lightbox-close" data-lightbox-close aria-label="Fechar">×</button>
+
+      <figure class="lightbox-figure" data-lightbox-figure>
+        <img data-lightbox-img alt="" />
+        <figcaption class="lightbox-caption" data-lightbox-caption>
+          <p class="lightbox-title" data-lightbox-title hidden></p>
+          <p class="lightbox-sub" data-lightbox-sub hidden></p>
+        </figcaption>
+      </figure>
+
+      <button type="button" class="lightbox-nav is-prev" data-lightbox-prev aria-label="Foto anterior">‹</button>
+      <button type="button" class="lightbox-nav is-next" data-lightbox-next aria-label="Próxima foto">›</button>
+    </div>
+  </dialog>
+
+  <!-- a lista que o build montou, do jeito que o cliente lê (photos.ts) -->
+  <script type="application/json" id="photos-data" set:html={JSON.stringify(photos)} />
+</Layout>
+
+<script>
+  import { initMural } from '../scripts/photos/main';
+  initMural();
+</script>
+
+<style>
+  .mural {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--paper);
+    /* o gesto é do mural, não do navegador (scroll/zoom/refresh por arrasto) */
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .mural:active {
+    cursor: grabbing;
+  }
+
+  /* o único elemento com will-change da página: é ele que anda todo frame */
+  .mural-plane {
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+  }
+
+  /* os tiles nascem no JS (infiniteCanvas.ts → makeNode), fora do escopo do
+     Astro — por isso o :global em tudo abaixo */
+  :global(.mural-tile) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    overflow: hidden;
+    /* o cinza que segura o lugar enquanto o thumb baixa — some sob a foto */
+    background: rgba(var(--ink-rgb), 0.06);
+    cursor: pointer;
+  }
+  :global(.mural-tile[hidden]) {
+    display: none;
+  }
+  :global(.mural-tile:focus-visible) {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  :global(.mural-tile img) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+  }
+  /* nó reciclado esperando o src novo: esconde a foto antiga (ver assign()) */
+  :global(.mural-tile img.is-loading) {
+    opacity: 0;
+    transition: none;
+  }
+
+  .mural-empty {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 0.9rem;
+    color: rgba(var(--ink-rgb), 0.6);
+  }
+
+  /* ——— HUD: difference sobre as fotos, como o .intro da home ——— */
+  .mural-back,
+  .mural-title,
+  .mural-hint {
+    position: fixed;
+    z-index: 3;
+    color: #fff;
+    mix-blend-mode: difference;
+  }
+  .mural-back {
+    top: 1.5rem;
+    left: 2rem;
+    padding: 0.35rem 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+  /* a mesma linha que cresce do .about-close — o "voltar" é um vocabulário só */
+  .mural-back::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .mural-back:hover::after,
+  .mural-back:focus-visible::after {
+    transform: scaleX(1);
+  }
+  :global(html[data-motion='reduced']) .mural-back::after {
+    transition: none;
+  }
+
+  .mural-title {
+    top: 1.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  .mural-hint {
+    bottom: 1.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  /* ——— lightbox ——— */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .lightbox::backdrop {
+    background: rgba(8, 8, 10, 0.82);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  .lightbox.is-open::backdrop {
+    opacity: 1;
+  }
+  :global(html[data-motion='reduced']) .lightbox::backdrop {
+    transition: none;
+  }
+
+  .lightbox-inner {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+  }
+
+  .lightbox-figure {
+    position: relative;
+    margin: 0;
+    /* largura/aspect-ratio entram inline (lightbox.ts → mount), derivados da
+       proporção da foto + tetos do config — nada de medida chutada aqui */
+    will-change: transform;
+  }
+  .lightbox-figure img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  /* legenda por cima do pé da foto: só existe quando há metadado (hidden
+     dinâmico), e voa junto com a figura no FLIP por morar dentro dela */
+  .lightbox-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 1.6rem 1rem 0.8rem;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+    color: #fff;
+    pointer-events: none;
+  }
+  .lightbox-caption:has(> [hidden]:only-child),
+  .lightbox-caption:has(> [hidden] + [hidden]) {
+    display: none;   /* sem metadado nenhum, nem o gradiente aparece */
+  }
+  .lightbox-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .lightbox-sub {
+    font-size: 0.75rem;
+    opacity: 0.75;
+  }
+
+  .lightbox-close,
+  .lightbox-nav {
+    position: fixed;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .lightbox-close:hover,
+  .lightbox-nav:hover {
+    background: rgba(255, 255, 255, 0.26);
+  }
+  .lightbox-close:focus-visible,
+  .lightbox-nav:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+  .lightbox-close {
+    top: 1.5rem;
+    right: 1.5rem;
+  }
+  .lightbox-nav {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .lightbox-nav.is-prev {
+    left: 1.2rem;
+  }
+  .lightbox-nav.is-next {
+    right: 1.2rem;
+  }
+
+  @media (max-width: 700px) {
+    .mural-back {
+      left: 1rem;
+    }
+    /* no celular as setas descem pro pé da tela: no meio elas cobririam a foto */
+    .lightbox-nav {
+      top: auto;
+      transform: none;
+      bottom: calc(1.2rem + env(safe-area-inset-bottom));
+    }
+    .lightbox-nav.is-prev {
+      left: 1rem;
+    }
+    .lightbox-nav.is-next {
+      right: 1rem;
+    }
+  }
+</style>

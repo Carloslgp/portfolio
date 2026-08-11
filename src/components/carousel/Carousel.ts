@@ -15,6 +15,7 @@ import {
 } from './Ribbon';
 import {
   SECTIONS, RADIUS, HEIGHT, REFLECT, CAM, BASE_ASPECT, LABEL, SEG_ANGLE, SHATTER, ABOUT,
+  GPU, coarsePointer,
 } from './config';
 
 const ABOUT_INDEX = SECTIONS.findIndex((s) => s.id === 'about');
@@ -59,14 +60,34 @@ export class Carousel {
   private ndc = new THREE.Vector2();
   private downX = 0;
   private downY = 0;
+  private canvas!: HTMLCanvasElement;
+
+  // Último ponteiro visto, aguardando um raycast. Um mouse de 1000Hz dispara
+  // mil pointermove por segundo, e resolver o hover em cada um seria mil
+  // raycasts pra pintar no máximo 60 quadros — 94% do trabalho jogado fora
+  // antes de virar pixel. Aqui o evento só ANOTA onde o ponteiro está; quem
+  // pergunta o que tem embaixo dele é o loop, uma vez por frame (ver hover()).
+  private hoverX = 0;
+  private hoverY = 0;
+  private hoverPending = false;
+  private hovering = false;
 
   async init(canvas: HTMLCanvasElement, lenis: any) {
     this.lenis = lenis;
 
+    this.canvas = canvas;
+    const coarse = coarsePointer();
+
     // --- renderer: alpha ligado + clear transparente pra o "PORTFOLIO" do DOM aparecer atrás ---
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio, coarse ? GPU.pixelRatioCoarse : GPU.pixelRatio),
+    );
+    // a segunda passada de render que o vidro das labels exige, em meia escala
+    // no celular — ver GPU.transmissionScale em config.ts
+    this.renderer.transmissionResolutionScale =
+      coarse ? GPU.transmissionScaleCoarse : GPU.transmissionScale;
     this.renderer.setClearColor(0x000000, 0);
 
     // ambiente PMREM: dá os reflexos/brilhos do vidro das labels.
@@ -162,12 +183,14 @@ export class Carousel {
       this.downY = e.clientY;
     });
     canvas.addEventListener('pointermove', (e) => {
-      canvas.style.cursor = this.pick(e) ? 'pointer' : '';
+      this.hoverX = e.clientX;
+      this.hoverY = e.clientY;
+      this.hoverPending = true;
     });
     canvas.addEventListener('pointerup', (e) => {
       // só conta como clique se quase não moveu (senão foi arrasto do carrossel)
       if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) > 6) return;
-      const seg = this.pick(e);
+      const seg = this.pick(e.clientX, e.clientY);
       if (!seg) return;
       // quem decide o que abrir é o main.ts: a cena não conhece o DOM do About
       window.dispatchEvent(new CustomEvent('section:open', {
@@ -186,10 +209,10 @@ export class Carousel {
   }
 
   // raycast do ponteiro contra os segmentos visíveis; retorna o Segment atingido
-  private pick(e: PointerEvent): Segment | null {
+  private pick(clientX: number, clientY: number): Segment | null {
     this.ndc.set(
-      (e.clientX / window.innerWidth) * 2 - 1,
-      -(e.clientY / window.innerHeight) * 2 + 1,
+      (clientX / window.innerWidth) * 2 - 1,
+      -(clientY / window.innerHeight) * 2 + 1,
     );
     this.raycaster.setFromCamera(this.ndc, this.camera);
     const hit = this.raycaster.intersectObjects(this.segments.map((s) => s.mesh), false)[0];
@@ -331,6 +354,40 @@ export class Carousel {
     }, 'descent');
 
     return tl;
+  }
+
+  // A saída para uma página PRÓPRIA (ex.: /photos): alinha a foto clicada e
+  // mergulha META do caminho nela. A navegação corta o movimento no meio de
+  // propósito — o cross-fade da view transition pega a câmera ainda avançando,
+  // e a página nova entra como continuação do gesto, não como um corte depois
+  // de uma animação que terminou e parou.
+  departInto(i: number): gsap.core.Timeline {
+    const tl = gsap.timeline();
+    if (this.inAbout) return tl;
+    this.input.enabled = false;
+
+    gsap.killTweensOf(this.input);
+    const goal = this.alignGoal(i);
+    if (Math.abs(goal - this.input.target) > 0.01) {
+      tl.to(this.input, {
+        target: goal, current: goal,
+        duration: 0.4, ease: 'power2.inOut',
+      });
+    }
+    // dive parcial: perto o bastante pra foto crescer na tela, longe o
+    // bastante pra curvatura do cilindro não virar distorção no último frame
+    tl.to(this.rig, { dive: 0.55, duration: 0.5, ease: 'power2.in' }, '<0.08');
+    return tl;
+  }
+
+  // Desfaz uma partida que não se consumou: o navegador serviu a home de volta
+  // do BFCache (botão voltar), com a câmera parada no meio do mergulho do
+  // departInto e o gesto travado. Sem isto a página restaurada nasce quebrada.
+  cancelDeparture() {
+    if (this.inAbout) return;
+    gsap.killTweensOf(this.rig);
+    gsap.to(this.rig, { dive: 0, duration: 0.5, ease: 'power2.out' });
+    this.input.enabled = true;
   }
 
   // Entrada direta em /#about (link compartilhado): põe a cena no estado final
@@ -538,6 +595,23 @@ export class Carousel {
     });
   }
 
+  // O hover, resolvido uma vez por frame com a última posição anotada pelo
+  // pointermove. Só faz trabalho quando o ponteiro de fato andou desde o
+  // último quadro, e só escreve no style quando a resposta MUDA — trocar
+  // `cursor` no mesmo valor a 60fps é invalidação de estilo de graça.
+  //
+  // Com a cena estilhaçada (About aberto) não há foto pra acertar: o raycast é
+  // pulado e o cursor volta ao normal.
+  private hover() {
+    if (!this.hoverPending) return;
+    this.hoverPending = false;
+
+    const on = !this.shattered && !!this.pick(this.hoverX, this.hoverY);
+    if (on === this.hovering) return;
+    this.hovering = on;
+    this.canvas.style.cursor = on ? 'pointer' : '';
+  }
+
   private emitActive(index: number) {
     if (index === this.lastActive) return;
     this.lastActive = index;
@@ -570,6 +644,10 @@ export class Carousel {
       this.backdrop.setReveal(this.rig.revealProgress);
       this.emitActive(this.input.activeIndex);
     }
+
+    // depois do layout(): o raycast tem que ver as fotos na pose DESTE frame,
+    // não na do anterior
+    this.hover();
 
     this.rig.update(dt, this.viewRadius);  // entrada + parallax; único a mexer na câmera
 

@@ -7,11 +7,22 @@ import 'lenis/dist/lenis.css';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- As fontes são deste domínio agora (ver as @font-face do global.css), e
+         por isso não há mais preconnect nenhum aqui: não existe terceiro no
+         caminho crítico pra "pré-conectar".
+
+         O preload é do arquivo que TODA página usa — o Inter latin. Sem ele o
+         navegador só descobre a fonte depois de baixar e analisar o CSS, e o
+         texto passa esse tempo todo desenhado na fonte do sistema. As outras
+         faces (Playfair, latin-ext) ficam de fora de propósito: preload é uma
+         ordem de prioridade, e pedir tudo com prioridade máxima é o mesmo que
+         não priorizar nada. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="/fonts/inter-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
     <!-- inline e ANTES de qualquer paint: o tema salvo entra junto com o CSS,
          senão quem escolheu escuro vê a página piscar branca a cada visita.

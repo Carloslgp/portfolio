@@ -13,7 +13,10 @@ export function initUI() {
     if (!s) return;
     if (label) label.textContent = s.label;
     if (cat) cat.textContent = s.label.toUpperCase();
-    if (thumb) { thumb.src = s.texture; thumb.alt = s.label; }
+    // s.thumb, e não s.texture: o card é um círculo de 48px, e apontá-lo para a
+    // textura do anel obrigava o navegador a decodificar a foto inteira de novo
+    // a cada troca de seção (ver SECTIONS em carousel/config.ts)
+    if (thumb) { thumb.src = s.thumb; thumb.alt = s.label; }
   }
 
   window.addEventListener('carousel:change', (e) => {

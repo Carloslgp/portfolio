@@ -1,11 +1,64 @@
 
+// `texture` é a foto que vai pra GPU (a parede do anel); `thumb` é a MESMA foto
+// em 160px, só pro círculo de 48px do card na base da tela.
+//
+// Os dois campos existem porque antes havia um só: o card apontava para a
+// textura e o navegador decodificava 4000px de JPEG pra desenhar 48 — a cada
+// troca de seção.
+//
+// A textura segue em .jpg de propósito. Estas cinco fotos são as únicas do site
+// com EXIF de orientação ativo, e cada uma tem a sua (8, 6, 3, 1 e nenhuma): o
+// navegador aplica essa tag ao decodificar, e só DEPOIS o giro fixo de -90° do
+// Segment.ts entra em cima. Uma conversão que descarte o EXIF sem gravar o giro
+// nos pixels deixa cada foto com uma correção diferente da que ela precisa — na
+// prática, deitadas e esticadas pela UV da fita. O thumb passa por isso ileso
+// porque é gerado com a rotação já gravada (ver scripts/optimize-images.mjs).
 export const SECTIONS = [
-  { id: 'work',   label: 'Work',   texture: '/textures/work.jpg' },
-  { id: 'craft',  label: 'Craft',  texture: '/textures/craft.jpg' },
-  { id: 'photos', label: 'Photos', texture: '/textures/photos.jpg' },
-  { id: 'about',  label: 'About',  texture: '/textures/about.jpg' },
-  { id: 'now',    label: 'Now',    texture: '/textures/now.jpg' },
+  { id: 'work',   label: 'Work',   texture: '/textures/work.jpg',   thumb: '/textures/thumbs/work.webp' },
+  { id: 'craft',  label: 'Craft',  texture: '/textures/craft.jpg',  thumb: '/textures/thumbs/craft.webp' },
+  { id: 'photos', label: 'Photos', texture: '/textures/photos.jpg', thumb: '/textures/thumbs/photos.webp' },
+  { id: 'about',  label: 'About',  texture: '/textures/about.jpg',  thumb: '/textures/thumbs/about.webp' },
+  { id: 'now',    label: 'Now',    texture: '/textures/now.jpg',    thumb: '/textures/thumbs/now.webp' },
 ] as const;
+
+// --- orçamento de GPU ---
+//
+// Tudo que muda de valor entre uma tela de mesa e um celular mora aqui, e a
+// pergunta é sempre a mesma: `pointer: coarse`. Ela não pergunta "é celular?" —
+// pergunta "o ponteiro é um dedo?", que é o que de fato acompanha uma GPU de
+// orçamento apertado. É a MESMA pergunta que o blur do mural já fazia do outro
+// lado do site (scripts/photos/config.ts → BLUR.DISABLE_ON_COARSE).
+export const GPU = {
+  /** Teto do devicePixelRatio. Cada ponto acima de 1 custa o QUADRADO em
+   *  pixels desenhados: em dpr 2 a cena inteira sai 4x. Num celular de tela
+   *  densa isso sozinho estoura o orçamento de um frame — e a densidade que
+   *  causa o problema é a mesma que disfarça o serrilhado de tê-la baixado. */
+  pixelRatio: 2,
+  pixelRatioCoarse: 1.5,
+
+  /** Escala do buffer que alimenta a refração do vidro das labels.
+   *
+   *  Um material com `transmission` faz o three desenhar a cena opaca uma
+   *  SEGUNDA vez por frame, num alvo à parte, pra ter o que refratar através
+   *  das letras. É o custo mais alto da home e ele é pago todo frame, porque a
+   *  água do reflexo nunca para.
+   *
+   *  Meia escala = um quarto dos pixels nessa segunda passada. O que se perde é
+   *  nitidez DENTRO da letra — e ali a imagem já chega deslocada e com franja
+   *  cromática de propósito (ver makeGlass em Labels.ts). O vidro continua
+   *  sendo vidro; ele só refrata uma versão um pouco mais macia da foto. */
+  transmissionScale: 1,
+  transmissionScaleCoarse: 0.5,
+};
+
+/** Precisa ser função, e não constante: este módulo é importado pelo
+ *  frontmatter do index.astro, que roda no NODE durante o build — lá não há
+ *  window, e um matchMedia no topo do arquivo quebraria a geração da página. */
+export function coarsePointer(): boolean {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(pointer: coarse)').matches;
+}
 
 export const RADIUS = 3;
 export const HEIGHT = 1.6;

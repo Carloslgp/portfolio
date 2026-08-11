@@ -14,7 +14,13 @@
 //                           { photo: 'o KeyLab no dia que chegou',
 //                             src: '/about/keylab.jpg' }
 //                         O arquivo vai em public/about/ (public/ é a raiz do
-//                         site: public/about/x.jpg → /about/x.jpg).
+//                         site: public/about/x.jpg → /about/x.jpg), e depois
+//                         passa por `npm run images` — public/ não tem pipeline
+//                         de otimização, então o que se joga lá é exatamente o
+//                         que o visitante baixa.
+//   • animação          → { photo: 'descrição', video: '...webm', poster:
+//                         '...webp' } no lugar do src. GIF animado NÃO, nunca:
+//                         ver o comentário do tipo Photo mais abaixo.
 //   • músicas           → { songs: 'título', items: SONGS } desenha as capas em
 //                         fila, e cada capa abre um modal com o texto da música.
 //                         O conteúdo das cinco mora em data/songs.ts — este
@@ -31,8 +37,21 @@ import { SONGS, type Song } from './songs';
 type Paragraph = string;
 
 /** Uma foto. Sem `src`, é a moldura vazia com a descrição de rótulo; com
- *  `src`, a mesma descrição vira o alt da imagem. */
-type Photo = { photo: string; src?: string; fit?: 'cover' | 'contain' };
+ *  `src`, a mesma descrição vira o alt da imagem.
+ *
+ *  `video` ocupa a mesma moldura com um vídeo mudo em loop, e é o que um GIF
+ *  animado deve ser: o art.gif tinha 1,3 MB e 75 quadros de 1920×1080 que o
+ *  navegador redesenha na CPU pra sempre; o mesmo trecho em VP9 tem 36 KB e é
+ *  decodificado em hardware. O `poster` é o que aparece até o vídeo começar —
+ *  e é tudo que aparece em baixa animação, porque lá ele não toca
+ *  (ver scripts/shots.ts). */
+type Photo = {
+  photo: string;
+  src?: string;
+  video?: string;
+  poster?: string;
+  fit?: 'cover' | 'contain';
+};
 
 /** Uma foto da fita 3D. `title` é o que aparece na legenda embaixo (e o que um
  *  leitor de tela anuncia ao trocar de foto); `alt` descreve a imagem. */
@@ -68,17 +87,17 @@ export const isSongs = (b: Block): b is Songs =>
 /** Os jogos que correm na fita 3D do tópico "Play". */
 export const GAMES: ReelPhoto[] = [
   {
-    src: '/images/about/zelda_totk.jpg',
+    src: '/images/about/zelda_totk.webp',
     title: 'The Legend of Zelda: Tears of the Kingdom',
     alt: 'Link olhando sobre as ilhas celestes de Hyrule',
   },
   {
-    src: '/images/about/rdr2.jpg',
+    src: '/images/about/rdr2.webp',
     title: 'Red Dead Redemption 2',
     alt: 'Arthur Morgan e gangue em Red Dead Redemption 2 em preto, vermelho e laranja',
   },
   {
-    src: '/images/about/ark.avif',
+    src: '/images/about/ark.webp',
     title: 'ARK: Survival Evolved',
     alt: 'Dinossauros na ilha de ARK: Survival Evolved',
   },
@@ -93,7 +112,7 @@ export const GAMES: ReelPhoto[] = [
     alt: 'Max e Chloe em Arcadia Bay, de Life is Strange',
   },
   {
-    src: '/images/about/pkm_alpha_saphire.jpg',
+    src: '/images/about/pkm_alpha_saphire.webp',
     title: 'Pokémon Alpha Sapphire',
     alt: 'Arte de Pokémon Alpha Sapphire',
   },
@@ -124,7 +143,7 @@ export const TOPICS: Topic[] = [
       'Zelda taught me the obstacle usually isn’t the obstacle, it’s the angle. Turn it enough times and “ugh, I have to go to college” becomes “wait, I get to go to the place I used to dream about.”',
       {
         photo: 'Princess Zelda holding the Master Sword in Tears of the Kingdom',
-        src: '/images/about_main_photos/games.JPG',
+        src: '/images/about_main_photos/games.webp',
       },
     ],
   },
@@ -137,7 +156,7 @@ export const TOPICS: Topic[] = [
       // logo abaixo do parágrafo que termina no KeyLab: a foto é o fim da frase
       {
         photo: 'Arturia KeyLab Essential keyboard on my desk',
-        src: '/images/about_main_photos/music.JPG',
+        src: '/images/about_main_photos/music.webp',
       },
       'These days I chase atmospheres somewhere between C418 and EDEN, though “finished song” is still more of an aspiration than something real. The muse and I have a standing meeting; attendance is inconsistent on both sides. But long before I ever touched a key, I was a listener first, and I still am one: lyrics (or meaning) before melody, always(except if it has no singer.)',
       // fecha o tópico, logo depois do "I was a listener first": elas são a
@@ -153,7 +172,8 @@ export const TOPICS: Topic[] = [
       'I care about design in pretty much everything: this portfolio, the terminal glow on Grimoire, the small choices most people don’t consciously notice but would definitely notice the absence of. Notable exception: my YouTube thumbnails (don’t ask me why, I don’t know either).',
       {
         photo: 'Grimoire terminal interface glowing green on a black screen',
-        src: '/images/about_main_photos/art.gif',
+        video: '/images/about_main_photos/art.webm',
+        poster: '/images/about_main_photos/art-poster.webp',
         fit: 'contain',
       },
     ],
@@ -186,7 +206,7 @@ export const TOPICS: Topic[] = [
       'I collect physical Nintendo media. “Collect” is a strong word: collector’s prices and intern money don’t really get along, so it’s more of a slow, expensive courtship.',
       {
         photo: 'My collection of physical Nintendo 3DS and Switch games',
-        src: '/images/about_main_photos/collection.jpg',
+        src: '/images/about_main_photos/collection.webp',
       },
     ],
   },

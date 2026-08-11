@@ -14,11 +14,32 @@ export type MotionMode = 'full' | 'reduced';
 
 let mode: MotionMode = 'full';
 
+// A escolha sobrevive à NAVEGAÇÃO: quem vai pra /photos precisa que a página
+// de lá saiba o modo, e quem volta de lá não reencara a pergunta do portão.
+// Mas guardar NÃO é decidir — o portão só pula a pergunta quando a chegada
+// veio de dentro do site (ver main.ts → isInternalArrival); num reload ou
+// numa visita nova ele pergunta de novo, mesmo com isto preenchido.
+const STORE_KEY = 'motion-mode';
+
 export function setMotionMode(next: MotionMode) {
   mode = next;
   // espelhado no <html> pra folha de estilo poder cortar transição sem
   // precisar passar por JS (ver index.astro, [data-motion='reduced'])
   document.documentElement.dataset.motion = next;
+  try {
+    sessionStorage.setItem(STORE_KEY, next);
+  } catch (e) {}
+}
+
+/** a escolha já feita nesta sessão, se houver — o portão e a página /photos
+ *  perguntam aqui antes de decidir sozinhos */
+export function storedMotionMode(): MotionMode | null {
+  try {
+    const v = sessionStorage.getItem(STORE_KEY);
+    return v === 'full' || v === 'reduced' ? v : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 export function reducedMotion(): boolean {

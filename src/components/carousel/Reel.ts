@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
-import { REEL, REEL_PHOTO_W, REEL_STEP, REEL_REFLECT } from './config';
+import { REEL, REEL_PHOTO_W, REEL_STEP, REEL_REFLECT, GPU, coarsePointer } from './config';
 import {
   makeRibbonGeometry, captureRest, bendRibbon, ribbonPose, placeOnRibbon,
 } from './Ribbon';
@@ -90,7 +90,11 @@ export class Reel {
       antialias: true,
       alpha: true,        // o branco da página é o fundo, não uma cor nossa
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // mesmo teto do anel da home (ver GPU em config.ts): esta fita vive numa
+    // página que já está rolando, e no celular ela divide a GPU com isso
+    this.renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio, coarsePointer() ? GPU.pixelRatioCoarse : GPU.pixelRatio),
+    );
     this.renderer.setClearColor(0x000000, 0);
 
     // Dobrada aqui e nunca mais: a curvatura desta fita é fixa.

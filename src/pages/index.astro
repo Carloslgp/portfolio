@@ -13,6 +13,31 @@ const first = SECTIONS[0];
 ---
 
 <Layout>
+  <Fragment slot="head">
+    <title>Carlos Leonardo — Developer</title>
+
+    {/* As fotos do anel, pedidas já na análise do HTML.
+
+        Sem isto elas só eram descobertas lá no fim: o navegador tinha que
+        baixar o bundle, executá-lo, montar o Carousel e só então o
+        TextureLoader abria os cinco pedidos — tudo em série. E a cortina não
+        sai sem elas, então esse tempo era tempo de espera de cara.
+
+        O portão é o que torna isto de graça: enquanto a pessoa lê a pergunta e
+        escolhe como quer ver o site, a rede está ociosa. As fotos passam a
+        ocupar justamente esse vão, e a escolha e o carregamento correm juntos
+        em vez de um depois do outro. */}
+    {SECTIONS.map((s) => (
+      <link rel="preload" href={s.texture} as="image" type="image/webp" />
+    ))}
+
+    {/* O /photos é uma página de verdade (MPA), e o mergulho que a antecede
+        dura meio segundo — pouco pra baixar HTML, CSS e JS numa rede ruim.
+        prefetch resolve isso na ociosidade, com prioridade mínima: quando o
+        clique vier, a página já está no cache. */}
+    <link rel="prefetch" href="/photos" />
+  </Fragment>
+
   <!-- a palavra gigante do fundo NÃO mora mais aqui: virou geometria na cena
        (Backdrop.ts), pra pegar perspectiva e descer junto com a câmera.
        A classe .bg-portfolio continua viva porque a cortina ainda a usa. -->
@@ -127,15 +152,31 @@ const first = SECTIONS[0];
                       medida é a da foto, então pôr a imagem depois não mexe
                       em nada do que está em volta. */}
                   {isPhoto(block) && (
-                    <figure class:list={['shot', { 'is-empty': !block.src }]}>
-                      {block.src
-                        ? <img
+                    <figure class:list={['shot', { 'is-empty': !block.src && !block.video }]}>
+                      {block.video
+                        /* preload="none": o vídeo mora no meio de uma página
+                           longa que muita gente nunca rola até o fim. Até lá o
+                           que se vê é o poster, e nenhum byte de vídeo foi
+                           pedido — quem manda tocar é o scripts/shots.ts,
+                           quando ele entra na tela E o portão pediu movimento. */
+                        ? <video
                             class:list={{ 'is-contained': block.fit === 'contain' }}
-                            src={block.src}
-                            alt={block.photo}
-                            loading="lazy"
+                            data-shot-video
+                            src={block.video}
+                            poster={block.poster}
+                            aria-label={block.photo}
+                            preload="none"
+                            muted loop playsinline disablepictureinpicture
                           />
-                        : <span class="slot-note">Foto — {block.photo}</span>}
+                        : block.src
+                          ? <img
+                              class:list={{ 'is-contained': block.fit === 'contain' }}
+                              src={block.src}
+                              alt={block.photo}
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          : <span class="slot-note">Foto — {block.photo}</span>}
                     </figure>
                   )}
 
@@ -223,10 +264,12 @@ const first = SECTIONS[0];
   import { initHud } from '../scripts/hud';
   import { initScramble } from '../scripts/scramble';
   import { initTheme } from '../scripts/theme';
+  import { initShotVideos } from '../scripts/shots';
   initTheme();
   initUI();
   initHud();
   initScramble();
+  initShotVideos();
   bootstrap();
 </script>
 
@@ -984,13 +1027,16 @@ const first = SECTIONS[0];
     border-radius: 2px;
     aspect-ratio: 3 / 2;
   }
-  .shot img {
+  /* <video> entra na MESMA moldura da foto: o bloco de animação é um bloco de
+     foto que se mexe, e a medida da página não pode depender de qual dos dois é */
+  .shot img,
+  .shot video {
     display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
-  .shot img.is-contained {
+  .shot .is-contained {
     object-fit: contain;
     background: #000;
   }

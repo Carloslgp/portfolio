@@ -8,14 +8,37 @@ import { setProgress, hideLoader, awaitGate } from './loading';
 import { reducedMotion } from './motion';
 import { registerScroll } from './scroll';
 
+// Esta chegada à home veio de DENTRO do site? (o "‹ Voltar" do /photos, o
+// botão voltar do navegador.) A distinção importa porque uma volta não é uma
+// chegada: quem volta já respondeu ao portão e já viu a descida da câmera —
+// re-encenar os dois transforma um passo atrás numa reabertura do site
+// inteiro. Reload (F5) e visita nova contam como chegada de verdade: o portão
+// pergunta e a entrada roda inteira.
+function isInternalArrival(): boolean {
+  const nav = performance.getEntriesByType('navigation')[0] as
+    PerformanceNavigationTiming | undefined;
+  if (nav?.type === 'back_forward') return true;   // botão do navegador
+  if (nav?.type === 'reload') return false;        // F5 é recomeço, não volta
+  try {
+    // navegação normal: veio de outra página DESTE site (ex.: /photos)?
+    return !!document.referrer && new URL(document.referrer).origin === location.origin;
+  } catch {
+    return false;
+  }
+}
+
 export async function bootstrap() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
   if (!canvas) return;
 
+  // Numa volta interna a escolha da sessão vale sem perguntar; numa chegada
+  // de verdade o portão pergunta, como sempre.
+  const internal = isInternalArrival();
+
   // O portão é armado ANTES do carregamento e só esperado depois: a pergunta
   // fica na tela enquanto as fotos baixam, então a escolha corre em paralelo e
   // não vira tempo de espera somado.
-  const gate = awaitGate();
+  const gate = awaitGate(internal);
 
   window.addEventListener('carousel:progress', (e) => {
     const { loaded, total } = (e as CustomEvent).detail;
@@ -38,8 +61,10 @@ export async function bootstrap() {
   await gate;                           // a cortina não sai sem a escolha feita
   await hideLoader();                   // cortina sai, mostrando o anel de cima
 
-  // câmera desce até a foto inicial — ou já nasce lá, em baixa animação
-  if (reducedMotion()) carousel.revealInstant();
+  // câmera desce até a foto inicial — ou já nasce lá, em baixa animação E na
+  // volta interna: quem está voltando do /photos já assistiu à descida, e
+  // repeti-la é o que fazia o "voltar" parecer o site carregando do zero
+  if (reducedMotion() || internal) carousel.revealInstant();
   else await carousel.reveal();
 
   // a linha do topo e os cantos (hora / frase) entram por último, com a cena já parada
@@ -48,6 +73,46 @@ export async function bootstrap() {
     .forEach((el) => el.classList.add('is-in'));
 
   initAbout(carousel, lenis);
+  initPhotosLink(carousel);
+}
+
+// ——— Photos: página própria (/photos), aberta pelo clique no anel ———
+//
+// Ao contrário do About, aqui não há painel na mesma página: é navegação de
+// verdade, MPA. A escolha é deliberada — sair da home destrói o render loop
+// do Three.js e o Lenis sem nenhum teardown manual, e a view transition
+// cross-document (ver global.css → @view-transition) costura as duas páginas
+// num cross-fade. O departInto só dá o primeiro passo do mergulho: é a
+// metade de um gesto que a página de fotos "completa" do outro lado.
+function initPhotosLink(carousel: Carousel) {
+  let leaving = false;   // clique duplo não pode empilhar duas navegações
+
+  window.addEventListener('section:open', async (e) => {
+    const detail = (e as CustomEvent).detail;
+    if (detail?.id !== 'photos' || leaving) return;
+    leaving = true;
+
+    // baixa animação: sem mergulho — navega seco, como pediu quem escolheu
+    if (!reducedMotion()) {
+      // a HUD sai antes do impacto, com a MESMA classe do mergulho do About:
+      // linha do topo e card não podem ficar boiando sobre a foto crescendo
+      document.body.classList.add('is-diving');
+      await carousel.departInto(detail.index);
+    }
+    location.href = '/photos';
+  });
+
+  // Botão VOLTAR do navegador: o Chrome pode servir a home direto do BFCache,
+  // congelada exatamente como ela estava ao partir — câmera no meio do
+  // mergulho, gesto travado, HUD apagada. Este é o único lugar que sabe
+  // desfazer isso. (Na navegação normal pelo "‹ Voltar" da página de fotos, a
+  // home recarrega do zero e nada disto roda.)
+  window.addEventListener('pageshow', (e) => {
+    if (!(e as PageTransitionEvent).persisted || !leaving) return;
+    leaving = false;
+    document.body.classList.remove('is-diving');
+    carousel.cancelDeparture();
+  });
 }
 
 // ——— About: mesma página, aberta pela descida ———
@@ -276,7 +341,8 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     if (open || busy) carousel.syncFrame();
   });
 
-  // clique numa foto do carrossel (o Carousel só avisa QUAL seção; a decisão é aqui)
+  // clique numa foto do carrossel (o Carousel só avisa QUAL seção; a decisão é
+  // aqui — e a de 'photos' mora em initPhotosLink, fora deste closure do About)
   window.addEventListener('section:open', (e) => {
     if ((e as CustomEvent).detail?.id === 'about') openAbout();
   });

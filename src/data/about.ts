@@ -140,9 +140,9 @@ export const TOPICS: Topic[] = [
         src: '/images/about_main_photos/music.JPG',
       },
       'These days I chase atmospheres somewhere between C418 and EDEN, though “finished song” is still more of an aspiration than something real. The muse and I have a standing meeting; attendance is inconsistent on both sides. But long before I ever touched a key, I was a listener first, and I still am one: lyrics (or meaning) before melody, always(except if it has no singer.)',
-      // fecha o tópico, logo depois do "I was a listener first": as cinco são a
+      // fecha o tópico, logo depois do "I was a listener first": elas são a
       // prova disso. O texto daqui é o título VISÍVEL do bloco (ver Songs.astro).
-      { songs: 'Top 5 Songs of My Life', items: SONGS },
+      { songs: 'Songs of My Life', items: SONGS },
     ],
   },
 

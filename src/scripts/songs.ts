@@ -7,7 +7,7 @@
 // Duas coisas moram aqui e em nenhum outro lugar:
 //   • a POSE de cada capa — a conta que transforma "está a 2 de distância da
 //     que está de frente" em translate/rotate/opacity. Fica em JS, e não em
-//     classes de CSS, porque a lista tem tamanho variável: cinco hoje, sete
+//     classes de CSS, porque a lista tem tamanho variável: três hoje, sete
 //     amanhã, sem uma regra nova por posição;
 //   • o LOCK da rolagem ao abrir o modal (ver scripts/scroll.ts).
 //
@@ -73,7 +73,7 @@ function mount(root: HTMLElement) {
 
       // Só a capa de frente é parada de Tab: as vizinhas estão ali como
       // profundidade, e quem navega pelo teclado troca de capa nas setas da
-      // legenda, não passeando por cima de cinco botões empilhados.
+      // legenda, não passeando por cima de uma pilha de botões.
       const btn = item.querySelector('button');
       if (btn) btn.tabIndex = far === 0 ? 0 : -1;
     });

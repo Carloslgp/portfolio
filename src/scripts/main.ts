@@ -77,11 +77,36 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
   let busy = false;   // trava a coreografia enquanto ela roda (clique duplo, hash, etc.)
   let tl: gsap.core.Timeline | null = null;
 
+  // A seta do pé da tela (ver index.astro → .about-hint). Ela diz uma coisa só,
+  // e é literal: AINDA TEM PÁGINA EMBAIXO. Então fica enquanto isso for
+  // verdade, e some quando deixa de ser — no fim do rolo, e só lá. Não é uma
+  // dica de primeiro quadro: quem para no meio pra ler um tópico continua
+  // vendo que a página não acabou ali.
+  //
+  // Como ela responde ao ESTADO (e não a um gesto), voltar a subir a traz de
+  // volta sozinha. É a mesma conta nos dois lugares que a chamam, e por isso
+  // ela vive numa função só.
+  const hint = panel.querySelector<HTMLElement>('[data-about-hint]');
+  /** px que faltam pro fim e já contam como "chegou" — o rolo suave raramente
+   *  para no zero exato, e sem essa folga a seta ficaria acesa no último quadro */
+  const HINT_END = 80;
+
+  function syncHint() {
+    // `limit` é o fim do rolo; `limit - scroll` é o que ainda falta. Quando a
+    // página inteira cabe na tela isso já nasce em 0 — a seta não aparece, e
+    // não precisa de um caso à parte pra isso. (Exige um lenis.resize() antes:
+    // quem chama daqui já fez o dele; nas rolagens ele já está medido.)
+    hint?.classList.toggle('is-gone', lenis.limit - lenis.scroll <= HINT_END);
+  }
+
   // A moldura rola junto com a página e sai de cena.
   // A posição vem do lenis.scroll, e não do window.scrollY: é o valor
   // interpolado que a rolagem suave está de fato mostrando neste frame, e ler
   // dele evita ainda forçar um layout a cada evento.
-  const onScroll = () => carousel.setBorderScroll(lenis.scroll);
+  const onScroll = () => {
+    carousel.setBorderScroll(lenis.scroll);
+    syncHint();
+  };
 
   // estado final sem coreografia: o deep-link (/#about), onde não há foto na
   // tela pra mergulhar, e a baixa animação, onde não se quer o mergulho
@@ -89,6 +114,7 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     document.body.classList.add('is-about');
     panel.hidden = false;
     lenis.resize();
+    syncHint();
     lenis.on('scroll', onScroll);
     open = true;
   }
@@ -148,6 +174,7 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     document.body.classList.remove('is-diving', 'is-descending');
     lenis.start();
     lenis.resize();
+    syncHint();
     lenis.on('scroll', onScroll);
 
     open = true;

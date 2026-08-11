@@ -161,6 +161,24 @@ const first = SECTIONS[0];
         </div>
       </div>
     </div>
+
+    <!-- ——— a dica de rolagem ———
+         Uma seta e nada mais, no pé da tela, dizendo uma coisa literal: ainda
+         tem página embaixo. Fica acesa o tempo TODO em que isso for verdade e
+         só apaga no fim do rolo — subir de volta a traz de novo, porque ela
+         responde ao estado da página, não a um gesto já feito
+         (ver scripts/main.ts → syncHint).
+
+         aria-hidden + pointer-events: none de propósito: é um sinal pra quem
+         VÊ a dobra. Quem lê por leitor de tela ou Tab já recebe o conteúdo
+         inteiro em sequência, e um "role para baixo" ali seria só ruído — e
+         uma seta que engolisse cliques por cima do texto, pior ainda. -->
+    <div class="about-hint" data-about-hint aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14" />
+        <path d="m19 12-7 7-7-7" />
+      </svg>
+    </div>
   </section>
 
   <!-- cortina: cobre a cena até fotos, fonte e shaders estarem prontos.
@@ -801,26 +819,105 @@ const first = SECTIONS[0];
     min-height: calc(100svh - var(--about-well-h));
   }
 
+  /* ——— voltar ———
+     Sem pílula, sem vidro: dentro do About a página é papel e tinta, e a
+     cápsula de vidro é vocabulário do CARROSSEL (.mode, .theme). Aqui em cima
+     ela pousava como um controle emprestado de outra tela — e não combinava
+     com a seta do pé, que é só um símbolo solto. Texto e símbolo, os dois. */
   .about-close {
     position: fixed;
     top: 1.5rem;
-    left: 1.5rem;
+    /* sem o recuo horizontal da pílula, o texto precisa vir buscar a margem que
+       ela dava: é o mesmo alinhamento ótico de antes */
+    left: 2.6rem;
     z-index: 6;
-    padding: 0.55rem 1.1rem;
+    /* padding só na vertical: a linha de baixo mede a LARGURA do botão, e um
+       recuo lateral a faria sobrar dos dois lados da palavra */
+    padding: 0.35rem 0;
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--ink);
-    background: rgba(90, 90, 90, 0.12);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(var(--ink-rgb), 0.1);
-    border-radius: 999px;
+    background: none;
+    border: 0;
     cursor: pointer;
-    transition: background 0.2s, color var(--theme-fade), border-color var(--theme-fade);
+    transition: color var(--theme-fade);
   }
-  .about-close:hover {
-    background: rgba(90, 90, 90, 0.2);
+
+  /* A linha que cresce no hover.
+     ::after com scaleX, e não um border-bottom animando largura: transform não
+     passa pelo layout, então a linha desliza no compositor sem reescrever a
+     caixa do botão a cada quadro.
+     Ela cresce da ESQUERDA pra direita: o sentido da leitura, o mesmo de um
+     sublinhado sendo traçado sob a palavra. */
+  .about-close::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  /* focus-visible junto: quem chega pelo Tab vê a mesma linha, e é ela que diz
+     onde o foco está agora que não há mais fundo pra mudar de cor */
+  .about-close:hover::after,
+  .about-close:focus-visible::after {
+    transform: scaleX(1);
+  }
+  :global(html[data-motion='reduced']) .about-close::after {
+    transition: none;
+  }
+
+  /* ——— a dica de rolagem ———
+     Centrada na tela, no pé — fixed pelo mesmo motivo do .about-close: ela é
+     uma marca da JANELA, não do texto, então não pode rolar junto com o que
+     está apontando. (Dentro do .about o `fixed` se ancora no painel enquanto
+     ele tem transform, na abertura; é isso que faz a seta subir junto com a
+     página em vez de aparecer sozinha no meio da coreografia.)
+     O centro embaixo está livre: o .mode sai de cena no About e o .theme mora
+     na quina direita. */
+  .about-hint {
+    position: fixed;
+    left: 50%;
+    /* a MESMA linha de base do .theme, na quina direita: os dois são marcas do
+       pé da janela, e em alturas diferentes um faria o outro parecer torto.
+       Também é o que tira a seta de baixo da barra do astro dev toolbar, que
+       em desenvolvimento mora exatamente aqui no centro. */
+    bottom: 2.2rem;
+    z-index: 6;
+    transform: translateX(-50%);
+
+    /* Símbolo solto, sem cápsula — o mesmo peso do "‹ Voltar" lá em cima.
+       Sem o fundo pra segurá-la, quem carrega a visibilidade é o desenho: a
+       tinta sobe pra 0.55 e o traço engrossa (ver o stroke-width no SVG). */
+    color: rgba(var(--ink-rgb), 0.55);
+    pointer-events: none;
+    transition: opacity 0.5s ease, color var(--theme-fade);
+  }
+  /* chegou ao fim: não há mais o que apontar (ver scripts/main.ts → syncHint) */
+  .about-hint.is-gone {
+    opacity: 0;
+  }
+
+  /* O balanço é o que separa "seta" de "seta que quer que você role". Vai no
+     <svg>, e não no .about-hint: lá em cima o transform já é a centralização,
+     e uma animação por cima dele jogaria a seta pra fora do centro.
+     Só translateY, sem pulso de opacidade: um desenho que passa metade do
+     ciclo apagado é justamente o que não se enxerga. */
+  .about-hint svg {
+    display: block;
+    animation: hint-bob 1.8s ease-in-out infinite;
+  }
+  @keyframes hint-bob {
+    0%, 100% { transform: translateY(-4px); }
+    50%      { transform: translateY(4px); }
+  }
+  :global(html[data-motion='reduced']) .about-hint svg {
+    animation: none;
   }
 
   .about-inner {

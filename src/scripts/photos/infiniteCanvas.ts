@@ -36,6 +36,16 @@ interface Placed {
   photoId: string;
 }
 
+/** O lugar de uma instância dentro do plano, em px LOCAIS (já descontada a
+ *  âncora): é o mesmo sistema em que os nós do mural são posicionados, então
+ *  quem receber isto pode pôr um elemento exatamente por cima do ladrilho. */
+export interface PlacedRect {
+  left: number;
+  top: number;
+  w: number;
+  h: number;
+}
+
 export interface CanvasOptions {
   /** baixa animação: sem inércia (o gesto para quando o dedo para) */
   reduced: boolean;
@@ -70,6 +80,14 @@ export class InfiniteCanvas {
   private raf = 0;
   private lastFrame = 0;
 
+  /** Nós criados agora entram com carregamento ANSIOSO. Vale só na chegada
+   *  vinda do anel: ali o mural nasce ampliado e encolhe até caber na tela, e
+   *  os ladrilhos que o `lazy` deixaria pra depois — porque a ampliação os
+   *  empurrou pra fora do enquadramento — apareceriam um a um durante o recuo,
+   *  exatamente como uma página carregando. É o que a emenda inteira existe
+   *  pra não parecer. */
+  private eager = false;
+
   constructor(
     private viewport: HTMLElement,
     private plane: HTMLElement,
@@ -88,6 +106,64 @@ export class InfiniteCanvas {
     this.placed.clear();
     this.placedAt.x = NaN;
     this.place();
+  }
+
+  /** Põe a câmera com uma instância desta foto no CENTRO do viewport e devolve
+   *  o lugar dela dentro do plano. É a chegada vinda do anel: o mural não abre
+   *  numa posição qualquer, abre na foto em que a home mergulhou.
+   *
+   *  Escolhe a instância mais próxima do centro do tile por um motivo prático:
+   *  as das beiradas têm metade dos vizinhos do outro lado da costura, e a
+   *  costura é perfeita mas não custa nada evitá-la no quadro de abertura.
+   *
+   *  Exige o tile já montado (setTile antes) e devolve `null` se esta foto não
+   *  estiver nele — aí quem chamou segue sem coreografia, com o mural normal. */
+  centerOn(photoId: string): PlacedRect | null {
+    const tile = this.tile;
+    if (!tile) return null;
+
+    let best: TileItem | null = null;
+    let bestDist = Infinity;
+    for (const item of tile.items) {
+      if (item.photo.id !== photoId) continue;
+      const d = Math.hypot(
+        item.x + item.w / 2 - tile.w / 2,
+        item.y + item.h / 2 - tile.h / 2,
+      );
+      if (d < bestDist) { bestDist = d; best = item; }
+    }
+    if (!best) return null;
+
+    const vw = this.viewport.clientWidth;
+    const vh = this.viewport.clientHeight;
+    this.offset.x = best.x + best.w / 2 - vw / 2;
+    this.offset.y = best.y + best.h / 2 - vh / 2;
+    // âncora EXATAMENTE no offset (sem arredondar, ao contrário do rebase do
+    // place): a foto da emenda precisa cair no centro sem meio pixel de folga,
+    // senão a troca da imagem em tela cheia pela do plano dá um tranco
+    this.rebase(this.offset.x, this.offset.y);
+
+    // Os ladrilhos que o setTile já pôs no DOM foram criados com preguiça, e o
+    // recuo os deixaria fora do enquadramento justamente enquanto o navegador
+    // decide se vale a pena baixá-los. Tirar a preguiça agora recomeça o
+    // carregamento dos adiados (é o que a especificação manda: lazy → eager
+    // dispara o load), pra parede já estar inteira quando ela aparecer.
+    for (const p of this.placed.values()) {
+      const img = p.node.firstElementChild as HTMLImageElement;
+      if (img.loading === 'lazy') img.loading = 'eager';
+    }
+
+    this.eager = true;
+    this.placedAt.x = NaN;      // força uma passada nova, mesmo se a câmera não andou
+    this.place();
+    this.eager = false;
+
+    return {
+      left: best.x - this.origin.x,
+      top: best.y - this.origin.y,
+      w: best.w,
+      h: best.h,
+    };
   }
 
   start() {
@@ -145,8 +221,7 @@ export class InfiniteCanvas {
     );
 
     // o movimento de verdade: um transform no container, e mais nada
-    this.plane.style.transform =
-      `translate3d(${this.origin.x - this.offset.x}px, ${this.origin.y - this.offset.y}px, 0)`;
+    this.applyTransform();
 
     // reciclar nós é mais caro que comparar dois floats: a passada de
     // virtualização só roda quando a câmera andou de verdade
@@ -156,6 +231,16 @@ export class InfiniteCanvas {
     ) {
       this.place();
     }
+  }
+
+  /** A posição da câmera vira UM transform no container. Mora numa função
+   *  porque não é só o loop que precisa dela: com o mural congelado (lightbox
+   *  aberto, ou a chegada vinda do anel) o tick sai antes de desenhar, e sem
+   *  isto aqui o plano ficaria no lugar antigo enquanto os nós já estariam
+   *  posicionados pelo novo — o mural nasceria deslocado. */
+  private applyTransform() {
+    this.plane.style.transform =
+      `translate3d(${this.origin.x - this.offset.x}px, ${this.origin.y - this.offset.y}px, 0)`;
   }
 
   // ——— virtualização ———
@@ -171,12 +256,12 @@ export class InfiniteCanvas {
       Math.abs(this.offset.x - this.origin.x) > MURAL.REBASE_DIST ||
       Math.abs(this.offset.y - this.origin.y) > MURAL.REBASE_DIST
     ) {
-      this.origin.x = Math.round(this.offset.x);
-      this.origin.y = Math.round(this.offset.y);
-      for (const p of this.placed.values()) this.position(p);
-      this.plane.style.transform =
-        `translate3d(${this.origin.x - this.offset.x}px, ${this.origin.y - this.offset.y}px, 0)`;
+      this.rebase(Math.round(this.offset.x), Math.round(this.offset.y));
     }
+
+    // a âncora pode ter mudado logo acima, e o congelado nem passa pelo tick:
+    // esta passada é o único lugar que garante plano e nós no mesmo sistema
+    this.applyTransform();
 
     const vw = this.viewport.clientWidth;
     const vh = this.viewport.clientHeight;
@@ -235,6 +320,20 @@ export class InfiniteCanvas {
       `translate3d(${p.wx - this.origin.x}px, ${p.wy - this.origin.y}px, 0)`;
   }
 
+  /** Troca a âncora local e REPOSICIONA quem já está no DOM.
+   *
+   *  As duas coisas andam juntas sempre: a posição de um nó é `mundo − âncora`,
+   *  escrita uma vez, na hora em que ele entra no quadro. Mexer na âncora sem
+   *  reescrever essas posições deixa os nós antigos medidos por uma régua e o
+   *  plano (que também desconta a âncora) por outra — e o mural inteiro sai do
+   *  lugar pela diferença. Por isso mexer na âncora é ESTA função, e não uma
+   *  atribuição solta. */
+  private rebase(x: number, y: number) {
+    this.origin.x = x;
+    this.origin.y = y;
+    for (const p of this.placed.values()) this.position(p);
+  }
+
   private assign(p: Placed, item: TileItem) {
     const { node } = p;
     node.style.width = `${item.w}px`;
@@ -260,7 +359,7 @@ export class InfiniteCanvas {
     node.type = 'button';
     node.className = 'mural-tile';
     const img = document.createElement('img');
-    img.loading = 'lazy';
+    img.loading = this.eager ? 'eager' : 'lazy';
     img.decoding = 'async';
     img.draggable = false;
     img.addEventListener('load', () => img.classList.remove('is-loading'));

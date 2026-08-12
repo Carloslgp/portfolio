@@ -29,6 +29,11 @@ export class CameraRig {
   // distância a curvatura do cilindro vira distorção em vez de perspectiva.
   dive = 0;
 
+  // Distância final entre a câmera e o centro da foto. O About usa a distância
+  // em que a imagem ainda aparece inteira; a saída para /photos troca este
+  // valor para atravessar as bordas da foto antes da emenda com o DOM.
+  diveGap = SHATTER.approach;
+
   // A descida que abre o About: 0 = no ponto da quebra, 1 = recuada até
   // enquadrar a moldura de cacos. Só recuo, sem inclinar e sem escorregar: o
   // plano do vidro fica paralelo à tela, e é o painel HTML subindo por trás que
@@ -129,7 +134,7 @@ export class CameraRig {
     const radius = THREE.MathUtils.lerp(
       THREE.MathUtils.lerp(
         THREE.MathUtils.lerp(CAM.top.radius, viewRadius, p),
-        RADIUS + SHATTER.approach,
+        RADIUS + this.diveGap,
         this.dive,
       ),
       RADIUS + ABOUT.frameGap,

@@ -3,7 +3,8 @@
 import Lenis from 'lenis';
 import gsap from 'gsap';
 import { Carousel } from '../components/carousel/Carousel';
-import { ABOUT } from '../components/carousel/config';
+import { ABOUT, DEPART, SECTIONS } from '../components/carousel/config';
+import { SEAM_ENTRY_KEY, SEAM_OVERSCAN } from '../data/gallery';
 import { setProgress, hideLoader, awaitGate } from './loading';
 import { reducedMotion } from './motion';
 import { registerScroll } from './scroll';
@@ -80,37 +81,149 @@ export async function bootstrap() {
 //
 // Ao contrário do About, aqui não há painel na mesma página: é navegação de
 // verdade, MPA. A escolha é deliberada — sair da home destrói o render loop
-// do Three.js e o Lenis sem nenhum teardown manual, e a view transition
-// cross-document (ver global.css → @view-transition) costura as duas páginas
-// num cross-fade. O departInto só dá o primeiro passo do mergulho: é a
-// metade de um gesto que a página de fotos "completa" do outro lado.
+// do Three.js e o Lenis sem nenhum teardown manual.
+//
+// A transição é uma EMENDA, e não um cross-fade entre duas telas diferentes: o
+// avanço desenrola o segmento e termina com a mesma foto chapada, cobrindo a
+// tela; a página de fotos abre nesse enquadramento e recua dali até o lugar
+// dela na parede (ver scripts/photos/main.ts → enterFromSeam). No quadro
+// da troca as duas páginas mostram a mesma imagem, então não há o que costurar:
+// a emenda não se vê porque não existe. Isso vale inclusive onde não há view
+// transition cross-document (Firefox), que ali degrada pra um corte seco — e um
+// corte entre dois quadros idênticos é invisível.
+/** Põe a foto chapada no QUADRO DA EMENDA — cobrindo a tela na proporção da
+ *  FITA, centralizada — e devolve essa medida. É o estado final do avanço e o
+ *  estado inicial da página de fotos: os dois documentos desenham o mesmo
+ *  retângulo antes de /photos devolver a imagem à proporção natural.
+ *
+ *  A proporção vem do build (data-aspect), e não do naturalWidth: no pior caso
+ *  a foto ainda está baixando quando alguém clica, e uma medida errada aí
+ *  desmontaria justamente a emenda. */
+function seamBox(flat: HTMLImageElement): { w: number; h: number } | null {
+  const aspect = Number(flat.dataset.aspect);
+  if (!aspect) return null;
+
+  // A troca de documento acontece ainda dentro da foto, não com a borda dela
+  // encostada no viewport. /photos começa com exatamente a mesma sobra.
+  const w = Math.max(window.innerWidth, window.innerHeight * aspect) * SEAM_OVERSCAN;
+  const h = w / aspect;
+  flat.style.width = `${w}px`;
+  flat.style.height = `${h}px`;
+  flat.style.left = `${(window.innerWidth - w) / 2}px`;
+  flat.style.top = `${(window.innerHeight - h) / 2}px`;
+  return { w, h };
+}
+
 function initPhotosLink(carousel: Carousel) {
   let leaving = false;   // clique duplo não pode empilhar duas navegações
+
+  const flat = document.querySelector<HTMLImageElement>('[data-depart]');
+
+  // A foto chapada é pedida quando o anel ENCOSTA na seção de fotos, não no
+  // clique: baixar 2400px de imagem no clique seria tarde (o mergulho dura
+  // menos de um segundo) e baixar no carregamento seria cedo demais — a home
+  // faria todo mundo pagar por uma transição que a maioria não vai ver. Parar
+  // na seção é a intenção mais barata que existe, e depois dela sobra tempo de
+  // rede ocioso de sobra. O decode antecipa também a decodificação, que é o que
+  // de fato apareceria como engasgo no primeiro quadro da imagem.
+  const arm = () => {
+    if (!flat?.dataset.src || flat.src) return;
+    flat.src = flat.dataset.src;
+    flat.decode?.().catch(() => {});
+  };
+  window.addEventListener('carousel:change', (e) => {
+    if (SECTIONS[(e as CustomEvent).detail?.index]?.id === 'photos') arm();
+  });
 
   window.addEventListener('section:open', async (e) => {
     const detail = (e as CustomEvent).detail;
     if (detail?.id !== 'photos' || leaving) return;
     leaving = true;
 
-    // baixa animação: sem mergulho — navega seco, como pediu quem escolheu
+    // baixa animação: sem mergulho — navega seco, como pediu quem escolheu.
+    // Sem o marcador, a página de fotos também abre seca, sem recuo: as duas
+    // pontas da emenda respondem à mesma escolha.
     if (!reducedMotion()) {
       // a HUD sai antes do impacto, com a MESMA classe do mergulho do About:
       // linha do topo e card não podem ficar boiando sobre a foto crescendo
       document.body.classList.add('is-diving');
-      await carousel.departInto(detail.index);
+      arm();   // clique numa foto de lado, sem passar pela seção: última chance
+
+      // A foto chapada entra na MESMA timeline do mergulho, ancorada no fim
+      // dele: é isso que faz a imagem terminar de cobrir a tela no quadro em
+      // que a câmera para, e não um punhado de milissegundos depois — que é o
+      // tanto que basta pra emenda virar um pisca.
+      // O QUADRO DA EMENDA: a foto cobrindo a tela na proporção da fita já
+      // desenrolada. /photos monta este mesmo retângulo antes de começar o
+      // recuo, então a navegação troca documentos sem trocar o quadro.
+      const seam = flat && seamBox(flat);
+
+      // Quem desenha a segunda metade do avanço.
+      //
+      // Ela não "assume" o movimento: ela GRUDA nele. A cada quadro a foto 3D é
+      // medida na tela, e a chapada é desenhada entre essa medida e o quadro da
+      // emenda, com um peso que sai do zero DEVAGAR (smoothstep tem derivada
+      // nula nas duas pontas). O efeito é que ela nasce exatamente do tamanho da
+      // foto que está substituindo E crescendo no mesmo ritmo, e só depois se
+      // desprende, em direção à tela cheia.
+      //
+      // A alternativa óbvia — medir a foto 3D uma vez e interpolar dali até a
+      // emenda — é o que estava aqui antes, e tem um defeito que só aparece
+      // medindo: as duas metades do avanço não crescem no mesmo ritmo (a 3D
+      // ainda tem 1,2x pela frente, a chapada tem 1,4x em menos tempo), então a
+      // troca de mãos dobrava a velocidade do zoom num quadro só. Tamanho igual
+      // e velocidade diferente ainda é um tranco.
+      const drawFlat = (p: number) => {
+        if (!flat || !seam || p < DEPART.flatAt) return;
+
+        const k = Math.min(1, (p - DEPART.flatAt) / (1 - DEPART.flatAt));
+        const now = carousel.frontPhotoSize();       // a foto 3D NESTE quadro
+
+        // smootherstep, e não o smoothstep comum: a derivada dele sai do zero
+        // MAIS devagar (30k²(1−k)² contra 6k(1−k)), e é justo no comecinho que
+        // o desprendimento aparece — a distância que falta pra tela cheia é
+        // grande, então um peso que cresce rápido demais vira aceleração
+        // repentina mesmo saindo do zero. O tempo perdido aqui é devolvido no
+        // meio da curva, onde o avanço já está veloz e ninguém repara.
+        const w = k * k * k * (k * (k * 6 - 15) + 10);
+
+        flat.style.transform =
+          `scale(${(now.w + (seam.w - now.w) * w) / seam.w}, ` +
+          `${(now.h + (seam.h - now.h) * w) / seam.h})`;
+
+        // o crossfade também por smoothstep: ele atravessa depressa a faixa do
+        // meio, que é onde as duas imagens aparecem somadas — a fita é curva e
+        // a chapada não, então o miolo delas nunca casa perfeitamente, e o que
+        // dá pra fazer é passar rápido por ali, no ponto mais veloz do avanço
+        const f = Math.min(1, k / DEPART.flatFade);
+        flat.style.opacity = `${f * f * (3 - 2 * f)}`;
+      };
+
+      const tl = carousel.departInto(detail.index, drawFlat);
+      tl.to({}, { duration: DEPART.hold });   // o pouso, com a tela já coberta
+      await tl;
+
+      // o recado pra página de fotos: esta chegada tem de onde continuar.
+      // Quem lê (e apaga) é o script inline de lá, antes do primeiro pixel.
+      try { sessionStorage.setItem(SEAM_ENTRY_KEY, '1'); } catch {}
     }
     location.href = '/photos';
   });
 
   // Botão VOLTAR do navegador: o Chrome pode servir a home direto do BFCache,
   // congelada exatamente como ela estava ao partir — câmera no meio do
-  // mergulho, gesto travado, HUD apagada. Este é o único lugar que sabe
-  // desfazer isso. (Na navegação normal pelo "‹ Voltar" da página de fotos, a
-  // home recarrega do zero e nada disto roda.)
+  // mergulho, gesto travado, HUD apagada, e agora também a foto chapada parada
+  // em cima de tudo. Este é o único lugar que sabe desfazer isso. (Na navegação
+  // normal pelo "‹ Voltar" da página de fotos, a home recarrega do zero e nada
+  // disto roda.)
   window.addEventListener('pageshow', (e) => {
     if (!(e as PageTransitionEvent).persisted || !leaving) return;
     leaving = false;
     document.body.classList.remove('is-diving');
+    if (flat) {
+      flat.style.opacity = '0';
+      flat.style.transform = 'none';
+    }
     carousel.cancelDeparture();
   });
 }

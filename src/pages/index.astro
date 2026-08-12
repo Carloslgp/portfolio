@@ -1,7 +1,10 @@
 ---
 // index.astro — frontmatter roda no build. Three.js NÃO vem aqui.
+import type { ImageMetadata } from 'astro';
+import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
 import { SECTIONS } from '../components/carousel/config';
+import { SEAM_ASPECT, SEAM_PHOTO, FULL } from '../data/gallery';
 // O texto do About mora em src/data/about.ts. Aqui embaixo só existe a forma
 // de desenhar cada tipo de bloco — nenhuma frase da página passa por este
 // arquivo, então editar o conteúdo é sempre lá.
@@ -10,6 +13,27 @@ import Reel from '../components/about/Reel.astro';
 import Songs from '../components/about/Songs.astro';
 
 const first = SECTIONS[0];
+
+// ——— a foto da emenda com /photos ———
+//
+// O mergulho no segmento "Photos" termina com esta foto chapada cobrindo a
+// tela, e a página de fotos abre exatamente nela. Vem do MESMO getImage que o
+// mural pede (as opções moram em data/gallery.ts), então as duas páginas caem
+// no mesmo arquivo gerado — a foto atravessa a navegação já no cache, sem
+// baixar duas vezes e sem piscar no ponto que a transição existe pra costurar.
+//
+// O glob repete o de photos.astro de propósito: cada página resolve o que ela
+// mesma precisa, e nada disso vira import no bundle do cliente (frontmatter é
+// build). Sem o arquivo na pasta, `seam` é null e a home volta a terminar o
+// mergulho na cena 3D — a transição fica pior, a página não quebra.
+const seamModule = Object.entries(
+  import.meta.glob<{ default: ImageMetadata }>(
+    '../assets/photos/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG}',
+    { eager: true },
+  ),
+).find(([path]) => path.endsWith(`/${SEAM_PHOTO}`))?.[1];
+
+const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) : null;
 ---
 
 <Layout>
@@ -95,6 +119,26 @@ const first = SECTIONS[0];
 
   <!-- cursor sutil que segue o mouse com atraso -->
   <div class="cursor" data-cursor aria-hidden="true"></div>
+
+  <!-- ——— a emenda com /photos ———
+       A foto do segmento "Photos", chapada, cobrindo a tela: é o último quadro
+       desta página e o primeiro da de fotos (ver scripts/main.ts →
+       initPhotosLink e DEPART em carousel/config.ts).
+
+       Nasce SEM src, com o endereço guardado no data-. Quem nunca leva o anel
+       até a seção de fotos não baixa 2400px de imagem por causa de uma
+       transição que não vai ver — quem leva, baixa na ociosidade, muito antes
+       do clique (ver `arm` no main.ts). -->
+  {seam && seamModule && (
+    <img
+      class="depart"
+      data-depart
+      data-src={seam.src}
+      data-aspect={SEAM_ASPECT}
+      alt=""
+      aria-hidden="true"
+    />
+  )}
 
   <!-- toggle de tema claro/escuro (ver scripts/theme.ts). Fica FORA do .overlay
        de propósito: o overlay some no About (body.is-about) e o tema é da página
@@ -282,6 +326,32 @@ const first = SECTIONS[0];
     display: block;
     z-index: 1;
     touch-action: none;         /* arrasto controla o carrossel, não a página */
+  }
+
+  /* A foto chapada que termina o avanço pra /photos.
+
+     z-index 12: acima de TUDO, inclusive do toggle de tema (11) — o último
+     quadro desta página precisa ser a foto e nada mais, senão sobra um botão
+     boiando no quadro em que as duas páginas deveriam ser indistinguíveis.
+
+     Sem medida nem posição aqui: as duas entram inline (ver seamBox no
+     main.ts), porque dependem da proporção da janela E da foto. O elemento tem
+     a proporção da IMAGEM, e não a da tela — assim a imagem o preenche sem
+     recorte, e o `scale` não uniforme do avanço pode reproduzir o encurtamento
+     que a curvatura do anel dá na foto 3D. Com `object-fit: cover` numa caixa
+     do tamanho da tela isso seria impossível: escalar recortaria em vez de
+     esticar. */
+  .depart {
+    position: fixed;
+    z-index: 12;
+    opacity: 0;
+    pointer-events: none;
+    /* o preflight do Tailwind põe max-width: 100% em toda <img>, e o quadro da
+       emenda é MAIOR que a janela de propósito (a foto é mais larga que a tela,
+       então cobri-la exige transbordar pelos lados). Sem isto a largura era
+       travada na da janela e a foto chegava espremida no fim do avanço. */
+    max-width: none;
+    max-height: none;
   }
 
   /* cortina de carregamento — acima de tudo (canvas 1, cursor 2, overlay 3) */

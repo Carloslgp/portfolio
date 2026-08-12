@@ -15,7 +15,7 @@ import {
 } from './Ribbon';
 import {
   SECTIONS, RADIUS, HEIGHT, REFLECT, CAM, BASE_ASPECT, LABEL, SEG_ANGLE, SHATTER, ABOUT,
-  GPU, coarsePointer,
+  DEPART, GPU, coarsePointer, THETA_LEN, ARC_WIDTH,
 } from './config';
 
 const ABOUT_INDEX = SECTIONS.findIndex((s) => s.id === 'about');
@@ -44,6 +44,8 @@ export class Carousel {
   private backdrop = new Backdrop();   // o PORTFOLIO gigante, agora dentro da cena
   private shatter = new Shatter();     // a foto do About quebrando em cacos de vidro
   private inAbout = false;             // abertura do About em curso ou aberta
+  private departing: gsap.core.Timeline | null = null;   // saída pro /photos em curso
+  private departureMorph = 0;          // curvatura a restaurar se a navegação voltar do BFCache
   private shattered = false;           // cena já apagada: o loop para de mexer nela
   private idle = false;                // mosaico rolou pra fora: nada a desenhar
 
@@ -357,36 +359,132 @@ export class Carousel {
   }
 
   // A saída para uma página PRÓPRIA (ex.: /photos): alinha a foto clicada e
-  // mergulha META do caminho nela. A navegação corta o movimento no meio de
-  // propósito — o cross-fade da view transition pega a câmera ainda avançando,
-  // e a página nova entra como continuação do gesto, não como um corte depois
-  // de uma animação que terminou e parou.
-  departInto(i: number): gsap.core.Timeline {
+  // avança nela até o pouso.
+  //
+  // O avanço é UM movimento em dois desenhos. A câmera vai até onde a foto
+  // ainda se lê como foto (DEPART.dive); dali em diante quem cresce é uma
+  // imagem CHAPADA em DOM, que não tem curvatura e pode cobrir a tela inteira —
+  // coisa que a fita não pode, porque a proporção dela nunca é a da janela.
+  //
+  // `onDive` é o que mantém os dois sendo um só: recebe o MESMO progresso já
+  // suavizado que move a câmera, quadro a quadro. Sem isso cada metade teria a
+  // sua curva, e no meio da troca uma estaria acelerando enquanto a outra freia
+  // — que foi exatamente o defeito da primeira versão. É o mesmo arranjo do
+  // enterAbout, onde o painel HTML sobe pendurado na timeline da cena: a cena
+  // não sabe o que é uma <img>, e o main.ts não sabe onde a câmera está.
+  departInto(i: number, onDive?: (p: number) => void): gsap.core.Timeline {
     const tl = gsap.timeline();
     if (this.inAbout) return tl;
     this.input.enabled = false;
+    this.departing = tl;
+
+    // O About mantém o anel curvo. /photos tem outro gesto: desenrola a própria
+    // superfície até um plano e por isso pode parar a câmera muito antes.
+    this.rig.diveGap = DEPART.approach;
+    this.departureMorph = this.morph;
+
+    // O parallax sai do caminho: daqui em diante mexer o mouse não empurra mais
+    // a câmera. Ele já perde força sozinho com o avanço (o rig multiplica a
+    // amplitude por 1 − dive), mas zerar o alvo agora é o que impede um gesto
+    // no meio do mergulho de virar deriva lateral — e é a deriva que faria a
+    // foto chapada, que nasce centralizada, não cair em cima da foto 3D.
+    this.rig.setPointer(0, 0);
 
     gsap.killTweensOf(this.input);
     const goal = this.alignGoal(i);
     if (Math.abs(goal - this.input.target) > 0.01) {
       tl.to(this.input, {
         target: goal, current: goal,
-        duration: 0.4, ease: 'power2.inOut',
+        duration: DEPART.alignDur, ease: 'power2.inOut',
       });
     }
-    // dive parcial: perto o bastante pra foto crescer na tela, longe o
-    // bastante pra curvatura do cilindro não virar distorção no último frame
-    tl.to(this.rig, { dive: 0.55, duration: 0.5, ease: 'power2.in' }, '<0.08');
+
+    // as labels apagam já na largada — ver DEPART.labelFadeDur
+    tl.to(this.labels, {
+      fade: 0, duration: DEPART.labelFadeDur, ease: 'power2.in',
+    }, '<');
+
+    // Um proxy, e não um tween direto do rig: o mesmo valor precisa sair daqui
+    // pra quem desenha a outra metade do movimento.
+    const state = { p: 0 };
+    tl.to(state, {
+      p: 1,
+      duration: DEPART.dur,
+      ease: DEPART.ease,
+      onUpdate: () => {
+        // A câmera pousa primeiro e fica estável durante o handoff.
+        const cameraP = THREE.MathUtils.smoothstep(state.p, 0, DEPART.cameraAt);
+        this.rig.dive = DEPART.dive * cameraP;
+
+        // Desenrola a fita inteira, conservando o comprimento. Para a foto
+        // ativa isso é uma correção contínua da curvatura, não uma substituição
+        // por um retângulo. Quem já estava no modo reto simplesmente fica lá.
+        const flattenP = THREE.MathUtils.smoothstep(
+          state.p,
+          DEPART.flattenFrom,
+          DEPART.flattenAt,
+        );
+        this.morph = THREE.MathUtils.lerp(this.departureMorph, 1, flattenP);
+        // Põe a câmera na pose DESTE instante antes de avisar quem desenha a
+        // outra metade: quem mede a foto na tela mede por projeção, e a projeção
+        // usa a matriz da câmera. Sem isto ela leria a pose do último quadro
+        // DESENHADO — um quadro de atraso, que num avanço rápido é a foto
+        // chapada nascendo alguns por cento menor que a 3D que ela substitui.
+        // dt = 0 porque aqui não se quer avançar relógio nenhum, só reposicionar.
+        this.rig.update(0, this.viewRadius);
+        onDive?.(state.p);
+      },
+    }, '<0.08');
+
     return tl;
   }
 
+  // O tamanho, em px de tela, que a foto da frente ocupa NESTE instante.
+  //
+  // É a medida que a foto chapada precisa pra nascer em cima da 3D em vez de
+  // por cima dela. Vai por projeção de verdade (project usa a matriz da câmera
+  // deste frame) em vez de fórmula: assim ela já responde a fov, proporção da
+  // janela, posição da câmera e ao botão curvo/reto, sem repetir aqui nenhuma
+  // conta que o three já faz.
+  //
+  // Os pontos medidos são os que de fato desenham a silhueta: a largura vem das
+  // BEIRADAS da fita (que no anel estão mais fundas que o centro, e por isso
+  // projetam menores — é essa perspectiva que encurta a foto na tela e cancela
+  // boa parte do esticamento da UV), e a altura vem do meio, onde a superfície
+  // está mais perto da lente.
+  frontPhotoSize(): { w: number; h: number } {
+    const k = this.morph;   // 0 = anel, 1 = fita reta
+    const halfX = THREE.MathUtils.lerp(RADIUS * Math.sin(THETA_LEN / 2), ARC_WIDTH / 2, k);
+    const edgeZ = THREE.MathUtils.lerp(RADIUS * Math.cos(THETA_LEN / 2), RADIUS, k);
+
+    const v = new THREE.Vector3();
+    const ndc = (x: number, y: number, z: number) => v.set(x, y, z).project(this.camera);
+
+    const w = Math.abs(ndc(halfX, 0, edgeZ).x - ndc(-halfX, 0, edgeZ).x);
+    const h = Math.abs(ndc(0, HEIGHT / 2, RADIUS).y - ndc(0, -HEIGHT / 2, RADIUS).y);
+
+    // NDC vai de -1 a 1: metade da janela por unidade
+    return { w: (w / 2) * window.innerWidth, h: (h / 2) * window.innerHeight };
+  }
+
   // Desfaz uma partida que não se consumou: o navegador serviu a home de volta
-  // do BFCache (botão voltar), com a câmera parada no meio do mergulho do
+  // do BFCache (botão voltar), com a câmera parada no meio do avanço do
   // departInto e o gesto travado. Sem isto a página restaurada nasce quebrada.
   cancelDeparture() {
     if (this.inAbout) return;
-    gsap.killTweensOf(this.rig);
+    // matar a TIMELINE, e não os tweens do rig: quem move a câmera agora é o
+    // onUpdate de um proxy, e um killTweensOf(this.rig) não o alcançaria
+    this.departing?.kill();
+    this.departing = null;
+    gsap.killTweensOf(this.labels);
+    this.rig.diveGap = SHATTER.approach;
     gsap.to(this.rig, { dive: 0, duration: 0.5, ease: 'power2.out' });
+    gsap.to(this, {
+      morph: this.departureMorph,
+      duration: 0.5,
+      ease: 'power2.out',
+    });
+    gsap.to(this.labels, { fade: 1, duration: 0.4, ease: 'power2.out' });
     this.input.enabled = true;
   }
 

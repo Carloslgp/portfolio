@@ -233,6 +233,82 @@ export const SHATTER = {
   stagger: 0.32,    // atraso do centro até a borda (a trinca se propaga)
 };
 
+// --- a saída para /photos: metade de um gesto ---
+//
+// Aqui a câmera não abre nada nesta página: ela mergulha na foto e a NAVEGAÇÃO
+// acontece com a foto cobrindo a tela. Quem termina o movimento é a página de
+// fotos, recuando daquela mesma foto até o lugar dela na parede (ver
+// scripts/photos/config.ts → ENTRY).
+//
+// Em vez de esconder a troca curva → plana com um zoom extremo, a própria fita
+// se DESENROLA durante a aproximação. Quando o DOM recebe a foto, a superfície
+// 3D já é um plano de mesma proporção; a troca deixa de ser um morph disfarçado
+// e vira apenas um crossfade entre dois desenhos equivalentes.
+export const DEPART = {
+  alignDur: 0.4,     // giro que traz a foto clicada pra frente, quando precisa
+
+  /** A aproximação INTEIRA, do clique ao pouso, em s. Ela é uma coisa só: a
+   *  câmera e a foto chapada que a substitui no fim andam pelo mesmo relógio
+   *  (ver Carousel.departInto → onDive). Antes eram dois movimentos com curvas
+   *  próprias, um acelerando e o outro freando ao mesmo tempo, e essa briga
+   *  aparecia no meio da troca. */
+  dur: 1.15,
+
+  /** A curva da aproximação. Repouso → repouso, e a mesma senoidal do recuo do
+   *  outro lado (photos/config.ts → ENTRY.EASE): as duas metades são o mesmo
+   *  pêndulo, uma indo e a outra voltando. Era `power2.in`, que ACELERA até o
+   *  fim — a câmera estava na velocidade máxima justamente no quadro em que a
+   *  página trocava, e é impossível uma troca não parecer corte quando a coisa
+   *  toda está correndo no instante em que ela acontece. */
+  ease: 'sine.inOut',
+
+  /** Quão perto a câmera chega ao alvo configurado abaixo. */
+  dive: 1,
+
+  /** Distância câmera ↔ centro da foto no fim, em unidades de mundo. Dá apenas
+   *  a pequena sangria necessária para cobrir a tela; a versão anterior ia a
+   *  0.3 e parecia entrar dentro da pintura. */
+  approach: 1.58,
+
+  /** A câmera e o desenrolar chegam ao destino antes do fim da timeline. Essa
+   *  pequena zona de repouso é onde a foto 3D, já plana, troca de mãos com o
+   *  DOM sem continuar mudando por baixo do crossfade. Valores são progresso
+   *  já suavizado da aproximação. */
+  cameraAt: 0.76,
+  flattenFrom: 0.1,
+  flattenAt: 0.7,
+
+  /** As labels de vidro saem logo no começo do avanço, em s. Mesmo motivo do
+   *  mergulho do About (ver ABOUT.labelFadeDur): elas ficam ENTRE a câmera e a
+   *  foto, então crescem na direção da lente. Pior aqui do que lá — a foto
+   *  chapada que entra no fim não tem label nenhuma, então segurá-las acesas
+   *  fazia a palavra ser APAGADA pelo crossfade, no meio da tela. */
+  labelFadeDur: 0.3,
+
+  /** Em que ponto do AVANÇO (não do tempo) a foto chapada entra, e quanto do
+   *  trecho restante o crossfade ocupa.
+   *
+   *  Ela não entra numa escala fixa: entra medindo a foto 3D na tela (ver
+   *  Carousel.frontPhotoSize) e nasce do tamanho exato dela — inclusive com o
+   *  mesmo esmagamento, porque a curvatura do cilindro encurta a foto na
+   *  horizontal e a chapada tem que chegar encurtada igual. Antes ela entrava
+   *  22% maior que a foto que estava substituindo.
+   *
+   *  A troca só começa depois de `flattenAt`: a curvatura já chegou exatamente
+   *  a zero e a câmera também já pousou. */
+  flatAt: 0.8,
+  flatFade: 0.72,
+
+  // O POUSO: um respiro com a foto já cobrindo a tela, antes de navegar.
+  //
+  // Sem ele a página trocava no quadro exato em que a imagem parava de crescer,
+  // e do outro lado o recuo começava — a ida virava volta sem nunca ter
+  // chegado, e é isso que se lia como transição dura. O movimento aqui é uma
+  // INVERSÃO de sentido, e inversão sem repouso é tranco. Curto: é uma pausa
+  // de respiração, não uma espera. */
+  hold: 0.08,
+};
+
 // Onde os cacos param: uma FAIXA no alto, que vira o cabeçalho da página.
 //
 // Antes eles também emolduravam os dois lados do texto, e era ali que o efeito

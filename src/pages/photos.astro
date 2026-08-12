@@ -10,6 +10,9 @@ import type { ImageMetadata } from 'astro';
 import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
 import { PHOTO_META } from '../data/photos';
+import {
+  SEAM_ASPECT, SEAM_PHOTO, SEAM_ENTRY_KEY, SEAM_OVERSCAN, THUMB, FULL,
+} from '../data/gallery';
 
 const modules = import.meta.glob<{ default: ImageMetadata }>(
   '../assets/photos/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG}',
@@ -29,18 +32,12 @@ const photos = await Promise.all(
     // duas variantes por foto. O sharp não amplia: pedir 2400 numa foto menor
     // devolve a largura original — o teto só vale pra quem passa dele.
     //
-    // 800 no thumb é a medida do mural: as linhas são justificadas em torno de
-    // TARGET_ROW_HEIGHT (300px), então um tile passa raspando dos 400px de
-    // largura — 800 é isso em tela densa, e nada além.
-    //
-    // A `full` desceu de 85 pra 80 de qualidade: numa foto de 2400px a
-    // diferença não se vê e são ~20% de bytes a menos, num arquivo que só é
-    // baixado quando alguém abre o lightbox de fato. (AVIF cortaria uns 45%
-    // aqui, mas custa ~19s de encode POR FOTO no build — é a troca a fazer no
-    // dia em que a pasta crescer e o peso passar a doer mais que o build.)
+    // As medidas (e o porquê de cada uma) moram em src/data/gallery.ts: a home
+    // pede a MESMA variante grande pra foto da emenda, e as duas páginas só
+    // caem no mesmo arquivo gerado se pedirem com opções idênticas.
     const [thumb, full] = await Promise.all([
-      getImage({ src, width: 800, format: 'webp', quality: 75 }),
-      getImage({ src, width: 2400, format: 'webp', quality: 80 }),
+      getImage({ src, ...THUMB }),
+      getImage({ src, ...FULL }),
     ]);
 
     // alt: metadado > título > nome do arquivo limpo. Nunca vazio.
@@ -60,6 +57,11 @@ const photos = await Promise.all(
     };
   }),
 );
+
+// A foto da emenda, se ela estiver na pasta. `null` é um estado legítimo (basta
+// alguém renomear o arquivo): sem ela a página abre como sempre abriu, sem
+// coreografia de chegada — a transição some, a página não quebra.
+const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
 ---
 
 <Layout>
@@ -73,10 +75,74 @@ const photos = await Promise.all(
   </Fragment>
 
   <!-- o plano infinito: o viewport é fixo e o gesto mora nele; quem se move é
-       só o .mural-plane, com UM translate3d por frame (ver infiniteCanvas.ts) -->
+       só o .mural-plane, com UM translate3d por frame (ver infiniteCanvas.ts).
+
+       O .mural-zoom no meio existe só pela chegada vinda do anel: é ele que
+       leva o `scale` do recuo (ver photos/main.ts → entrada). Fica separado do
+       plano de propósito — o plano tem um transform reescrito TODO FRAME pelo
+       infiniteCanvas, e dividir essa string com uma segunda animação seria pedir
+       que as duas se atropelassem. Aqui cada uma tem o seu elemento. -->
   <main class="mural" data-mural aria-label="Mural de fotos — arraste para navegar">
-    <div class="mural-plane" data-mural-plane></div>
+    <div class="mural-zoom" data-mural-zoom>
+      <div class="mural-plane" data-mural-plane></div>
+    </div>
   </main>
+
+  {seam && (
+    <>
+      {/* ——— a emenda com a home ———
+          A home termina com o segmento desenrolado e esta MESMA foto cobrindo
+          a tela. Esta <img> é o primeiro quadro daqui e é HTML puro de propósito:
+          se dependesse do bundle, haveria um vão de papel branco entre as duas
+          páginas justo no ponto que a transição existe pra costurar.
+
+          Nasce SEM src. Quem entra em /photos por link não tem emenda pra
+          cobrir, e um src no HTML faria essa pessoa baixar 2400px de foto pra
+          nada — `display: none` não impede o download. O script logo abaixo é
+          quem decide, ainda na análise do HTML e antes de qualquer pixel. */}
+      <img
+        class="mural-hero"
+        data-mural-hero
+        alt=""
+        aria-hidden="true"
+        fetchpriority="high"
+      />
+
+      <script
+        is:inline
+        define:vars={{
+          seamSrc: seam.full,
+          entryKey: SEAM_ENTRY_KEY,
+          seamAspect: SEAM_ASPECT,
+          seamOverscan: SEAM_OVERSCAN,
+        }}
+      >
+        // Roda na análise do HTML (inline e sem type=module), então o navegador
+        // já sai daqui sabendo se pinta a foto ou o mural. O marcador é APAGADO
+        // na leitura: recarregar /photos, ou voltar pra cá pelo histórico, é
+        // chegada normal — a coreografia é da vinda pelo anel, uma vez só.
+        try {
+          if (sessionStorage.getItem(entryKey)) {
+            sessionStorage.removeItem(entryKey);
+            document.documentElement.dataset.entry = 'seam';
+            const hero = document.querySelector('[data-mural-hero]');
+
+            // O primeiro quadro repete a proporção da FITA, não a natural do
+            // arquivo. A correção de aspecto acontece junto com o recuo, no
+            // bundle; aqui só importa pintar o mesmo quadro da home antes de o
+            // navegador ter uma chance de mostrar o documento.
+            const w = Math.max(innerWidth, innerHeight * seamAspect) * seamOverscan;
+            const h = w / seamAspect;
+            hero.style.width = `${w}px`;
+            hero.style.height = `${h}px`;
+            hero.style.left = `${(innerWidth - w) / 2}px`;
+            hero.style.top = `${(innerHeight - h) / 2}px`;
+            hero.src = seamSrc;
+          }
+        } catch (e) {}
+      </script>
+    </>
+  )}
 
   {photos.length === 0 && (
     <p class="mural-empty">Sem fotos por enquanto — jogue arquivos em <code>src/assets/photos/</code>.</p>
@@ -147,11 +213,46 @@ const photos = await Promise.all(
     cursor: grabbing;
   }
 
+  /* o portador do recuo da chegada. Fora da entrada é um <div> inerte: nenhum
+     transform, nenhuma camada. A origem no centro é o que faz o recuo ser um
+     recuo — a foto da emenda chega centralizada, e escalar em torno do centro
+     a mantém parada no meio da tela enquanto o mural nasce em volta dela. */
+  .mural-zoom {
+    position: absolute;
+    inset: 0;
+    transform-origin: 50% 50%;
+  }
+
   /* o único elemento com will-change da página: é ele que anda todo frame */
   .mural-plane {
     position: absolute;
     inset: 0;
     will-change: transform;
+  }
+
+  /* ——— a foto da emenda ———
+     Nasce cobrindo a tela, no enquadramento exato em que a home a deixou. O JS
+     a muda pra dentro do plano, no lugar do ladrilho dela (mesma proporção,
+     mesmo centro: os dois enquadramentos são o mesmo por construção), e dali
+     ela some por crossfade — por baixo está a MESMA foto, então a troca não se
+     vê, e o que sobra é a versão que o mural já ia desenhar. */
+  .mural-hero {
+    position: fixed;
+    z-index: 4;
+    max-width: none;
+    max-height: none;
+    /* A caixa tem a proporção da fita; preencher é intencional. É a mesma
+       deformação suave que o WebGL aplica à textura no segmento. */
+    object-fit: fill;
+    pointer-events: none;
+  }
+  /* já dentro do plano, no lugar do ladrilho: as medidas e o translate entram
+     inline (vêm do packing), aqui fica só o que não muda */
+  .mural-hero.is-placed {
+    position: absolute;
+    inset: auto;
+    left: 0;
+    top: 0;
   }
 
   /* os tiles nascem no JS (infiniteCanvas.ts → makeNode), fora do escopo do
@@ -206,6 +307,22 @@ const photos = await Promise.all(
     z-index: 3;
     color: #fff;
     mix-blend-mode: difference;
+  }
+
+  /* Na chegada pelo anel a HUD entra por último, com o mural já assentado: o
+     primeiro quadro daqui tem que ser a foto e NADA mais, senão três textos
+     aparecendo de estalo denunciam que houve uma troca de página bem no ponto
+     que a emenda existe pra esconder. Cada um volta à opacidade que é a dele
+     (a dica vive a 0.6) quando o data-entry vira 'done' — ver photos/main.ts. */
+  :global(html[data-entry='seam']) .mural-back,
+  :global(html[data-entry='seam']) .mural-title,
+  :global(html[data-entry='seam']) .mural-hint {
+    opacity: 0;
+  }
+  :global(html[data-entry]) .mural-back,
+  :global(html[data-entry]) .mural-title,
+  :global(html[data-entry]) .mural-hint {
+    transition: opacity 0.5s ease;
   }
   .mural-back {
     top: 1.5rem;

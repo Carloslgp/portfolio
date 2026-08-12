@@ -44,6 +44,74 @@ export const MURAL = {
   RESIZE_DEBOUNCE: 180,
 };
 
+// ——— a chegada vinda do anel (ver photos/main.ts → playEntry) ———
+//
+// A home entrega esta página no meio de um gesto: a câmera mergulhou na foto
+// até ela cobrir a tela, e o mural começa exatamente daí — a mesma foto, no
+// mesmo tamanho — e RECUA até o lugar dela na parede. O que se vê é uma
+// câmera só, indo e voltando; a troca de página acontece no quadro em que as
+// duas telas são a mesma imagem.
+export const ENTRY = {
+  /** duração do recuo, em s */
+  DUR: 1.4,
+
+  /** A curva. O movimento aqui é uma INVERSÃO de sentido, não uma continuação:
+   *  a home chega avançando na foto e daqui se afasta dela. Toda inversão passa
+   *  por um instante de repouso, e é como esse repouso é atravessado que decide
+   *  se ela é suave ou um tranco — por isso as duas pontas precisam ser moles.
+   *
+   *  Uma curva de saída (power3.out, a primeira versão) parte na velocidade
+   *  máxima: a foto pousava, parava, e era ARRANCADA pra trás. Uma cúbica
+   *  inOut (power2.inOut, a segunda) resolvia o arranco e criava o problema
+   *  oposto — o primeiro terço do tempo rendia 3% do movimento, e o que era
+   *  duro virou empacado, seguido de corrida.
+   *
+   *  A senoidal é a mais mansa das simétricas e não tem nem um nem outro: a
+   *  aceleração nunca dá um salto (é a única cuja derivada segunda também é
+   *  contínua nas pontas), então ela desprende do repouso sem tranco e sem
+   *  fazer esperar. É literalmente o movimento de um pêndulo passando pelo
+   *  ponto de retorno — que é exatamente o que a câmera faz aqui. */
+  EASE: 'sine.inOut',
+
+  /** Interpolar a escala em PROGRESSÃO GEOMÉTRICA, e não linear.
+   *
+   *  O olho lê zoom em proporção, não em pixels: ir de 3× pra 2,5× e de 1,5×
+   *  pra 1× são a mesma fração de mudança, mas a segunda leva metade dos
+   *  pixels. Numa interpolação linear a mesma velocidade numérica parece
+   *  acelerar quanto mais perto do fim — o recuo terminava correndo. Elevando
+   *  a escala a (1 − t), cada instante muda a imagem na MESMA proporção, e a
+   *  única variação de velocidade que sobra é a da curva acima, que é a que se
+   *  quer ouvir.
+   *
+   *  false volta ao comportamento antigo — está aqui pra poder comparar. */
+  GEOMETRIC: true,
+
+  /** Quando a foto grande dá lugar à do mural, e quanto dura o crossfade — em
+   *  FRAÇÕES da duração, pra mexer no DUR não desmontar a coreografia. As duas
+   *  são a MESMA imagem em resoluções diferentes, então isto não é uma
+   *  transição visual: é só evitar que a troca de resolução seja um corte.
+   *  Cedo o bastante pra acontecer com tudo em movimento, tarde o bastante pra
+   *  a foto já ter encolhido. */
+  HANDOFF_AT: 0.64,
+  HANDOFF_DUR: 0.2,
+
+  /** quando a HUD (voltar / título / dica) começa a aparecer, em fração */
+  HUD_AT: 0.58,
+
+  /** Teto da espera pela foto antes de recuar assim mesmo, em ms.
+   *
+   *  O recuo não pode começar antes de existir um quadro PINTADO com a foto
+   *  cobrindo a tela: o GSAP anda por relógio de parede, e um primeiro quadro
+   *  lento (é uma página recém-carregada, decodificando imagem) faria a
+   *  animação já nascer adiantada — a tela apareceria com papel em volta da
+   *  foto exatamente no ponto que a emenda existe pra não ter emenda.
+   *
+   *  Mas esperar não pode virar refém: se a foto grande demorar, o ladrilho do
+   *  mural — a mesma imagem, em 800px — já está ali embaixo, e recuar com ele
+   *  é melhor que uma página parada. */
+  HOLD_MAX: 600,
+};
+
 // ——— gesto / física do pan ———
 export const PAN = {
   /** decaimento do momentum por frame (base 60fps; corrigido por dt).

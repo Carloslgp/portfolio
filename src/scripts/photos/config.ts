@@ -129,6 +129,23 @@ export const PAN = {
   /** ganho do wheel/trackpad (1 = os deltas do navegador, ao pé da letra) */
   WHEEL_FACTOR: 1.0,
 
+  /** fração do delta pendente consumida por frame a 60fps. Mais baixo deixa a
+   *  rodinha mais macia e prolonga a cauda depois que ela para. */
+  WHEEL_SMOOTH: 0.18,
+
+  /** impulso em px/s acrescentado por px recebido da rodinha. É a inércia que
+   *  permanece depois do último evento, além do amaciamento do passo bruto. */
+  WHEEL_MOMENTUM: 5.0,
+
+  /** teto da velocidade acumulada ao girar a rodinha muitas vezes seguidas */
+  WHEEL_MAX_SPEED: 2400,
+
+  /** distância pendente abaixo da qual a cauda é assentada de uma vez */
+  WHEEL_STOP: 0.1,
+
+  /** conversão de DOM_DELTA_LINE para pixels (Firefox/mouses tradicionais) */
+  WHEEL_LINE_PX: 16,
+
   /** velocidade que uma seta do teclado imprime, em px/s — decai pelo mesmo
    *  DAMPING, então segurar a tecla (auto-repeat) sustenta o movimento */
   ARROW_SPEED: 1400,

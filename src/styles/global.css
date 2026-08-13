@@ -130,6 +130,18 @@ html[data-theme='dark'] {
   box-sizing: border-box;
 }
 
+/* O indicador visual vive em components/LiquidScrollbar.astro, onde a forma
+   orgânica pode ser desenhada de verdade; o trilho nativo fica escondido para
+   não aparecer uma segunda barra rígida por baixo dele. */
+html {
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 html,
 body {
   height: 100%;

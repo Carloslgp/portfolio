@@ -60,7 +60,8 @@ export class InfiniteCanvas {
 
   // câmera e física
   private offset = { x: 0, y: 0 };
-  private vel = { x: 0, y: 0 };          // px/s (momentum / setas)
+  private vel = { x: 0, y: 0 };          // px/s (momentum / wheel / setas)
+  private wheelPending = { x: 0, y: 0 }; // px de wheel ainda por amortecer
   private origin = { x: 0, y: 0 };       // âncora local dos nós (ver rebase)
 
   // arrasto
@@ -207,6 +208,7 @@ export class InfiniteCanvas {
   freeze() {
     this.frozen = true;
     this.vel.x = this.vel.y = 0;
+    this.wheelPending.x = this.wheelPending.y = 0;
     this.dragging = false;
     this.opts.onVelocity(0, 0, 1 / 60);
   }
@@ -233,6 +235,29 @@ export class InfiniteCanvas {
       this.vel.y *= decay;
       if (Math.hypot(this.vel.x, this.vel.y) < PAN.STOP_SPEED) {
         this.vel.x = this.vel.y = 0;
+      }
+
+      // A rodinha entrega passos discretos. Guardar esses passos e consumir
+      // uma fração por quadro tira o tranco sem inventar distância: depois que
+      // o usuário para, o restante continua andando e assenta exatamente na
+      // soma dos deltas recebidos. O expoente deixa a duração igual em 60 e
+      // 144Hz, assim como o damping do momentum acima.
+      if (this.wheelPending.x || this.wheelPending.y) {
+        const ease = 1 - Math.pow(1 - PAN.WHEEL_SMOOTH, dt * 60);
+        const dx = this.wheelPending.x * ease;
+        const dy = this.wheelPending.y * ease;
+        this.offset.x += dx;
+        this.offset.y += dy;
+        this.wheelPending.x -= dx;
+        this.wheelPending.y -= dy;
+
+        // Fecha a cauda microscópica da exponencial sem perder os últimos
+        // décimos de pixel do gesto.
+        if (Math.hypot(this.wheelPending.x, this.wheelPending.y) < PAN.WHEEL_STOP) {
+          this.offset.x += this.wheelPending.x;
+          this.offset.y += this.wheelPending.y;
+          this.wheelPending.x = this.wheelPending.y = 0;
+        }
       }
     }
 
@@ -424,6 +449,7 @@ export class InfiniteCanvas {
       this.last = { x: e.clientX, y: e.clientY, t: e.timeStamp };
       this.dragVel.x = this.dragVel.y = 0;
       this.vel.x = this.vel.y = 0;            // pega o mural onde ele está
+      this.wheelPending.x = this.wheelPending.y = 0;
       // NÃO captura aqui: com a captura ativa o `click` deixa de nascer no
       // botão do tile e passa a mirar o viewport — o toque simples morreria.
       // A captura entra só quando o gesto se declara arrasto (abaixo).
@@ -481,9 +507,44 @@ export class InfiniteCanvas {
       // ctrl+wheel é o zoom DE PÁGINA do navegador — acessibilidade; fica com ele
       if (e.ctrlKey) return;
       e.preventDefault();
-      this.vel.x = this.vel.y = 0;            // wheel não briga com momentum
-      this.offset.x += e.deltaX * PAN.WHEEL_FACTOR;
-      this.offset.y += e.deltaY * PAN.WHEEL_FACTOR;
+
+      // Alguns navegadores entregam wheel em linhas/páginas em vez de pixels.
+      // Normalizar antes da física mantém a mesma sensação entre eles.
+      const unit = e.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? PAN.WHEEL_LINE_PX
+        : e.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? this.viewport.clientHeight
+          : 1;
+      const dx = e.deltaX * unit * PAN.WHEEL_FACTOR;
+      const dy = e.deltaY * unit * PAN.WHEEL_FACTOR;
+
+      if (this.opts.reduced) {
+        // A preferência por pouco movimento continua sem inércia.
+        this.vel.x = this.vel.y = 0;
+        this.wheelPending.x = this.wheelPending.y = 0;
+        this.offset.x += dx;
+        this.offset.y += dy;
+      } else {
+        // Além de amaciar o passo bruto, cada evento dá um impulso à física.
+        // É esse impulso que continua vivo quando a sequência de eventos acaba;
+        // sem ele, uma rolagem longa alcança o alvo antes de a mão parar e parece
+        // travar instantaneamente no último clique da rodinha.
+        const kick = (current: number, delta: number) => {
+          if (!delta) return current;
+          const impulse = delta * PAN.WHEEL_MOMENTUM;
+          // Inverter a roda freia e já parte na direção nova, em vez de somar
+          // velocidades opostas por vários quadros.
+          const next = Math.sign(current) === Math.sign(impulse)
+            ? current + impulse
+            : impulse;
+          return Math.max(-PAN.WHEEL_MAX_SPEED, Math.min(PAN.WHEEL_MAX_SPEED, next));
+        };
+
+        this.vel.x = kick(this.vel.x, dx);
+        this.vel.y = kick(this.vel.y, dy);
+        this.wheelPending.x += dx;
+        this.wheelPending.y += dy;
+      }
     }, { passive: false });
   }
 
@@ -496,6 +557,7 @@ export class InfiniteCanvas {
       }[e.key];
       if (!dir) return;
       e.preventDefault();
+      this.wheelPending.x = this.wheelPending.y = 0;
       if (this.opts.reduced) {
         // sem inércia: passo seco, e a virtualização resolve no frame seguinte
         this.offset.x += dir[0] * PAN.ARROW_STEP;

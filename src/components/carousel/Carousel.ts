@@ -253,6 +253,20 @@ export class Carousel {
     this.input.enabled = true;
   }
 
+  /** Põe uma seção na frente sem animar.
+   *
+   * Usado quando /photos volta sem BFCache: é uma restauração de estado, não um
+   * novo gesto do visitante, então a home deve nascer no segmento de onde ele
+   * saiu em vez de recomeçar em Work. */
+  focusSectionInstant(i: number) {
+    if (i < 0 || i >= SECTIONS.length) return;
+    gsap.killTweensOf(this.input);
+    const goal = this.alignGoal(i);
+    this.input.target = goal;
+    this.input.current = goal;
+    this.layout();
+  }
+
   // alterna anel (false) ↔ fita (true) animando o desenrolar com GSAP
   setMode(flat: boolean) {
     gsap.to(this, { morph: flat ? 1 : 0, duration: 0.9, ease: 'power3.inOut' });

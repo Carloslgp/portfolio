@@ -57,3 +57,11 @@ export const SEAM_ASPECT = ARC_WIDTH / HEIGHT;
  *  sessionStorage, e não um parâmetro na URL: /photos é um endereço que se
  *  compartilha, e a coreografia de chegada não é parte do endereço. */
 export const SEAM_ENTRY_KEY = 'mural-entry';
+
+/** Marca a entrada de /photos que nasceu do anel.
+ *
+ * Diferente de SEAM_ENTRY_KEY, esta chave não descreve uma animação: ela é o
+ * contrato de NAVEGAÇÃO entre as duas páginas. O referrer pode ser omitido por
+ * política do navegador/site, então ele não é uma fonte confiável para decidir
+ * se o “Voltar” deve usar o histórico. */
+export const PHOTOS_RETURN_KEY = 'photos-return-to-ring';

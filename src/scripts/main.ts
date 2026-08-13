@@ -4,7 +4,7 @@ import Lenis from 'lenis';
 import gsap from 'gsap';
 import { Carousel } from '../components/carousel/Carousel';
 import { ABOUT, DEPART, SECTIONS } from '../components/carousel/config';
-import { SEAM_ENTRY_KEY, SEAM_OVERSCAN } from '../data/gallery';
+import { PHOTOS_RETURN_KEY, SEAM_ENTRY_KEY, SEAM_OVERSCAN } from '../data/gallery';
 import { setProgress, hideLoader, awaitGate } from './loading';
 import { reducedMotion } from './motion';
 import { registerScroll } from './scroll';
@@ -28,13 +28,29 @@ function isInternalArrival(): boolean {
   }
 }
 
+/** Consome a marca deixada pela saída para /photos.
+ *
+ * Ela fica no sessionStorage porque precisa sobreviver caso a home seja
+ * descartada do BFCache. Nesse caso o documento realmente nasce de novo, mas
+ * ainda sabe que isto é uma VOLTA e pode reaparecer direto no segmento Photos. */
+function takePhotosReturn(): boolean {
+  try {
+    if (!sessionStorage.getItem(PHOTOS_RETURN_KEY)) return false;
+    sessionStorage.removeItem(PHOTOS_RETURN_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function bootstrap() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
   if (!canvas) return;
 
   // Numa volta interna a escolha da sessão vale sem perguntar; numa chegada
   // de verdade o portão pergunta, como sempre.
-  const internal = isInternalArrival();
+  const returningFromPhotos = takePhotosReturn();
+  const internal = returningFromPhotos || isInternalArrival();
 
   // O portão é armado ANTES do carregamento e só esperado depois: a pergunta
   // fica na tela enquanto as fotos baixam, então a escolha corre em paralelo e
@@ -58,6 +74,10 @@ export async function bootstrap() {
 
   // A ordem aqui é a coreografia da abertura, e cada passo espera o anterior:
   await carousel.init(canvas, lenis);   // fotos, fonte e shaders — atrás da cortina
+  if (returningFromPhotos) {
+    const photosIndex = SECTIONS.findIndex((section) => section.id === 'photos');
+    if (photosIndex >= 0) carousel.focusSectionInstant(photosIndex);
+  }
   carousel.run();                       // cena viva na pose de topo
   await gate;                           // a cortina não sai sem a escolha feita
   await hideLoader();                   // cortina sai, mostrando o anel de cima
@@ -207,6 +227,10 @@ function initPhotosLink(carousel: Carousel) {
       // Quem lê (e apaga) é o script inline de lá, antes do primeiro pixel.
       try { sessionStorage.setItem(SEAM_ENTRY_KEY, '1'); } catch {}
     }
+    // Não deduzimos a origem por `document.referrer` na página seguinte: ele
+    // pode vir vazio por política de privacidade. Esta marca diz, sem
+    // ambiguidade, que existe uma home logo atrás no histórico.
+    try { sessionStorage.setItem(PHOTOS_RETURN_KEY, location.href); } catch {}
     location.href = '/photos';
   });
 
@@ -218,6 +242,10 @@ function initPhotosLink(carousel: Carousel) {
   // disto roda.)
   window.addEventListener('pageshow', (e) => {
     if (!(e as PageTransitionEvent).persisted || !leaving) return;
+    // No caminho feliz a home voltou viva e bootstrap() não rodou outra vez
+    // para consumir a chave. Limpa aqui para ela não vazar para uma visita
+    // futura à página inicial.
+    try { sessionStorage.removeItem(PHOTOS_RETURN_KEY); } catch {}
     leaving = false;
     document.body.classList.remove('is-diving');
     if (flat) {

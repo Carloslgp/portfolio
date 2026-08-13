@@ -98,18 +98,15 @@ export const ENTRY = {
   /** quando a HUD (voltar / título / dica) começa a aparecer, em fração */
   HUD_AT: 0.58,
 
-  /** Teto da espera pela foto antes de recuar assim mesmo, em ms.
+  /** Teto da espera pelo quadro inicial ficar pronto, em ms.
    *
-   *  O recuo não pode começar antes de existir um quadro PINTADO com a foto
-   *  cobrindo a tela: o GSAP anda por relógio de parede, e um primeiro quadro
-   *  lento (é uma página recém-carregada, decodificando imagem) faria a
-   *  animação já nascer adiantada — a tela apareceria com papel em volta da
-   *  foto exatamente no ponto que a emenda existe pra não ter emenda.
+   *  A foto grande continua cobrindo tudo enquanto ela E os thumbs que vão
+   *  aparecer durante o recuo carregam e decodificam. Assim rede/decodificação
+   *  acontecem no repouso entre os dois movimentos, não no meio do zoom.
    *
-   *  Mas esperar não pode virar refém: se a foto grande demorar, o ladrilho do
-   *  mural — a mesma imagem, em 800px — já está ali embaixo, e recuar com ele
-   *  é melhor que uma página parada. */
-  HOLD_MAX: 600,
+   *  Mas esperar não pode virar refém de uma conexão interrompida ou imagem
+   *  problemática. Depois deste teto a página segue com o que já conseguiu. */
+  READY_MAX: 4000,
 };
 
 // ——— gesto / física do pan ———

@@ -34,6 +34,7 @@ export class Lightbox {
   private source: HTMLElement | null = null;   // o tile de origem (FLIP + foco)
   private busy = false;
   private open = false;
+  private pendingFull: HTMLImageElement | null = null;
   /** ids cuja versão grande já foi pedida — o navegador guarda os bytes, aqui
    *  só se guarda a lembrança de já ter pedido (ver warmNeighbours) */
   private warmed = new Set<string>();
@@ -126,6 +127,16 @@ export class Lightbox {
       this.source = null;
       this.open = false;
       this.busy = false;
+
+      // A página anterior guarda um canvas WebGL inteiro no BFCache. Segurar
+      // também o bitmap grande do lightbox depois do X aumenta a pressão de
+      // memória e pode fazer o navegador expulsar justamente aquela home viva.
+      // O thumb do mural continua no cache; aqui liberamos só o que já não está
+      // mais sendo exibido (inclusive um download ainda em curso).
+      this.pendingFull?.removeAttribute('src');
+      this.pendingFull = null;
+      this.img.removeAttribute('src');
+      this.img.alt = '';
     };
 
     if (this.hooks.reduced) return finish();
@@ -197,15 +208,21 @@ export class Lightbox {
     this.img.width = photo.w;
     this.img.height = photo.h;
 
+    this.pendingFull?.removeAttribute('src');
     const full = new Image();
+    this.pendingFull = full;
     full.src = photo.full;
     full.decode()
       .then(() => {
         // decodificou depois de o usuário já ter navegado adiante? descarta.
-        if (this.photos[this.index].id === photo.id) this.img.src = photo.full;
+        if (!this.open || this.photos[this.index].id !== photo.id) return;
+        this.img.src = photo.full;
+        if (this.pendingFull === full) this.pendingFull = null;
         this.warmNeighbours();
       })
-      .catch(() => {});   // decode() rejeita em navegação rápida; o thumb fica
+      .catch(() => {
+        if (this.pendingFull === full) this.pendingFull = null;
+      });   // decode() rejeita em navegação rápida; o thumb fica
 
     // metadados quando existem; sem eles, a legenda simplesmente não ocupa nada
     this.titleEl.textContent = photo.title ?? '';

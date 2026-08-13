@@ -12,7 +12,9 @@ import { MotionBlur } from './motionBlur';
 import { Lightbox } from './lightbox';
 import { ENTRY, MURAL } from './config';
 import { storedMotionMode } from '../motion';
-import { SEAM_ASPECT, SEAM_OVERSCAN, SEAM_PHOTO } from '../../data/gallery';
+import {
+  PHOTOS_RETURN_KEY, SEAM_ASPECT, SEAM_OVERSCAN, SEAM_PHOTO,
+} from '../../data/gallery';
 
 export function initMural() {
   const viewport = document.querySelector<HTMLElement>('[data-mural]');
@@ -55,17 +57,24 @@ export function initMural() {
   // reboot da home reconhece a volta e entra sem pergunta nem descida: ver
   // main.ts → isInternalArrival.) O href="/" fica de rede pra quem entrou
   // direto em /photos por link — aí não há história pra voltar.
+  //
+  // A origem é uma marca explícita da home. `document.referrer` não serve de
+  // contrato: ele pode vir vazio por Referrer-Policy ou configuração de
+  // privacidade, e nesse caso o código antigo caía no href e recarregava tudo.
+  let returnToRing = false;
+  try {
+    returnToRing = !!sessionStorage.getItem(PHOTOS_RETURN_KEY);
+    if (returnToRing) {
+      history.replaceState({ ...history.state, returnToRing: true }, '');
+    } else {
+      returnToRing = history.state?.returnToRing === true;
+    }
+  } catch {}
+
   document.querySelector<HTMLAnchorElement>('[data-back]')?.addEventListener('click', (e) => {
-    try {
-      if (
-        history.length > 1 &&
-        document.referrer &&
-        new URL(document.referrer).origin === location.origin
-      ) {
-        e.preventDefault();
-        history.back();
-      }
-    } catch {}
+    if (!returnToRing || history.length <= 1) return;
+    e.preventDefault();
+    history.back();
   });
 
   const tileWidth = () => Math.max(window.innerWidth, MURAL.MIN_TILE_W);
@@ -134,6 +143,11 @@ function enterFromSeam(canvas: InfiniteCanvas, plane: HTMLElement, seat: PlacedR
   // o gesto fica de fora do recuo — é o mesmo congelamento do lightbox
   canvas.freeze();
 
+  // Promove o portador do zoom enquanto a foto ainda cobre a tela. Sem este
+  // aquecimento, alguns navegadores criam a camada compositada só no primeiro
+  // quadro em movimento — exatamente onde a pausa era percebida.
+  zoom.style.willChange = 'transform';
+
   // O zoom é escrito no braço, sem o plugin de transform do GSAP: a escala de
   // cada quadro sai de uma conta própria (ver ENTRY.GEOMETRIC), e o que o GSAP
   // anima é o PROGRESSO, não a escala. Uma propriedade só, um dono só.
@@ -164,13 +178,14 @@ function enterFromSeam(canvas: InfiniteCanvas, plane: HTMLElement, seat: PlacedR
   plane.appendChild(hero);
   draw();
 
-  // Nasce PARADA. Ver ENTRY.HOLD_MAX: o recuo só pode começar depois de a tela
+  // Nasce PARADA. Ver ENTRY.READY_MAX: o recuo só pode começar depois de a tela
   // ter mostrado, num quadro de verdade, a foto cobrindo tudo.
   const tl = gsap.timeline({
     paused: true,
     onComplete: () => {
       hero.remove();
       zoom.style.transform = '';                     // devolve o <div> inerte
+      zoom.style.willChange = '';
       canvas.unfreeze();
       endEntry();                                    // rede: o HUD_AT já passou
     },
@@ -184,15 +199,25 @@ function enterFromSeam(canvas: InfiniteCanvas, plane: HTMLElement, seat: PlacedR
   }, ENTRY.HANDOFF_AT * ENTRY.DUR);
   tl.call(endEntry, undefined, ENTRY.HUD_AT * ENTRY.DUR);
 
-  // dois quadros: o primeiro é o que PINTA a foto em tela cheia, o segundo já
-  // pode se mexer. Um só não bastaria — o callback do primeiro roda ANTES do
-  // desenho dele, e o recuo começaria no mesmo quadro da chegada.
+  // A foto grande segura a tela enquanto TODO o enquadramento que vai aparecer
+  // no recuo carrega e decodifica. Antes esperávamos só `hero.decode()`: como a
+  // hero já vinha no cache da home, o movimento começava imediatamente e os
+  // thumbs eram decodificados no meio dele — a travada observada na entrada.
+  //
+  // Depois da prontidão ainda damos dois quadros ao navegador: um para montar a
+  // camada promovida acima e outro para pintá-la antes de o relógio andar.
   const play = () => requestAnimationFrame(() => requestAnimationFrame(() => tl.play()));
-  const decoded = hero.decode?.().catch(() => {}) ?? Promise.resolve();
   let started = false;
-  const once = () => { if (!started) { started = true; play(); } };
-  decoded.then(once);
-  setTimeout(once, ENTRY.HOLD_MAX);
+  let guard = 0;
+  const once = () => {
+    if (started) return;
+    started = true;
+    clearTimeout(guard);
+    play();
+  };
+  const heroReady = hero.decode?.().catch(() => {}) ?? Promise.resolve();
+  Promise.all([heroReady, canvas.readyForEntry()]).then(once);
+  guard = window.setTimeout(once, ENTRY.READY_MAX);
 }
 
 /** Fim da chegada: a HUD pode entrar (o CSS cuida do fade) e a foto em tela

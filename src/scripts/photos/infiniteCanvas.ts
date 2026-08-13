@@ -166,6 +166,30 @@ export class InfiniteCanvas {
     };
   }
 
+  /** Espera os thumbs do primeiro enquadramento estarem decodificados.
+   *
+   * O canvas está congelado durante a chegada, portanto `placed` não muda
+   * enquanto esta Promise resolve. URLs repetidas são esperadas uma vez só: as
+   * cópias do tile compartilham os mesmos bytes e o mesmo bitmap decodificado. */
+  readyForEntry(): Promise<void> {
+    const unique = new Map<string, HTMLImageElement>();
+    for (const p of this.placed.values()) {
+      const img = p.node.firstElementChild as HTMLImageElement;
+      if (img.src && !unique.has(img.src)) unique.set(img.src, img);
+    }
+
+    const ready = [...unique.values()].map((img) => {
+      if (img.decode) return img.decode().catch(() => {});
+      if (img.complete) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        img.addEventListener('load', () => resolve(), { once: true });
+        img.addEventListener('error', () => resolve(), { once: true });
+      });
+    });
+
+    return Promise.all(ready).then(() => {});
+  }
+
   start() {
     this.lastFrame = performance.now();
     const loop = (t: number) => {

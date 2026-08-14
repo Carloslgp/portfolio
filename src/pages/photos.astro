@@ -281,8 +281,13 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
      a muda pra dentro do plano, no lugar do ladrilho dela (mesma proporção,
      mesmo centro: os dois enquadramentos são o mesmo por construção), e dali
      ela some por crossfade — por baixo está a MESMA foto, então a troca não se
-     vê, e o que sobra é a versão que o mural já ia desenhar. */
-  .mural-hero {
+     vê, e o que sobra é a versão que o mural já ia desenhar.
+
+     :global como os tiles, e pelo mesmo motivo: a foto da SAÍDA não vem deste
+     HTML. A da chegada é removida assim que ela termina, e quem abriu /photos
+     por link nunca teve uma — então a saída monta a dela no JS (ver
+     photos/main.ts → leaveToSeam), fora do alcance do escopo do Astro. */
+  :global(.mural-hero) {
     position: fixed;
     z-index: 4;
     max-width: none;
@@ -294,7 +299,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   }
   /* já dentro do plano, no lugar do ladrilho: as medidas e o translate entram
      inline (vêm do packing), aqui fica só o que não muda */
-  .mural-hero.is-placed {
+  :global(.mural-hero.is-placed) {
     position: absolute;
     inset: auto;
     left: 0;
@@ -374,6 +379,24 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   :global(html[data-entry]) .mural-hint {
     transition: opacity 0.5s ease;
   }
+
+  /* Na SAÍDA a HUD é a primeira a sair, com o mural ainda parado — mesma razão
+     da chegada, do lado de lá do espelho: o quadro que atravessa a troca de
+     página tem que ser a foto e nada mais. Mais rápido que o fade de entrada
+     (0.32 contra 0.5) porque ela tem que estar fora antes de o mergulho pegar
+     velocidade, e não no tempo dela.
+
+     Depois das regras da chegada de propósito: as duas têm a mesma
+     especificidade, e é a ordem que decide qual vale — data-entry fica em
+     'done' a página inteira, então os dois atributos coexistem aqui. */
+  :global(html[data-exit]) .mural-back,
+  :global(html[data-exit]) .mural-title,
+  :global(html[data-exit]) .mural-hint {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.32s ease;
+  }
+
   .mural-back {
     top: 1.5rem;
     left: 2rem;

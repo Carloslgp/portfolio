@@ -52,6 +52,14 @@ export interface PlacedRect {
   h: number;
 }
 
+/** Um PlacedRect mais a pose de câmera que põe aquela instância no centro da
+ *  tela. É o que a saída precisa saber de uma vez só: onde encostar a foto
+ *  grande, e para onde a câmera tem que caminhar. */
+export interface Seat extends PlacedRect {
+  camX: number;
+  camY: number;
+}
+
 export interface CanvasOptions {
   /** baixa animação: sem inércia (o gesto para quando o dedo para) */
   reduced: boolean;
@@ -204,6 +212,96 @@ export class InfiniteCanvas {
       w: best.w,
       h: best.h,
     };
+  }
+
+  /** A instância desta foto mais próxima do CENTRO DA TELA — o alvo do
+   *  mergulho de saída. Não move nada: só diz onde ela está e qual pose de
+   *  câmera a centraliza; quem caminha até lá é quem chamou, pelo panTo.
+   *
+   *  Ao contrário do centerOn, a busca não é dentro do tile: é sobre o plano
+   *  INFINITO, com as cópias e o deslocamento de meio tile das colunas ímpares.
+   *  A diferença importa porque quem sai pode estar em qualquer lugar do mural,
+   *  e a instância certa é sempre a mais perto de onde a pessoa parou — nunca a
+   *  do "tile original", que pode estar a três telas de distância.
+   *
+   *  A cópia mais próxima sai de uma divisão arredondada (o inverso exato do
+   *  wrap do place()); os vizinhos ±1 entram na conta porque o deslocamento das
+   *  colunas ímpares muda qual linha é a melhor conforme a paridade da coluna,
+   *  e a metade de um tile é longe demais pra se resolver no chute. */
+  seatNearest(photoId: string): Seat | null {
+    const tile = this.tile;
+    if (!tile) return null;
+
+    const vw = this.viewport.clientWidth;
+    const vh = this.viewport.clientHeight;
+    const cx = this.offset.x + vw / 2;
+    const cy = this.offset.y + vh / 2;
+
+    let best: { wx: number; wy: number; w: number; h: number } | null = null;
+    let bestDist = Infinity;
+
+    for (const item of tile.items) {
+      if (item.photo.id !== photoId) continue;
+      const c0 = Math.round((cx - item.x - item.w / 2) / tile.w);
+      for (let c = c0 - 1; c <= c0 + 1; c++) {
+        const shift = (((c % 2) + 2) % 2) ? tile.h / 2 : 0;
+        const r0 = Math.round((cy - item.y - item.h / 2 - shift) / tile.h);
+        for (let r = r0 - 1; r <= r0 + 1; r++) {
+          const wx = c * tile.w + item.x;
+          const wy = r * tile.h + shift + item.y;
+          const d = Math.hypot(wx + item.w / 2 - cx, wy + item.h / 2 - cy);
+          if (d < bestDist) {
+            bestDist = d;
+            best = { wx, wy, w: item.w, h: item.h };
+          }
+        }
+      }
+    }
+    if (!best) return null;
+
+    // Reancora a origem no offset ATUAL. Daqui até o fim da saída a câmera anda
+    // no máximo meio tile, e partindo de distância zero nenhum rebase pode
+    // acontecer no meio do caminho — um rebase reescreve as posições locais de
+    // todo mundo, e a foto grande da saída mora nesse mesmo sistema sem passar
+    // pela virtualização que o conserta.
+    this.rebase(this.offset.x, this.offset.y);
+
+    // Mesmo motivo do centerOn: o mergulho empurra ladrilhos pra fora do
+    // enquadramento, e o que o `lazy` adiar agora aparece um a um durante o
+    // deslize — exatamente como uma página carregando.
+    for (const p of this.placed.values()) {
+      const img = p.node.firstElementChild as HTMLImageElement;
+      if (img.loading === 'lazy') img.loading = 'eager';
+    }
+
+    this.eager = true;
+    this.placedAt.x = NaN;      // a âncora mudou: força a passada de reposição
+    this.place();
+    this.eager = false;
+
+    return {
+      left: best.wx - this.origin.x,
+      top: best.wy - this.origin.y,
+      w: best.w,
+      h: best.h,
+      camX: best.wx + best.w / 2 - vw / 2,
+      camY: best.wy + best.h / 2 - vh / 2,
+    };
+  }
+
+  /** Onde a câmera está agora, em px de mundo — o ponto de partida da saída. */
+  cameraOffset(): { x: number; y: number } {
+    return { x: this.offset.x, y: this.offset.y };
+  }
+
+  /** Põe a câmera aqui, no braço. É o que o tick faria, para quem está
+   *  CONGELADO: a saída é uma coreografia com relógio próprio (GSAP), e não
+   *  física — mas o plano, a virtualização, a lente e a camada 3D continuam
+   *  precisando da mesma passada de sempre, que é a que o place() dá. */
+  panTo(x: number, y: number) {
+    this.offset.x = x;
+    this.offset.y = y;
+    this.place();
   }
 
   /** Espera os thumbs do primeiro enquadramento estarem decodificados.

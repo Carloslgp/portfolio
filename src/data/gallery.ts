@@ -65,3 +65,15 @@ export const SEAM_ENTRY_KEY = 'mural-entry';
  * política do navegador/site, então ele não é uma fonte confiável para decidir
  * se o “Voltar” deve usar o histórico. */
 export const PHOTOS_RETURN_KEY = 'photos-return-to-ring';
+
+/** O SEAM_ENTRY_KEY da volta: avisa a home de que o último quadro de /photos é
+ *  a foto da emenda cobrindo a tela — o mesmo quadro em que esta página parou
+ *  ao partir — e que, portanto, ela deve DESFAZER o avanço a partir dali em vez
+ *  de repor a cena de estalo.
+ *
+ *  Quem escreve é a saída do mural, logo antes do history.back(); quem lê e
+ *  APAGA é a home, ao ser restaurada. Sem a marca (botão voltar do navegador,
+ *  baixa animação, ou uma home que o BFCache não guardou) o quadro que chega
+ *  não é a foto, e desfazer o avanço em cima dele seria animar a partir de um
+ *  estado que ninguém viu — daí o corte seco continuar sendo o certo ali. */
+export const SEAM_BACK_KEY = 'mural-back';

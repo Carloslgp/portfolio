@@ -4,7 +4,9 @@ import Lenis from 'lenis';
 import gsap from 'gsap';
 import { Carousel } from '../components/carousel/Carousel';
 import { ABOUT, DEPART, SECTIONS } from '../components/carousel/config';
-import { PHOTOS_RETURN_KEY, SEAM_ENTRY_KEY, SEAM_OVERSCAN } from '../data/gallery';
+import {
+  PHOTOS_RETURN_KEY, SEAM_BACK_KEY, SEAM_ENTRY_KEY, SEAM_OVERSCAN,
+} from '../data/gallery';
 import { setProgress, hideLoader, awaitGate } from './loading';
 import { reducedMotion } from './motion';
 import { registerScroll } from './scroll';
@@ -43,6 +45,23 @@ function takePhotosReturn(): boolean {
   }
 }
 
+/** Consome a marca da volta COSTURADA — /photos terminou mergulhando na foto da
+ *  emenda, e o quadro que chega aqui é ela cobrindo a tela.
+ *
+ * Só vale numa home restaurada viva pelo BFCache, que é onde existe um avanço
+ * parado pra desfazer. Num documento que nasce de novo não há o que rebobinar, e
+ * a marca precisa ser consumida do mesmo jeito: senão ela sobrevive na sessão e
+ * costura uma volta futura que não teve saída nenhuma. */
+function takeSeamBack(): boolean {
+  try {
+    if (!sessionStorage.getItem(SEAM_BACK_KEY)) return false;
+    sessionStorage.removeItem(SEAM_BACK_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function bootstrap() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
   if (!canvas) return;
@@ -51,6 +70,12 @@ export async function bootstrap() {
   // de verdade o portão pergunta, como sempre.
   const returningFromPhotos = takePhotosReturn();
   const internal = returningFromPhotos || isInternalArrival();
+
+  // Este documento nasceu agora, então não há avanço congelado pra rebobinar: a
+  // cortina de carregamento é que cobre a troca, e a home reaparece no segmento
+  // de fotos (logo abaixo). Consumir a marca aqui é o que impede ela de valer
+  // numa volta futura — ver takeSeamBack.
+  takeSeamBack();
 
   // O portão é armado ANTES do carregamento e só esperado depois: a pergunta
   // fica na tela enquanto as fotos baixam, então a escolha corre em paralelo e
@@ -139,6 +164,12 @@ function initPhotosLink(carousel: Carousel) {
 
   const flat = document.querySelector<HTMLImageElement>('[data-depart]');
 
+  // O QUADRO DA EMENDA desta janela. Vive aqui fora, e não dentro do avanço,
+  // porque a volta precisa REMEDI-LO: a janela pode ter mudado de tamanho
+  // enquanto a pessoa estava em /photos, e é a medida nova que a página de fotos
+  // acabou de usar do outro lado. O drawFlat lê esta variável, não uma cópia.
+  let seam: { w: number; h: number } | null = null;
+
   // A foto chapada é pedida quando o anel ENCOSTA na seção de fotos, não no
   // clique: baixar 2400px de imagem no clique seria tarde (o mergulho dura
   // menos de um segundo) e baixar no carregamento seria cedo demais — a home
@@ -176,7 +207,7 @@ function initPhotosLink(carousel: Carousel) {
       // O QUADRO DA EMENDA: a foto cobrindo a tela na proporção da fita já
       // desenrolada. /photos monta este mesmo retângulo antes de começar o
       // recuo, então a navegação troca documentos sem trocar o quadro.
-      const seam = flat && seamBox(flat);
+      seam = flat ? seamBox(flat) : null;
 
       // Quem desenha a segunda metade do avanço.
       //
@@ -234,12 +265,22 @@ function initPhotosLink(carousel: Carousel) {
     location.href = '/photos';
   });
 
-  // Botão VOLTAR do navegador: o Chrome pode servir a home direto do BFCache,
-  // congelada exatamente como ela estava ao partir — câmera no meio do
-  // mergulho, gesto travado, HUD apagada, e agora também a foto chapada parada
-  // em cima de tudo. Este é o único lugar que sabe desfazer isso. (Na navegação
-  // normal pelo "‹ Voltar" da página de fotos, a home recarrega do zero e nada
-  // disto roda.)
+  // A transição de página do navegador (@view-transition) tira um RETRATO do
+  // documento restaurado e o segura por cima enquanto faz o cross-fade. Começar
+  // o rebobinamento por baixo desse retrato gastaria o começo do movimento
+  // escondido, e ele reapareceria já no meio — um salto exatamente no ponto que
+  // a emenda existe pra costurar. `pagereveal` entrega a transição em curso,
+  // quando há uma; onde não há (Firefox, baixa animação), fica no resolvido.
+  let revealed: Promise<unknown> = Promise.resolve();
+  window.addEventListener('pagereveal', (e) => {
+    const vt = (e as any).viewTransition;
+    if (vt) revealed = vt.finished.catch(() => {});
+  });
+
+  // O VOLTAR: o Chrome pode servir a home direto do BFCache, congelada
+  // exatamente como ela estava ao partir — câmera no meio do mergulho, gesto
+  // travado, HUD apagada, e a foto chapada parada em cima de tudo. Este é o
+  // único lugar que sabe desfazer isso, e há dois jeitos de fazê-lo.
   window.addEventListener('pageshow', (e) => {
     if (!(e as PageTransitionEvent).persisted || !leaving) return;
     // No caminho feliz a home voltou viva e bootstrap() não rodou outra vez
@@ -247,11 +288,43 @@ function initPhotosLink(carousel: Carousel) {
     // futura à página inicial.
     try { sessionStorage.removeItem(PHOTOS_RETURN_KEY); } catch {}
     leaving = false;
-    document.body.classList.remove('is-diving');
-    if (flat) {
-      flat.style.opacity = '0';
-      flat.style.transform = 'none';
+
+    // o que sobra depois dos dois caminhos: a foto chapada volta a ser o
+    // elemento inerte de sempre e a HUD reaparece (o CSS cuida do fade)
+    const settle = () => {
+      document.body.classList.remove('is-diving');
+      if (flat) {
+        flat.style.opacity = '';
+        flat.style.transform = '';
+      }
+    };
+
+    // ——— a volta costurada ———
+    // /photos terminou mergulhando na MESMA foto que esta página deixou
+    // cobrindo a tela, no mesmo enquadramento: os dois documentos mostram o
+    // mesmo quadro no instante da troca, então não há nada a esconder — só o
+    // avanço a desfazer, a partir dali.
+    if (takeSeamBack() && !reducedMotion()) {
+      // a janela pode ter mudado de tamanho enquanto a pessoa estava em /photos.
+      // O `?? seam` não é decoração: sem caixa da emenda o drawFlat desiste de
+      // desenhar, e desistir AQUI deixaria a foto parada cobrindo a tela.
+      if (flat) seam = seamBox(flat) ?? seam;
+      // um rAF antes de olhar o `revealed`: o pagereveal chega na primeira
+      // oportunidade de desenho, que é justamente onde este callback espera
+      requestAnimationFrame(() => revealed.then(() => {
+        const rewind = carousel.returnFromDeparture();
+        if (rewind) return void rewind.then(settle);
+        settle();                        // sem timeline não há o que rebobinar
+        carousel.cancelDeparture();
+      }));
+      return;
     }
+
+    // ——— o corte seco ———
+    // Botão voltar do navegador (que corta /photos no meio do mural, sem
+    // coreografia de saída) ou baixa animação. Aqui o quadro que chega não é a
+    // foto, então não existe emenda: a cena é reposta e a câmera recua sozinha.
+    settle();
     carousel.cancelDeparture();
   });
 }

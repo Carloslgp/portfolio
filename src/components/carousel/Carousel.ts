@@ -481,9 +481,67 @@ export class Carousel {
     return { w: (w / 2) * window.innerWidth, h: (h / 2) * window.innerHeight };
   }
 
+  // A VOLTA de /photos, quando a página de fotos devolve a MESMA foto cobrindo
+  // a tela (ver scripts/photos/main.ts → leaveToSeam).
+  //
+  // Não há animação nova aqui: é o avanço, com o playhead andando ao contrário.
+  // A foto chapada encolhe de volta ao tamanho exato da foto 3D e apaga, a fita
+  // se enrola, a câmera recua, as labels de vidro reacendem — tudo pelas curvas
+  // que já estavam lá dentro, na ordem inversa em que aconteceram. É o mesmo
+  // arranjo do fechamento do About (ver main.ts → closeAbout), e vale pelo mesmo
+  // motivo: uma volta escrita à parte seria uma segunda descrição do mesmo
+  // movimento, livre pra divergir da primeira no próximo ajuste.
+  //
+  // O rebobinamento é um tween do TEMPO da timeline, com ease 'none', e não um
+  // .reverse(): assim ele tem duração própria (mais curta) sem que nenhuma das
+  // curvas de dentro seja reinterpretada — quem acelera é o relógio, não o
+  // movimento.
+  //
+  // O GIRO fica de fora, e é a única coisa que fica. Ele não é movimento de
+  // câmera: é a ESCOLHA da seção, e quem volta de /photos quer o anel na seção
+  // de fotos — desfazê-lo devolveria o anel a um ângulo que ninguém pediu. É
+  // também o que a volta sem BFCache já faz, pelo focusSectionInstant. Matar o
+  // tween do input antes de rebobinar o tira do caminho sem tocar no resto.
+  returnFromDeparture(): Promise<void> | null {
+    const tl = this.departing;
+    if (!tl || this.inAbout) return null;
+    this.departing = null;
+
+    // o tempo é lido ANTES de matar o giro: tirar um filho de uma timeline pode
+    // encurtar a duração dela, e o playhead seria grampeado junto
+    const at = { t: tl.time() };
+    gsap.killTweensOf(this.input);
+    tl.pause();
+    return new Promise<void>((resolve) => {
+      gsap.to(at, {
+        t: 0,
+        duration: at.t / DEPART.returnScale,
+        ease: 'none',
+        onUpdate: () => tl.time(at.t),
+        onComplete: () => {
+          tl.kill();
+          // rede: o playhead em zero já repôs os três, mas eles são o estado
+          // que o resto da página assume daqui em diante, e não podem depender
+          // de um arredondamento do último quadro
+          this.rig.dive = 0;
+          this.morph = this.departureMorph;
+          this.labels.fade = 1;
+          this.rig.diveGap = SHATTER.approach;   // o próximo mergulho é o do About
+          this.input.enabled = true;
+          resolve();
+        },
+      });
+    });
+  }
+
   // Desfaz uma partida que não se consumou: o navegador serviu a home de volta
   // do BFCache (botão voltar), com a câmera parada no meio do avanço do
   // departInto e o gesto travado. Sem isto a página restaurada nasce quebrada.
+  //
+  // É o caminho de quem NÃO tem uma emenda pra costurar: o botão voltar do
+  // navegador (que corta a página de fotos no meio do mural, sem coreografia de
+  // saída) e a baixa animação. Quando há emenda, quem responde é o
+  // returnFromDeparture acima.
   cancelDeparture() {
     if (this.inAbout) return;
     // matar a TIMELINE, e não os tweens do rig: quem move a câmera agora é o

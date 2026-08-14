@@ -307,6 +307,12 @@ export const DEPART = {
   // INVERSÃO de sentido, e inversão sem repouso é tranco. Curto: é uma pausa
   // de respiração, não uma espera. */
   hold: 0.08,
+
+  /** A VOLTA: este mesmo avanço rodado de trás pra frente, mais rápido (ver
+   *  Carousel.returnFromDeparture). É o arranjo do fechamento do About, e o
+   *  número tem o mesmo motivo do ABOUT.exitScale — a ida é uma escolha e pode
+   *  demorar o tempo dela, a volta é um passo atrás e não pode arrastar. */
+  returnScale: 1.5,
 };
 
 // Onde os cacos param: uma FAIXA no alto, que vira o cabeçalho da página.

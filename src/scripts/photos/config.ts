@@ -66,6 +66,14 @@ export const TUNNEL = {
   /** trecho final da chegada home → photos em que a parede se curva. Começa
    * depois do crossfade da hero, quando o tile do mural já assumiu a foto. */
   ENTRY_AT: 0.76,
+
+  /** trecho INICIAL da saída em que a parede volta a ser plana — o espelho do
+   * ENTRY_AT (a chegada curva nos últimos 24%; a saída endireita nos primeiros
+   * 22%). Cedo de propósito: a foto que atravessa a troca de página é plana, e
+   * a foto grande que a substitui no fim não passa pela lente do tubo. Enquanto
+   * a parede ainda estiver curva, o ladrilho de baixo tem uma matrix3d que a
+   * foto grande não tem — e as duas só podem coincidir em cima de um plano. */
+  EXIT_AT: 0.22,
 };
 
 // ——— a chegada vinda do anel (ver photos/main.ts → playEntry) ———
@@ -131,6 +139,76 @@ export const ENTRY = {
    *  Mas esperar não pode virar refém de uma conexão interrompida ou imagem
    *  problemática. Depois deste teto a página segue com o que já conseguiu. */
   READY_MAX: 4000,
+};
+
+// ——— a saída de volta pro anel (ver photos/main.ts → leaveToSeam) ———
+//
+// A chegada e a saída são o MESMO pêndulo. A home avança na foto e para; o
+// mural recua dela até a parede. Aqui o movimento se inverte outra vez: a
+// câmera desliza até a foto da emenda, mergulha nela até ela cobrir a tela no
+// enquadramento exato em que a home a deixou, e só então a navegação acontece.
+// Quem termina o gesto é a home, rebobinando o avanço dela a partir daquele
+// quadro (ver Carousel.returnFromDeparture).
+//
+// Existem DUAS coisas acontecendo, e é bom nomeá-las: o DESLIZE (a câmera anda
+// pela parede até a foto certa) e o MERGULHO (a parede inteira se aproxima).
+// Elas não são duas animações em fila — correm no mesmo relógio, o deslize
+// terminando enquanto o mergulho ainda cresce, que é o que uma câmera de
+// verdade faz quando vai até um assunto e entra nele.
+//
+// Só roda pra quem chegou pelo anel: sem uma home logo atrás no histórico não
+// há emenda pra costurar, e o "‹ Voltar" volta a ser um link comum.
+export const EXIT = {
+  /** duração do gesto, em s. Mais curta que os 1,4 do recuo da chegada, pelo
+   *  mesmo motivo do CLOSE_DUR do lightbox: a ida é uma escolha, a volta é um
+   *  passo atrás — e passo atrás não pode arrastar. */
+  DUR: 1.05,
+
+  /** A mesma senoidal da chegada, e pela mesma razão (ver ENTRY.EASE): as duas
+   *  pontas precisam ser moles porque nas duas há uma inversão de sentido. Esta
+   *  tem uma em cada extremidade — o mural está parado quando ela começa, e a
+   *  home começa a recuar quando ela termina. */
+  EASE: 'sine.inOut',
+
+  /** Fração do gesto em que o DESLIZE acaba, ou seja, em que a foto da emenda
+   *  chega ao centro da tela.
+   *
+   *  Tem que sobrar mergulho depois dele. A ampliação de um instante multiplica
+   *  tudo que ainda está fora do centro, então uma foto que ainda estivesse
+   *  caminhando no fim atravessaria a tela em vez de crescer nela. Aqui o
+   *  deslize fecha com o mural a ~2x, ou seja, com o mergulho ainda pela metade:
+   *  a chegada ao centro acontece em movimento, não numa parada. */
+  GLIDE_UNTIL: 0.55,
+
+  /** Quando a foto GRANDE entra por cima do ladrilho, e quanto dura a troca —
+   *  em frações da duração, como na chegada.
+   *
+   *  A ida faz isto ao contrário (a foto grande já está lá e dá lugar ao
+   *  ladrilho), e por um motivo que aqui não existe: lá a foto grande É o quadro
+   *  que chega, então ela carrega desde o primeiro instante a proporção da FITA,
+   *  e o crossfade acontece com as duas imagens em larguras diferentes. Aqui ela
+   *  entra por cima de um ladrilho que já está na tela, e pode entrar do tamanho
+   *  exato dele — o crossfade vira o que ele sempre quis ser: uma troca de
+   *  resolução, sem nenhuma imagem dobrada. O esticamento pra proporção da fita
+   *  começa DEPOIS, com só ela na tela (ver ASPECT_FROM abaixo). */
+  HANDOFF_AT: 0.26,
+  HANDOFF_DUR: 0.16,
+
+  /** Teto da espera pela foto grande decodificar antes de o gesto começar.
+   *
+   *  Curtíssimo, ao contrário do READY_MAX da chegada. Quem volta pelo anel já
+   *  tem essa foto no cache (foi ela que cobriu a tela na ida), então o decode
+   *  resolve em poucos ms e o clique responde na hora. E se ela NÃO estiver
+   *  quente, esperar não adianta nada: por baixo dela está a mesma imagem em
+   *  thumb, no mesmo lugar, então uma foto grande que chega atrasada não deixa
+   *  buraco nenhum — ela só aparece mais nítida um pouco depois. */
+  READY_MAX: 240,
+
+  /** O POUSO, em s: um respiro com a foto já cobrindo a tela antes de navegar.
+   *  É o mesmo DEPART.hold do outro lado, e existe pela mesma razão — no quadro
+   *  seguinte a este o movimento inverte de sentido, e inversão sem repouso é
+   *  tranco. */
+  HOLD: 0.06,
 };
 
 // ——— gesto / física do pan ———

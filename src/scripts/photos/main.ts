@@ -5,16 +5,16 @@
 // suave da home vive e morre com a home (navegação MPA — sair de lá destrói
 // o loop do Three.js e o Lenis juntos, sem teardown manual).
 import gsap from 'gsap';
-import { readPhotos } from './photos';
+import { readPhotos, type Photo } from './photos';
 import { buildTile } from './layout';
 import { InfiniteCanvas, type PlacedRect } from './infiniteCanvas';
 import { MotionBlur } from './motionBlur';
 import { Lightbox } from './lightbox';
 import { TunnelRenderer } from './tunnelRenderer';
-import { ENTRY, MURAL, TUNNEL } from './config';
+import { ENTRY, EXIT, MURAL, TUNNEL } from './config';
 import { storedMotionMode } from '../motion';
 import {
-  PHOTOS_RETURN_KEY, SEAM_ASPECT, SEAM_OVERSCAN, SEAM_PHOTO,
+  PHOTOS_RETURN_KEY, SEAM_ASPECT, SEAM_BACK_KEY, SEAM_OVERSCAN, SEAM_PHOTO,
 } from '../../data/gallery';
 
 export function initMural() {
@@ -80,6 +80,14 @@ export function initMural() {
     renderer: rendererUsable ? renderer : null,
   });
 
+  // A curvatura da parede tem um dono só, e as duas coreografias (chegada e
+  // saída) passam por aqui. `desiredTunnelStrength` guarda a INTENÇÃO; o que
+  // chega à lente é zero enquanto não houver quadro de GPU pra sustentá-la.
+  const setTunnel = (strength: number) => {
+    desiredTunnelStrength = strength;
+    canvas?.setTunnelStrength(rendererActive ? strength : 0);
+  };
+
   // ——— o Voltar ———
   // Quem chegou aqui vindo da home volta PELA HISTÓRIA, não pelo href: o
   // BFCache do navegador restaura a home viva — anel no lugar, sem cortina —
@@ -101,10 +109,49 @@ export function initMural() {
     }
   } catch {}
 
+  // A saída, montada no clique e não antes: ela precisa da câmera onde a pessoa
+  // parou, e isso só existe na hora. `exit` de pé também é a trava do clique
+  // duplo — o mesmo papel do `leaving` da home.
+  let exit: Exit | null = null;
+  let entering = false;   // a chegada ainda anda? (ver o enterFromSeam lá embaixo)
+
   document.querySelector<HTMLAnchorElement>('[data-back]')?.addEventListener('click', (e) => {
     if (!returnToRing || history.length <= 1) return;
     e.preventDefault();
-    history.back();
+    if (exit || !canvas) return;
+
+    // A emenda pede a foto da emenda. Sem ela na pasta (basta alguém renomear o
+    // arquivo), em baixa animação, e com a CHEGADA ainda em curso, voltar
+    // continua sendo só voltar.
+    const seamPhoto = reduced || entering
+      ? null
+      : photos.find((p) => p.id === SEAM_PHOTO);
+    exit = seamPhoto
+      ? leaveToSeam(canvas, plane, seamPhoto, blur, desiredTunnelStrength, setTunnel)
+      : null;
+
+    if (!exit) return void history.back();
+
+    exit.done.then(() => {
+      // O recado pra home, escrito só agora: o quadro que ela vai receber é a
+      // foto cobrindo a tela, e não o mural. Escrever antes seria prometer uma
+      // emenda que uma saída interrompida no meio não entregaria.
+      try { sessionStorage.setItem(SEAM_BACK_KEY, '1'); } catch {}
+      history.back();
+    });
+  });
+
+  // O navegador pode devolver ESTA página pelo BFCache — é o "avançar" logo
+  // depois da volta. Ela voltaria congelada dentro da foto, no último quadro da
+  // saída, e sem gesto nenhum. É o mesmo remendo que a home faz do outro lado
+  // (ver scripts/main.ts → pageshow), e o único lugar que sabe desfazer isto.
+  window.addEventListener('pageshow', (e) => {
+    if (!(e as PageTransitionEvent).persisted || !exit) return;
+    // a home não chegou a consumir a marca (a volta virou um avançar): limpa
+    // aqui pra ela não valer numa saída futura, que talvez nem aconteça
+    try { sessionStorage.removeItem(SEAM_BACK_KEY); } catch {}
+    exit.undo();
+    exit = null;
   });
 
   const tileWidth = () => Math.max(window.innerWidth, MURAL.MIN_TILE_W);
@@ -119,11 +166,18 @@ export function initMural() {
     ? canvas.centerOn(SEAM_PHOTO)
     : null;
 
-  if (seat) enterFromSeam(canvas, plane, seat, (strength) => {
-    desiredTunnelStrength = strength;
-    canvas?.setTunnelStrength(rendererActive ? strength : 0);
-  });
-  else {
+  if (seat) {
+    const arrival = enterFromSeam(canvas, plane, seat, setTunnel);
+    // A HUD acende ANTES de a chegada terminar (ENTRY.HUD_AT), então existe um
+    // vão de meio segundo em que dá pra clicar no "‹ Voltar" com o recuo ainda
+    // andando. As duas coreografias escrevem o MESMO transform do .mural-zoom, e
+    // duas donas de uma propriedade só é o defeito que este projeto inteiro
+    // evita. Enquanto o recuo anda, voltar é só voltar — ver o clique acima.
+    if (arrival) {
+      entering = true;
+      arrival.then(() => { entering = false; });
+    }
+  } else {
     endEntry();
   }
 
@@ -166,10 +220,13 @@ function enterFromSeam(
   plane: HTMLElement,
   seat: PlacedRect,
   setTunnelStrength: (strength: number) => void,
-) {
+): gsap.core.Timeline | null {
   const zoom = document.querySelector<HTMLElement>('[data-mural-zoom]');
   const hero = document.querySelector<HTMLImageElement>('[data-mural-hero]');
-  if (!zoom || !hero) return endEntry();
+  if (!zoom || !hero) {
+    endEntry();
+    return null;
+  }
 
   // A home entrega a foto na proporção da fita. O ladrilho já tem a proporção
   // natural; scaleX recompõe a largura da fita no primeiro quadro, e os dois
@@ -266,6 +323,184 @@ function enterFromSeam(
   const heroReady = hero.decode?.().catch(() => {}) ?? Promise.resolve();
   Promise.all([heroReady, canvas.readyForEntry()]).then(once);
   guard = window.setTimeout(once, ENTRY.READY_MAX);
+
+  return tl;
+}
+
+// ——— a saída de volta pro anel ———
+//
+// O caminho inverso da chegada, e o seu espelho exato: a câmera desliza até a
+// foto da emenda, mergulha nela até ela cobrir a tela no MESMO enquadramento em
+// que a home a deixou, e a navegação acontece com a foto parada ali. Do outro
+// lado, a home rebobina o avanço dela a partir daquele quadro. De ponta a ponta
+// é uma câmera só, entrando e saindo da mesma foto duas vezes.
+//
+// A geometria de chegada é reaproveitada AO PÉ DA LETRA — mesma conta de
+// seamW/seamH, mesma escala, mesma correção de proporção. Tem que ser: o quadro
+// que termina esta página é, por construção, o quadro que a home tem congelado.
+interface Exit {
+  /** resolve quando a foto está parada cobrindo a tela — a hora de navegar */
+  done: Promise<void>;
+  /** desfaz tudo (o navegador devolveu esta página pelo BFCache) */
+  undo(): void;
+}
+
+function leaveToSeam(
+  canvas: InfiniteCanvas,
+  plane: HTMLElement,
+  photo: Photo,
+  blur: MotionBlur,
+  tunnelFrom: number,
+  setTunnelStrength: (strength: number) => void,
+): Exit | null {
+  const zoom = document.querySelector<HTMLElement>('[data-mural-zoom]');
+  const seat = canvas.seatNearest(photo.id);
+  if (!zoom || !seat) return null;
+
+  // Onde a foto está agora, em px de TELA, medidos do centro do viewport. É a
+  // distância que o deslize tem que consumir.
+  const start = canvas.cameraOffset();
+  const dx = seat.camX - start.x;
+  const dy = seat.camY - start.y;
+
+  const tileAspect = seat.w / seat.h;
+  const endAspectX = SEAM_ASPECT / tileAspect;
+  const seamW = Math.max(window.innerWidth, window.innerHeight * SEAM_ASPECT)
+    * SEAM_OVERSCAN;
+  const seamH = seamW / SEAM_ASPECT;
+  const scale = seamH / seat.h;
+
+  // A HUD sai primeiro, com o mural ainda parado (o fade é do CSS, via
+  // data-exit): o quadro que atravessa a troca de página tem que ser a foto e
+  // NADA mais, exatamente como na chegada.
+  document.documentElement.dataset.exit = 'seam';
+
+  // O gesto sai de cena — mesmo congelamento do lightbox e da chegada. O borrão
+  // vai junto: ele responde à velocidade da MÃO, e daqui em diante quem se move
+  // é a câmera. (Também não haveria como pagá-lo: o filtro rasteriza o
+  // container inteiro a cada frame, e o container está sendo ampliado 4x.)
+  blur.reset();
+  canvas.freeze();
+
+  // promove a camada enquanto nada se move ainda — ver o mesmo aquecimento na
+  // chegada, e pelo mesmo motivo: sem ele o primeiro quadro do zoom é o quadro
+  // em que o navegador decide criar a camada
+  zoom.style.willChange = 'transform';
+
+  // A foto grande, montada aqui e não no HTML: a da chegada já foi removida (e
+  // quem abriu /photos por link nunca teve uma). Nasce DO TAMANHO DO LADRILHO,
+  // no lugar exato dele, e invisível — ver EXIT.HANDOFF_AT.
+  const hero = document.createElement('img');
+  hero.className = 'mural-hero is-placed';
+  hero.alt = '';
+  hero.setAttribute('aria-hidden', 'true');
+  hero.setAttribute('fetchpriority', 'high');
+  hero.decoding = 'async';
+  hero.style.opacity = '0';
+  hero.style.width = `${seat.w}px`;
+  hero.style.height = `${seat.h}px`;
+  hero.src = photo.full;
+  plane.appendChild(hero);
+
+  // o esticamento pra proporção da fita só começa DEPOIS do crossfade, com a
+  // foto grande sozinha na tela (ver EXIT.HANDOFF_AT)
+  const aspectFrom = EXIT.HANDOFF_AT + EXIT.HANDOFF_DUR;
+
+  const at = { t: 0 };
+  const draw = () => {
+    const t = at.t;
+
+    // O mergulho, em progressão geométrica — a mesma conta da chegada no
+    // sentido contrário (ver ENTRY.GEOMETRIC): cada instante amplia a imagem na
+    // mesma PROPORÇÃO, então a única variação de velocidade que se ouve é a da
+    // curva do relógio.
+    const k = Math.pow(scale, t);
+
+    // O deslize é escrito em pixels de TELA, e é por isso que ele é dividido
+    // pela ampliação deste instante.
+    //
+    // O zoom multiplica tudo que está fora do centro: uma distância interpolada
+    // em px de mundo pareceria acelerar sozinha conforme a parede se aproxima, e
+    // a foto passaria correndo pelo centro em vez de assentar nele. Aqui quem
+    // segue uma curva é o que o olho mede — a distância APARENTE até o centro —
+    // e o quanto a câmera tem que andar em mundo pra sustentar isso sai por
+    // consequência. É a mesma ideia do drawFlat da home, que mede a foto 3D na
+    // tela a cada quadro em vez de interpolar às cegas.
+    //
+    // (1 − u)³ chega ao centro com velocidade zero: a foto pousa no meio da tela
+    // em vez de bater nele e parar.
+    const u = Math.min(1, t / EXIT.GLIDE_UNTIL);
+    const rest = Math.pow(1 - u, 3);
+    canvas.panTo(seat.camX - (dx * rest) / k, seat.camY - (dy * rest) / k);
+
+    zoom.style.transform = `scale(${k})`;
+
+    // A proporção da FITA volta no fim, e por multiplicação, como o zoom. A
+    // rampa é smootherstep porque ela tem que partir e chegar em repouso: sair
+    // do zero devagar esconde o começo do esticamento debaixo do crossfade que
+    // acabou de terminar, e chegar em repouso faz a largura parar no MESMO
+    // quadro em que o mergulho para — que é o quadro que a home recebe.
+    const a = Math.min(1, Math.max(0, (t - aspectFrom) / (1 - aspectFrom)));
+    const ramp = a * a * a * (a * (a * 6 - 15) + 10);
+    hero.style.transform =
+      `translate3d(${seat.left}px, ${seat.top}px, 0) scaleX(${Math.pow(endAspectX, ramp)})`;
+  };
+  draw();
+
+  const tl = gsap.timeline({ paused: true });
+  tl.to(at, { t: 1, duration: EXIT.DUR, ease: EXIT.EASE, onUpdate: draw }, 0);
+
+  // A parede endireita já na largada: ela precisa estar plana ANTES de a foto
+  // grande encostar no ladrilho, senão as duas não coincidem (ver TUNNEL.EXIT_AT).
+  const tunnel = { t: tunnelFrom };
+  tl.to(tunnel, {
+    t: 0,
+    duration: TUNNEL.EXIT_AT * EXIT.DUR,
+    ease: 'sine.inOut',
+    onUpdate: () => setTunnelStrength(tunnel.t),
+  }, 0);
+
+  tl.to(hero, {
+    opacity: 1,
+    duration: EXIT.HANDOFF_DUR * EXIT.DUR,
+    ease: 'none',
+  }, EXIT.HANDOFF_AT * EXIT.DUR);
+
+  tl.to({}, { duration: EXIT.HOLD });   // o pouso, com a tela já coberta
+
+  const done = new Promise<void>((resolve) => {
+    tl.eventCallback('onComplete', resolve);
+  });
+
+  // O gesto não pode ficar refém do decode (ver EXIT.READY_MAX): quem volta
+  // pelo anel tem a foto quente e parte no quadro seguinte; quem não tem parte
+  // depois do teto, com o thumb segurando a imagem por baixo. Os dois rAF são o
+  // mesmo respiro da chegada — um pra montar a camada promovida acima, outro
+  // pra pintá-la antes de o relógio andar.
+  let started = false;
+  const play = () => {
+    if (started) return;
+    started = true;
+    clearTimeout(guard);
+    requestAnimationFrame(() => requestAnimationFrame(() => tl.play()));
+  };
+  const guard = window.setTimeout(play, EXIT.READY_MAX);
+  (hero.decode?.().catch(() => {}) ?? Promise.resolve()).then(play);
+
+  return {
+    done,
+    undo() {
+      started = true;
+      clearTimeout(guard);
+      tl.kill();
+      hero.remove();
+      zoom.style.transform = '';                     // devolve o <div> inerte
+      zoom.style.willChange = '';
+      delete document.documentElement.dataset.exit;  // a HUD volta pelo CSS
+      setTunnelStrength(tunnelFrom);
+      canvas.unfreeze();
+    },
+  };
 }
 
 /** Fim da chegada: a HUD pode entrar (o CSS cuida do fade) e a foto em tela

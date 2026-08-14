@@ -44,6 +44,30 @@ export const MURAL = {
   RESIZE_DEBOUNCE: 180,
 };
 
+// ——— a parede curva / tubo (ver tunnel.ts) ———
+//
+// O centro do viewport é o fundo do tubo; as bordas avançam em Z e viram suas
+// faces para a câmera. São proporções, não pixels casados no olho, então a lente
+// conserva a mesma presença em um notebook largo e numa janela menor.
+export const TUNNEL = {
+  /** distância da câmera baseada na diagonal. Sem teto: em ultrawide/4K a
+   * geometria e a lente crescem juntas, conservando a mesma ampliação. */
+  PERSPECTIVE_DIAG: 0.85,
+  PERSPECTIVE_MIN: 900,
+
+  /** inclinação máxima das faces (desktop / toque). A dobra precisa aparecer
+   *  com clareza quando uma foto atravessa o viewport durante o pan. */
+  MAX_ANGLE: 36 * Math.PI / 180,
+  MAX_ANGLE_COARSE: 24 * Math.PI / 180,
+
+  /** o tubo é levemente oval: X curva mais, Y respira sem dominar o mural */
+  VERTICAL_WEIGHT: 0.86,
+
+  /** trecho final da chegada home → photos em que a parede se curva. Começa
+   * depois do crossfade da hero, quando o tile do mural já assumiu a foto. */
+  ENTRY_AT: 0.76,
+};
+
 // ——— a chegada vinda do anel (ver photos/main.ts → playEntry) ———
 //
 // A home entrega esta página no meio de um gesto: a câmera mergulhou na foto
@@ -92,8 +116,8 @@ export const ENTRY = {
    *  transição visual: é só evitar que a troca de resolução seja um corte.
    *  Cedo o bastante pra acontecer com tudo em movimento, tarde o bastante pra
    *  a foto já ter encolhido. */
-  HANDOFF_AT: 0.64,
-  HANDOFF_DUR: 0.2,
+  HANDOFF_AT: 0.6,
+  HANDOFF_DUR: 0.16,
 
   /** quando a HUD (voltar / título / dica) começa a aparecer, em fração */
   HUD_AT: 0.58,
@@ -160,7 +184,7 @@ export const PAN = {
 // ——— motion blur direcional (ver motionBlur.ts) ———
 export const BLUR = {
   /** desvio máximo do feGaussianBlur, em px. O clamp de tudo. */
-  MAX: 14,
+  MAX: 9,
 
   /** velocidade (px/s) que atinge o blur máximo — a régua da curva */
   SPEED_FULL: 3200,

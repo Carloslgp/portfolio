@@ -4,8 +4,9 @@
 // ——— o modelo ———
 // Existe uma CÂMERA (offset, em px de mundo) passeando sobre um plano onde o
 // tile se repete em grade. Nada disso vira scroll de página: o container é
-// fixo e o movimento é UM transform por frame nele (translate3d), enquanto os
-// nós filhos só mudam quando entram/saem do enquadramento.
+// fixo e a câmera continua sendo UM transform por frame nele (translate3d).
+// A lente do tubo atualiza os filhos na mesma passada que já virtualiza o
+// enquadramento, sem leituras de layout (ver tunnel.ts).
 //
 // ——— a aritmética do wrap ———
 // A cópia (c, r) do tile vive em (c·tileW, r·tileH + shift), onde shift
@@ -27,13 +28,18 @@
 import type { Photo } from './photos';
 import type { Tile, TileItem } from './layout';
 import { MURAL, PAN } from './config';
+import { TunnelProjection } from './tunnel';
+import { TunnelRenderer, type RenderPlacement } from './tunnelRenderer';
 
 interface Placed {
   node: HTMLButtonElement;
   /** posição de mundo da instância (constante enquanto ela está no DOM) */
   wx: number;
   wy: number;
+  w: number;
+  h: number;
   photoId: string;
+  thumb: string;
 }
 
 /** O lugar de uma instância dentro do plano, em px LOCAIS (já descontada a
@@ -53,6 +59,10 @@ export interface CanvasOptions {
   onOpen(photo: Photo, node: HTMLButtonElement): void;
   /** velocidade REAL do conteúdo neste frame, em px/s — alimenta o blur */
   onVelocity(vx: number, vy: number, dt: number): void;
+  /** 0 durante a emenda; 1 numa chegada direta. Em reduced vira 0 na lente. */
+  tunnelStrength: number;
+  /** camada subdividida opcional; sem WebGL os próprios botões seguem visíveis */
+  renderer?: TunnelRenderer | null;
 }
 
 export class InfiniteCanvas {
@@ -80,6 +90,8 @@ export class InfiniteCanvas {
 
   private raf = 0;
   private lastFrame = 0;
+  private tunnel: TunnelProjection;
+  private tunnelStrength: number;
 
   /** Nós criados agora entram com carregamento ANSIOSO. Vale só na chegada
    *  vinda do anel: ali o mural nasce ampliado e encolhe até caber na tela, e
@@ -94,6 +106,15 @@ export class InfiniteCanvas {
     private plane: HTMLElement,
     private opts: CanvasOptions,
   ) {
+    this.tunnelStrength = this.opts.tunnelStrength;
+    const stage = this.viewport.querySelector<HTMLElement>('[data-mural-stage]');
+    if (!stage) throw new Error('InfiniteCanvas: [data-mural-stage] ausente');
+    this.tunnel = new TunnelProjection(
+      this.viewport,
+      stage,
+      this.opts.reduced,
+      this.opts.tunnelStrength,
+    );
     this.bindPointer();
     this.bindWheel();
     this.bindKeys();
@@ -102,11 +123,29 @@ export class InfiniteCanvas {
   /** (re)define o tile — no boot e a cada resize com debounce. O DOM inteiro é
    *  devolvido ao pool e a próxima passada remonta o enquadramento do zero. */
   setTile(tile: Tile) {
+    this.tunnel.resize();
     this.tile = tile;
     for (const p of this.placed.values()) this.release(p.node);
     this.placed.clear();
+    this.syncRenderer();
     this.placedAt.x = NaN;
     this.place();
+  }
+
+  /** Atualiza centro/perspectiva mesmo num resize que não reempacota o tile. */
+  resize() {
+    this.tunnel.resize();
+    this.opts.renderer?.resize();
+    this.drawTiles();
+    this.renderTunnel();
+  }
+
+  /** Usado pela emenda: a parede nasce plana sob a hero e ganha curvatura só
+   * quando a foto já está voltando ao lugar dela. */
+  setTunnelStrength(value: number) {
+    this.tunnelStrength = this.opts.reduced ? 0 : Math.max(0, Math.min(1, value));
+    if (this.tunnel.setStrength(value)) this.drawTiles();
+    this.renderTunnel();
   }
 
   /** Põe a câmera com uma instância desta foto no CENTRO do viewport e devolve
@@ -188,7 +227,8 @@ export class InfiniteCanvas {
       });
     });
 
-    return Promise.all(ready).then(() => {});
+    const rendererReady = this.opts.renderer?.readyForEntry() ?? Promise.resolve();
+    return Promise.all([...ready, rendererReady]).then(() => {});
   }
 
   start() {
@@ -269,17 +309,14 @@ export class InfiniteCanvas {
       dt,
     );
 
-    // o movimento de verdade: um transform no container, e mais nada
+    // a câmera continua tendo um dono só; a lente dos filhos é atualizada em
+    // place(), abaixo, sem disputar esta string
     this.applyTransform();
 
-    // reciclar nós é mais caro que comparar dois floats: a passada de
-    // virtualização só roda quando a câmera andou de verdade
-    if (
-      Math.abs(this.offset.x - this.placedAt.x) > 1 ||
-      Math.abs(this.offset.y - this.placedAt.y) > 1
-    ) {
-      this.place();
-    }
+    // A lente depende da posição de tela, então qualquer movimento real precisa
+    // redesenhar os cordéis. O custo continua sem leitura de layout; quando a
+    // câmera assenta em zero, esta passada também para por inteiro.
+    if (this.offset.x !== this.placedAt.x || this.offset.y !== this.placedAt.y) this.place();
   }
 
   /** A posição da câmera vira UM transform no container. Mora numa função
@@ -356,17 +393,49 @@ export class InfiniteCanvas {
     for (const [key, w] of wanted) {
       if (this.placed.has(key)) continue;
       const node = this.pool.pop() ?? this.makeNode();
-      const p: Placed = { node, wx: w.wx, wy: w.wy, photoId: '' };
+      const p: Placed = {
+        node, wx: w.wx, wy: w.wy, w: w.item.w, h: w.item.h, photoId: '', thumb: '',
+      };
       this.assign(p, w.item);
-      this.position(p);
       node.hidden = false;
       this.placed.set(key, p);
     }
+
+    // A lente depende da posição EM TELA, portanto também reescreve quem já
+    // estava no DOM. A travessia é só de escritas e reaproveita esta chamada da
+    // virtualização; não existe leitura de layout nem um segundo RAF.
+    this.drawTiles();
+    this.syncRenderer();
+    this.renderTunnel();
   }
 
   private position(p: Placed) {
-    p.node.style.transform =
-      `translate3d(${p.wx - this.origin.x}px, ${p.wy - this.origin.y}px, 0)`;
+    this.tunnel.project(p, this.origin, this.offset);
+  }
+
+  private drawTiles() {
+    for (const p of this.placed.values()) this.position(p);
+  }
+
+  private syncRenderer() {
+    if (!this.opts.renderer) return;
+    const entries: RenderPlacement[] = [];
+    for (const [key, p] of this.placed) {
+      entries.push({
+        key,
+        photoId: p.photoId,
+        thumb: p.thumb,
+        wx: p.wx,
+        wy: p.wy,
+        w: p.w,
+        h: p.h,
+      });
+    }
+    this.opts.renderer.sync(entries);
+  }
+
+  private renderTunnel() {
+    this.opts.renderer?.frame(this.offset, this.tunnelStrength);
   }
 
   /** Troca a âncora local e REPOSICIONA quem já está no DOM.
@@ -385,10 +454,13 @@ export class InfiniteCanvas {
 
   private assign(p: Placed, item: TileItem) {
     const { node } = p;
+    p.w = item.w;
+    p.h = item.h;
     node.style.width = `${item.w}px`;
     node.style.height = `${item.h}px`;
     if (p.photoId === item.photo.id) return;   // nó reciclado com a MESMA foto
     p.photoId = item.photo.id;
+    p.thumb = item.photo.thumb;
 
     const img = node.firstElementChild as HTMLImageElement;
     // a troca de src num nó reciclado mostraria a foto ANTIGA esticada até a

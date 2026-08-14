@@ -10,7 +10,8 @@ import { buildTile } from './layout';
 import { InfiniteCanvas, type PlacedRect } from './infiniteCanvas';
 import { MotionBlur } from './motionBlur';
 import { Lightbox } from './lightbox';
-import { ENTRY, MURAL } from './config';
+import { TunnelRenderer } from './tunnelRenderer';
+import { ENTRY, MURAL, TUNNEL } from './config';
 import { storedMotionMode } from '../motion';
 import {
   PHOTOS_RETURN_KEY, SEAM_ASPECT, SEAM_OVERSCAN, SEAM_PHOTO,
@@ -18,10 +19,12 @@ import {
 
 export function initMural() {
   const viewport = document.querySelector<HTMLElement>('[data-mural]');
+  const fx = document.querySelector<HTMLElement>('[data-mural-fx]');
+  const glCanvas = document.querySelector<HTMLCanvasElement>('[data-mural-gl]');
   const plane = document.querySelector<HTMLElement>('[data-mural-plane]');
   const gaussian = document.querySelector<SVGFEGaussianBlurElement>('[data-blur-gaussian]');
   const photos = readPhotos();
-  if (!viewport || !plane || !gaussian || !photos.length) return;
+  if (!viewport || !fx || !glCanvas || !plane || !gaussian || !photos.length) return;
 
   // A resposta de "quer movimento?" nesta página: a escolha feita no portão da
   // home (sessionStorage) manda; quem entrou direto por /photos nunca viu o
@@ -33,21 +36,48 @@ export function initMural() {
     : window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   document.documentElement.dataset.motion = reduced ? 'reduced' : 'full';
 
-  const blur = new MotionBlur(plane, gaussian, reduced);
+  // O filtro fica FORA da árvore que compõe a perspectiva. Assim ele borra o
+  // quadro 3D já pronto, sem achatar os filhos e apagar a profundidade.
+  const blur = new MotionBlur(fx, gaussian, reduced);
+
+  const seamEntry = document.documentElement.dataset.entry === 'seam' && !reduced;
+  let canvas: InfiniteCanvas | null = null;
+  let rendererUsable = false;
+  let rendererActive = false;
+  let desiredTunnelStrength = seamEntry ? 0 : 1;
+  const renderer = new TunnelRenderer(
+    glCanvas,
+    reduced,
+    () => {
+      rendererUsable = false;
+      rendererActive = false;
+      canvas?.setTunnelStrength(0);
+    },
+    () => {
+      rendererActive = true;
+      canvas?.setTunnelStrength(desiredTunnelStrength);
+    },
+  );
+  rendererUsable = renderer.init();
 
   const lightbox = new Lightbox(photos, document.body, {
     reduced,
     freeze: () => {
       blur.reset();
-      canvas.freeze();
+      canvas?.freeze();
     },
-    unfreeze: () => canvas.unfreeze(),
+    unfreeze: () => canvas?.unfreeze(),
   });
 
-  const canvas = new InfiniteCanvas(viewport, plane, {
+  canvas = new InfiniteCanvas(viewport, plane, {
     reduced,
     onOpen: (photo, node) => lightbox.show(photo, node),
     onVelocity: (vx, vy, dt) => blur.update(vx, vy, dt),
+    // Na chegada direta, o DOM fica plano até o primeiro frame GPU estar
+    // pronto. O callback de ativação acima curva proxies e canvas na mesma
+    // pintura, sem mostrar por um instante a aproximação CSS entre os dois.
+    tunnelStrength: 0,
+    renderer: rendererUsable ? renderer : null,
   });
 
   // ——— o Voltar ———
@@ -85,12 +115,17 @@ export function initMural() {
   // montar o tile e ligar o loop: são escritas de estilo numa tacada só, sem
   // nenhum quadro desenhado no meio — o que a tela já mostra (a foto da emenda,
   // pintada pelo HTML) continua valendo até o recuo começar.
-  const seat = document.documentElement.dataset.entry === 'seam' && !reduced
+  const seat = seamEntry
     ? canvas.centerOn(SEAM_PHOTO)
     : null;
 
-  if (seat) enterFromSeam(canvas, plane, seat);
-  else endEntry();
+  if (seat) enterFromSeam(canvas, plane, seat, (strength) => {
+    desiredTunnelStrength = strength;
+    canvas?.setTunnelStrength(rendererActive ? strength : 0);
+  });
+  else {
+    endEntry();
+  }
 
   canvas.start();
 
@@ -106,6 +141,7 @@ export function initMural() {
   window.addEventListener('resize', () => {
     clearTimeout(timer);
     timer = window.setTimeout(() => {
+      canvas.resize();
       const w = tileWidth();
       if (w !== lastTileW) {
         lastTileW = w;
@@ -125,7 +161,12 @@ export function initMural() {
 // A emenda é possível porque os dois documentos usam SEAM_ASPECT e
 // SEAM_OVERSCAN para construir o mesmo retângulo. Não há medida casada no olho:
 // o último quadro da home e o primeiro daqui saem da mesma conta.
-function enterFromSeam(canvas: InfiniteCanvas, plane: HTMLElement, seat: PlacedRect) {
+function enterFromSeam(
+  canvas: InfiniteCanvas,
+  plane: HTMLElement,
+  seat: PlacedRect,
+  setTunnelStrength: (strength: number) => void,
+) {
   const zoom = document.querySelector<HTMLElement>('[data-mural-zoom]');
   const hero = document.querySelector<HTMLImageElement>('[data-mural-hero]');
   if (!zoom || !hero) return endEntry();
@@ -197,6 +238,13 @@ function enterFromSeam(canvas: InfiniteCanvas, plane: HTMLElement, seat: PlacedR
     duration: ENTRY.HANDOFF_DUR * ENTRY.DUR,
     ease: 'none',
   }, ENTRY.HANDOFF_AT * ENTRY.DUR);
+  const tunnel = { t: 0 };
+  tl.to(tunnel, {
+    t: 1,
+    duration: (1 - TUNNEL.ENTRY_AT) * ENTRY.DUR,
+    ease: 'sine.inOut',
+    onUpdate: () => setTunnelStrength(tunnel.t),
+  }, TUNNEL.ENTRY_AT * ENTRY.DUR);
   tl.call(endEntry, undefined, ENTRY.HUD_AT * ENTRY.DUR);
 
   // A foto grande segura a tela enquanto TODO o enquadramento que vai aparecer

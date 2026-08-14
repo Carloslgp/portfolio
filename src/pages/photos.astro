@@ -74,8 +74,9 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
     <link rel="prefetch" href="/" />
   </Fragment>
 
-  <!-- o plano infinito: o viewport é fixo e o gesto mora nele; quem se move é
-       só o .mural-plane, com UM translate3d por frame (ver infiniteCanvas.ts).
+  <!-- o plano infinito: o viewport é fixo e o gesto mora nele; a câmera vive
+       no .mural-plane, com UM translate3d por frame. Os tiles recebem a projeção
+       3D do tubo na mesma passada da virtualização (ver tunnel.ts).
 
        O .mural-zoom no meio existe só pela chegada vinda do anel: é ele que
        leva o `scale` do recuo (ver photos/main.ts → entrada). Fica separado do
@@ -83,8 +84,13 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
        infiniteCanvas, e dividir essa string com uma segunda animação seria pedir
        que as duas se atropelassem. Aqui cada uma tem o seu elemento. -->
   <main class="mural" data-mural aria-label="Mural de fotos — arraste para navegar">
-    <div class="mural-zoom" data-mural-zoom>
-      <div class="mural-plane" data-mural-plane></div>
+    <div class="mural-fx" data-mural-fx>
+      <div class="mural-stage" data-mural-stage>
+        <div class="mural-zoom" data-mural-zoom>
+          <canvas class="mural-gl" data-mural-gl aria-hidden="true"></canvas>
+          <div class="mural-plane" data-mural-plane></div>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -203,14 +209,26 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
     inset: 0;
     overflow: hidden;
     background: var(--paper);
-    /* o gesto é do mural, não do navegador (scroll/zoom/refresh por arrasto) */
-    touch-action: none;
+    /* o gesto de um dedo é do mural; o pinch continua sendo zoom do navegador */
+    touch-action: pinch-zoom;
     cursor: grab;
     user-select: none;
     -webkit-user-select: none;
   }
   .mural:active {
     cursor: grabbing;
+  }
+
+  /* O filtro de movimento recebe o quadro DEPOIS da composição 3D. Um filter
+     direto no .mural-plane achataria os descendentes e mataria o tubo. */
+  .mural-fx,
+  .mural-stage {
+    position: absolute;
+    inset: 0;
+  }
+  .mural-stage {
+    perspective-origin: 50% 50%;
+    transform-style: preserve-3d;
   }
 
   /* o portador do recuo da chegada. Fora da entrada é um <div> inerte: nenhum
@@ -221,6 +239,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
     position: absolute;
     inset: 0;
     transform-origin: 50% 50%;
+    transform-style: preserve-3d;
   }
 
   /* o único elemento com will-change da página: é ele que anda todo frame */
@@ -228,6 +247,33 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
     position: absolute;
     inset: 0;
     will-change: transform;
+    transform-style: preserve-3d;
+  }
+
+  /* Three desenha a dobra contínua das fotos. O DOM permanece exatamente no
+     mesmo lugar por cima dele, como superfície de interação e fallback. */
+  .mural-gl {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0;
+  }
+  :global(html[data-tunnel-renderer='webgl']) .mural-gl {
+    opacity: 1;
+  }
+  :global(html[data-tunnel-renderer='webgl'] .mural-tile) {
+    background: transparent;
+  }
+  :global(html[data-tunnel-renderer='webgl'] .mural-tile img) {
+    opacity: 0;
+    transition: none;
+  }
+  :global(html[data-tunnel-renderer='webgl'] .mural-tile:focus-visible) {
+    /* O proxy 3D acompanha os quatro cantos; o foco continua denunciando qual
+       foto recebeu teclado sem recolocar o bitmap plano sobre o canvas. */
+    outline-color: var(--ink);
   }
 
   /* ——— a foto da emenda ———
@@ -268,6 +314,10 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
     /* o cinza que segura o lugar enquanto o thumb baixa — some sob a foto */
     background: rgba(var(--ink-rgb), 0.06);
     cursor: pointer;
+    /* a matrix3d de tunnel.ts ancora o canto superior esquerdo: ele é a
+       amostra global compartilhada com os tiles que encostam aqui */
+    transform-origin: 0 0;
+    backface-visibility: hidden;
   }
   :global(.mural-tile[hidden]) {
     display: none;

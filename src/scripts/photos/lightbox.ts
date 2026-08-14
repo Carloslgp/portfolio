@@ -5,9 +5,9 @@
 // é qualquer clique que não caiu na figura nem num botão.
 //
 // A abertura é FLIP: o navegador já desenhou o tile no mural, então a figura
-// do modal nasce POR CIMA dele (mesmo centro, mesma escala — a proporção é a
-// mesma foto, logo a escala é uniforme) e anima até o centro da tela. O que
-// se vê é o tile crescendo, não um modal aparecendo.
+// do modal nasce POR CIMA dele (mesmo centro e mesma caixa projetada) e anima
+// até o centro da tela. Como o tubo pode inclinar a origem, X e Y são medidos
+// separados; o que se vê é o tile se desprendendo da parede, não um modal.
 //
 // A alta resolução entra por troca de src: a figura abre com o THUMB (que já
 // está decodificado — é o que o mural mostra) e a full-res substitui quando
@@ -93,18 +93,20 @@ export class Lightbox {
     }
 
     // FLIP: com o modal já no lugar final, mede-se onde a figura CAIU e ela
-    // parte do retângulo do tile — mesma foto, mesma proporção, escala uniforme
+    // parte da caixa projetada do tile. A origem pode estar inclinada pelo tubo,
+    // então a bounding box perdeu a proporção natural: X e Y entram separados.
     const to = this.figure.getBoundingClientRect();
-    const scale = from.width / to.width;
+    const scaleX = from.width / to.width;
+    const scaleY = from.height / to.height;
     const dx = from.left + from.width / 2 - (to.left + to.width / 2);
     const dy = from.top + from.height / 2 - (to.top + to.height / 2);
 
     this.dialog.classList.add('is-open');   // o backdrop atravessa em CSS
     gsap.fromTo(
       this.figure,
-      { x: dx, y: dy, scale },
+      { x: dx, y: dy, scaleX, scaleY },
       {
-        x: 0, y: 0, scale: 1,
+        x: 0, y: 0, scaleX: 1, scaleY: 1,
         duration: LIGHTBOX.OPEN_DUR,
         ease: LIGHTBOX.OPEN_EASE,
         onComplete: () => { this.busy = false; },
@@ -156,7 +158,8 @@ export class Lightbox {
       gsap.to(this.figure, {
         x: from.left + from.width / 2 - (to.left + to.width / 2),
         y: from.top + from.height / 2 - (to.top + to.height / 2),
-        scale: from.width / to.width,
+        scaleX: from.width / to.width,
+        scaleY: from.height / to.height,
         duration: LIGHTBOX.CLOSE_DUR,
         ease: LIGHTBOX.CLOSE_EASE,
         onComplete: finish,

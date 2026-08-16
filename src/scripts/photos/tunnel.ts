@@ -100,20 +100,49 @@ export class TunnelProjection {
     const parentY = origin.y - offset.y;
     const tx = this.viewW / 2 + x0.position - parentX;
     const ty = this.viewH / 2 + y0.position - parentY;
-    const tz = x0.depth + y0.depth;
+
+    // O teto de profundidade (ver TUNNEL.DEPTH_CEIL): sem ele o canto do
+    // overscan diagonal passa da câmera, e um vértice atrás do olho não é mais
+    // distorção — é a foto rasgada pela tela. O canto ancorado é a amostra
+    // COMPARTILHADA com os vizinhos, então tratá-lo aqui mantém a emenda; o
+    // resto da placa segue a mesma inclinação, amansada pelo mesmo fator.
+    const rawDepth = x0.depth + y0.depth;
+    const tz = this.softDepth(rawDepth);
+    const taper = this.softDepthSlope(rawDepth);
 
     // Colunas X/Y da matrix3d: cada pixel local percorre o cordel do seu eixo.
     // A terceira coluna só mantém a matriz inversível; o elemento vive em z=0.
     const xx = (x1.position - x0.position) / rect.w;
-    const xz = (x1.depth - x0.depth) / rect.w;
+    const xz = ((x1.depth - x0.depth) / rect.w) * taper;
     const yy = (y1.position - y0.position) / rect.h;
-    const yz = (y1.depth - y0.depth) / rect.h;
+    const yz = ((y1.depth - y0.depth) / rect.h) * taper;
 
     rect.node.style.transform = `matrix3d(` +
       `${xx.toFixed(7)}, 0, ${xz.toFixed(7)}, 0, ` +
       `0, ${yy.toFixed(7)}, ${yz.toFixed(7)}, 0, ` +
       `0, 0, 1, 0, ` +
       `${tx.toFixed(3)}, ${ty.toFixed(3)}, ${tz.toFixed(3)}, 1)`;
+  }
+
+  /** Reta até o joelho, exponencial encostando no teto depois dele — a mesma
+   * curva do shader (ver tunnelRenderer.ts → softDepth). Nunca alcança o teto,
+   * então a parede nunca alcança a câmera. */
+  private softDepth(raw: number): number {
+    const ceil = this.perspective * TUNNEL.DEPTH_CEIL;
+    const knee = ceil * TUNNEL.DEPTH_KNEE;
+    if (raw <= knee) return raw;
+    const span = Math.max(ceil - knee, 0.0001);
+    return ceil - span * Math.exp(-(raw - knee) / span);
+  }
+
+  /** A derivada da curva acima: 1 antes do joelho (nada muda no que está na
+   * tela), caindo pra zero conforme o teto se aproxima. */
+  private softDepthSlope(raw: number): number {
+    const ceil = this.perspective * TUNNEL.DEPTH_CEIL;
+    const knee = ceil * TUNNEL.DEPTH_KNEE;
+    if (raw <= knee) return 1;
+    const span = Math.max(ceil - knee, 0.0001);
+    return Math.exp(-(raw - knee) / span);
   }
 
   /** Mistura o plano com o arco ANTES de montar os cordéis. Assim a emenda

@@ -233,6 +233,7 @@ export class TunnelRenderer {
       shader.uniforms.uStrength = { value: this.strength };
       shader.uniforms.uMaxAngle = { value: this.coarse ? TUNNEL.MAX_ANGLE_COARSE : TUNNEL.MAX_ANGLE };
       shader.uniforms.uVerticalWeight = { value: TUNNEL.VERTICAL_WEIGHT };
+      shader.uniforms.uDepthCeil = { value: this.perspective * TUNNEL.DEPTH_CEIL };
       material.userData.shader = shader;
 
       shader.vertexShader = shader.vertexShader
@@ -244,6 +245,17 @@ export class TunnelRenderer {
           uniform float uStrength;
           uniform float uMaxAngle;
           uniform float uVerticalWeight;
+          uniform float uDepthCeil;
+
+          // O teto de profundidade (ver TUNNEL.DEPTH_CEIL). Reta até o joelho,
+          // exponencial encostando no teto depois dele — mesma inclinação na
+          // emenda, então a superfície não ganha quina.
+          float softDepth(float raw) {
+            float knee = uDepthCeil * ${TUNNEL.DEPTH_KNEE.toFixed(4)};
+            if (raw <= knee) return raw;
+            float span = max(uDepthCeil - knee, 0.0001);
+            return uDepthCeil - span * exp(-(raw - knee) / span);
+          }
 
           vec2 tunnelAxis(float distance, float halfView, float maxAngle) {
             float radius = halfView / max(maxAngle, 0.0001);
@@ -274,12 +286,12 @@ export class TunnelRenderer {
           vec3 curved = vec3(
             uViewport.x * 0.5 + sx.x,
             uViewport.y - (uViewport.y * 0.5 + sy.x),
-            sx.y + sy.y
+            softDepth(sx.y + sy.y)
           );
           vec3 transformed = mix(planar, curved, uStrength);
         `);
     };
-    material.customProgramCacheKey = () => 'mural-tunnel-v1';
+    material.customProgramCacheKey = () => 'mural-tunnel-v2';
   }
 
   private render() {
@@ -295,6 +307,7 @@ export class TunnelRenderer {
       shader.uniforms.uOffset.value.set(this.offset.x, this.offset.y);
       shader.uniforms.uViewport.value.set(this.viewW, this.viewH);
       shader.uniforms.uStrength.value = this.strength;
+      shader.uniforms.uDepthCeil.value = this.perspective * TUNNEL.DEPTH_CEIL;
     }
     try {
       this.renderer.render(this.scene, this.camera);

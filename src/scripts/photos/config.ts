@@ -51,17 +51,84 @@ export const MURAL = {
 // conserva a mesma presença em um notebook largo e numa janela menor.
 export const TUNNEL = {
   /** distância da câmera baseada na diagonal. Sem teto: em ultrawide/4K a
-   * geometria e a lente crescem juntas, conservando a mesma ampliação. */
-  PERSPECTIVE_DIAG: 0.85,
-  PERSPECTIVE_MIN: 900,
+   * geometria e a lente crescem juntas, conservando a mesma ampliação.
+   *
+   * Quanto MENOR, mais curta a distância focal — e a mesma profundidade do
+   * arco rende mais encolhimento nas beiradas. É a metade ÓPTICA da distorção;
+   * a outra é o MAX_ANGLE abaixo, que é a geométrica. As duas juntas porque
+   * arco fundo com lente longa vira uma curva mole, e lente curta sobre parede
+   * quase plana só afunila o mural sem dobrar nada. */
+  PERSPECTIVE_DIAG: 0.62,
+  PERSPECTIVE_MIN: 700,
 
   /** inclinação máxima das faces (desktop / toque). A dobra precisa aparecer
-   *  com clareza quando uma foto atravessa o viewport durante o pan. */
-  MAX_ANGLE: 36 * Math.PI / 180,
-  MAX_ANGLE_COARSE: 24 * Math.PI / 180,
+   *  com clareza quando uma foto atravessa o viewport durante o pan — a foto
+   *  entra pela beirada quase de perfil e só se abre de frente ao passar pelo
+   *  centro. O raio do tubo é halfView/ângulo: mais ângulo = tubo mais
+   *  apertado, mais profundidade nas bordas. */
+  MAX_ANGLE: 54 * Math.PI / 180,
+  MAX_ANGLE_COARSE: 38 * Math.PI / 180,
 
   /** o tubo é levemente oval: X curva mais, Y respira sem dominar o mural */
   VERTICAL_WEIGHT: 0.86,
+
+  /** ——— o teto de profundidade ———
+   *
+   *  Depois da beirada do viewport a parede segue pela TANGENTE, e a tangente
+   *  de um tubo apertado sobe em Z sem limite: o canto diagonal do overscan
+   *  (margem de render + a foto inteira que ainda cabe nela) pode acumular mais
+   *  profundidade do que a distância da câmera. Passar da câmera não é "mais
+   *  distorção", é o vértice indo parar ATRÁS do olho — a divisão perspectiva
+   *  inverte de sinal e a foto se espalha rasgada pela tela.
+   *
+   *  Sobra de segurança em fração da distância da câmera. O tubo pode chegar a
+   *  esta fração e não passa dela nunca. */
+  DEPTH_CEIL: 0.55,
+
+  /** Onde o teto começa a agir, em fração dele. Até o joelho a profundidade é
+   *  a do arco, ao pé da letra; dali em diante ela se aproxima do teto por uma
+   *  exponencial que encosta na reta com a MESMA inclinação, então não existe
+   *  quina — e a curva sai igual dos dois lados de qualquer emenda, que é o que
+   *  mantém vizinhos colados. O joelho fica alto de propósito: o que está na
+   *  tela passa quase inteiro por baixo dele e não é tocado; quem é amansado é
+   *  o overscan fundo, que só aparece espremido junto ao ponto de fuga. */
+  DEPTH_KNEE: 0.7,
+
+  /** ——— a curvatura obedece à VELOCIDADE ———
+   *
+   *  Parado, o mural é uma parede quase reta: é assim que se olha uma foto. O
+   *  tubo é o que o MOVIMENTO faz com ela — quanto mais rápido a câmera corre,
+   *  mais a parede se enrola em volta de quem olha, e ao soltar ela se desenrola
+   *  de volta pro plano. Os números abaixo são a mesma família de constantes do
+   *  BLUR (velocidade → efeito), e de propósito: são os dois lados da mesma
+   *  leitura de velocidade, e casá-los é o que faz o pan rápido parecer UMA
+   *  coisa só em vez de dois enfeites somados.
+   *
+   *  O que sai daqui MULTIPLICA a intenção da coreografia (ver
+   *  infiniteCanvas.ts): a chegada e a saída continuam donas do liga/desliga da
+   *  lente, a velocidade decide só o quanto dela aparece.
+   */
+
+  /** curvatura em repouso, em fração do tubo cheio. Não é zero: um resto de
+   *  dobra guarda a profundidade do mural (e a lente já montada) sem chegar a
+   *  distorcer a foto que a pessoa parou pra ver. */
+  REST: 0.12,
+
+  /** velocidade (px/s) do tubo cheio — a régua da curva, como o SPEED_FULL do
+   *  blur. Mais baixa que a dele: a dobra tem que estar madura no pan
+   *  comum, não só no arremesso. */
+  SPEED_FULL: 2600,
+
+  /** expoente da curva velocidade→curvatura. Acima de 1 segura a dobra nas
+   *  velocidades baixas, pra um arrasto de ajuste não entortar o mural. */
+  SPEED_EXP: 1.35,
+
+  /** Sobe e desce por low-pass ASSIMÉTRICO (0..1 por frame a 60fps): a parede
+   *  se enrola no tempo da mão e se desenrola devagar, sozinha. Simétrico, o
+   *  desenrolar chegava junto com a parada e a dobra virava um pisca; a cauda
+   *  lenta é o que faz o movimento ter RESÍDUO, como toda massa tem. */
+  SPEED_ATTACK: 0.18,
+  SPEED_RELEASE: 0.07,
 
   /** trecho final da chegada home → photos em que a parede se curva. Começa
    * depois do crossfade da hero, quando o tile do mural já assumiu a foto. */

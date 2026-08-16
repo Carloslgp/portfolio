@@ -27,9 +27,11 @@
 // src/alt — o navegador já tem os thumbs em cache depois da primeira volta.
 import type { Photo } from './photos';
 import type { Tile, TileItem } from './layout';
-import { MURAL, PAN } from './config';
+import { MURAL, PAN, TUNNEL } from './config';
 import { TunnelProjection } from './tunnel';
 import { TunnelRenderer, type RenderPlacement } from './tunnelRenderer';
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 interface Placed {
   node: HTMLButtonElement;
@@ -67,7 +69,9 @@ export interface CanvasOptions {
   onOpen(photo: Photo, node: HTMLButtonElement): void;
   /** velocidade REAL do conteúdo neste frame, em px/s — alimenta o blur */
   onVelocity(vx: number, vy: number, dt: number): void;
-  /** 0 durante a emenda; 1 numa chegada direta. Em reduced vira 0 na lente. */
+  /** A INTENÇÃO da coreografia para a lente: 0 durante a emenda; 1 numa
+   *  chegada direta. Não é a curvatura que aparece — quem decide isso é a
+   *  velocidade do pan (ver drive, abaixo). Em reduced vira 0 na lente. */
   tunnelStrength: number;
   /** camada subdividida opcional; sem WebGL os próprios botões seguem visíveis */
   renderer?: TunnelRenderer | null;
@@ -99,6 +103,15 @@ export class InfiniteCanvas {
   private raf = 0;
   private lastFrame = 0;
   private tunnel: TunnelProjection;
+
+  // ——— a lente, em duas metades ———
+  // `choreo` é a INTENÇÃO (a chegada e a saída abrem e fecham a lente pelo
+  // setTunnelStrength); `drive` é quanto dessa intenção a VELOCIDADE do pan
+  // pede agora. O que vai pra parede é o produto: sem coreografia não há
+  // curvatura nenhuma, e com ela a dobra ainda espera o movimento acontecer.
+  private choreo: number;
+  private driveT = 0;                    // a curva velocidade→dobra, suavizada
+  private drive: number;
   private tunnelStrength: number;
 
   /** Nós criados agora entram com carregamento ANSIOSO. Vale só na chegada
@@ -114,14 +127,16 @@ export class InfiniteCanvas {
     private plane: HTMLElement,
     private opts: CanvasOptions,
   ) {
-    this.tunnelStrength = this.opts.tunnelStrength;
+    this.choreo = clamp01(this.opts.tunnelStrength);
+    this.drive = TUNNEL.REST;            // o mural nasce parado, logo quase reto
+    this.tunnelStrength = this.opts.reduced ? 0 : this.choreo * this.drive;
     const stage = this.viewport.querySelector<HTMLElement>('[data-mural-stage]');
     if (!stage) throw new Error('InfiniteCanvas: [data-mural-stage] ausente');
     this.tunnel = new TunnelProjection(
       this.viewport,
       stage,
       this.opts.reduced,
-      this.opts.tunnelStrength,
+      this.tunnelStrength,
     );
     this.bindPointer();
     this.bindWheel();
@@ -149,10 +164,11 @@ export class InfiniteCanvas {
   }
 
   /** Usado pela emenda: a parede nasce plana sob a hero e ganha curvatura só
-   * quando a foto já está voltando ao lugar dela. */
+   * quando a foto já está voltando ao lugar dela. É a INTENÇÃO da lente — o
+   * quanto dela chega à parede continua sendo assunto da velocidade do pan. */
   setTunnelStrength(value: number) {
-    this.tunnelStrength = this.opts.reduced ? 0 : Math.max(0, Math.min(1, value));
-    if (this.tunnel.setStrength(value)) this.drawTiles();
+    this.choreo = clamp01(value);
+    if (this.applyStrength()) this.drawTiles();
     this.renderTunnel();
   }
 
@@ -342,7 +358,11 @@ export class InfiniteCanvas {
     cancelAnimationFrame(this.raf);
   }
 
-  /** o mural congela enquanto o lightbox está aberto */
+  /** O mural congela enquanto o lightbox está aberto. A curvatura fica onde
+   *  está de propósito: o FLIP de abertura mede o ladrilho AGORA e o de
+   *  fechamento pousa nele de novo (o unfreeze só vem depois), então a parede
+   *  se desenrolando por baixo moveria o alvo dos dois. Ela volta a obedecer à
+   *  velocidade no primeiro frame depois do unfreeze. */
   freeze() {
     this.frozen = true;
     this.vel.x = this.vel.y = 0;
@@ -401,11 +421,13 @@ export class InfiniteCanvas {
 
     // a velocidade que o blur enxerga é a REAL do frame — cobre arrasto,
     // momentum, wheel e setas de uma vez, porque todos passam pelo offset
-    this.opts.onVelocity(
-      (this.offset.x - before.x) / dt,
-      (this.offset.y - before.y) / dt,
-      dt,
-    );
+    const vx = (this.offset.x - before.x) / dt;
+    const vy = (this.offset.y - before.y) / dt;
+    this.opts.onVelocity(vx, vy, dt);
+
+    // a MESMA velocidade enrola a parede. Blur e curvatura leem o mesmo número
+    // no mesmo frame, então o pan rápido chega como um efeito só.
+    const curved = this.driveTunnel(Math.hypot(vx, vy), dt);
 
     // a câmera continua tendo um dono só; a lente dos filhos é atualizada em
     // place(), abaixo, sem disputar esta string
@@ -414,7 +436,39 @@ export class InfiniteCanvas {
     // A lente depende da posição de tela, então qualquer movimento real precisa
     // redesenhar os cordéis. O custo continua sem leitura de layout; quando a
     // câmera assenta em zero, esta passada também para por inteiro.
-    if (this.offset.x !== this.placedAt.x || this.offset.y !== this.placedAt.y) this.place();
+    if (this.offset.x !== this.placedAt.x || this.offset.y !== this.placedAt.y) {
+      this.place();
+    } else if (curved) {
+      // A câmera parou mas a parede ainda está se desenrolando: a cauda lenta
+      // do release é movimento sem deslocamento, e sem este ramo ela congelaria
+      // no meio da volta, na curvatura do último frame que andou.
+      this.drawTiles();
+      this.renderTunnel();
+    }
+  }
+
+  /** A velocidade do pan vira curvatura (ver TUNNEL.REST e vizinhos). Devolve
+   *  se a lente mudou o bastante pra pedir redesenho. */
+  private driveTunnel(speed: number, dt: number): boolean {
+    if (this.opts.reduced) return false;
+
+    const target = Math.pow(Math.min(speed / TUNNEL.SPEED_FULL, 1), TUNNEL.SPEED_EXP);
+    // assimétrico: enrola no tempo da mão, desenrola devagar. O expoente em dt
+    // é o mesmo truque do damping da física — mesma sensação em 60 e 144Hz.
+    const rate = target > this.driveT ? TUNNEL.SPEED_ATTACK : TUNNEL.SPEED_RELEASE;
+    this.driveT += (target - this.driveT) * (1 - Math.pow(1 - rate, dt * 60));
+
+    this.drive = TUNNEL.REST + (1 - TUNNEL.REST) * this.driveT;
+    return this.applyStrength();
+  }
+
+  /** Recompõe o produto intenção × velocidade e o entrega às duas lentes (a
+   *  matrix3d do DOM e o shader). Devolve se a mudança valeu um redesenho — o
+   *  limiar é o da TunnelProjection, então DOM e canvas nunca discordam sobre
+   *  qual quadro é o atual. */
+  private applyStrength(): boolean {
+    this.tunnelStrength = this.opts.reduced ? 0 : this.choreo * this.drive;
+    return this.tunnel.setStrength(this.tunnelStrength);
   }
 
   /** A posição da câmera vira UM transform no container. Mora numa função

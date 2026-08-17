@@ -86,6 +86,28 @@ export const DRAG_FACTOR = 0.003;      // dx do arrasto → radianos de alvo
 export const MOMENTUM = 1.6;           // quanto a velocidade do arrasto "arremessa" ao soltar
 export const SNAP_DELAY = 140;         // ms de ociosidade antes de travar no segmento
 
+// --- o que separa um CLIQUE de um ARRASTO ---
+//
+// Folga, em px, entre o pointerdown e o pointerup. A do mouse pode ser apertada
+// (a seta só anda se a mão andar), mas o dedo NÃO pousa parado: a polpa rola
+// sobre o vidro entre encostar e levantar, e num toque comum isso dá facilmente
+// 10~15px. Com os 6px do mouse valendo pros dois, boa parte dos toques
+// legítimos era lida como arrasto — o anel dava um empurrãozinho e a seção não
+// abria, o que na mão vira "cliquei cinco vezes até pegar".
+export const CLICK_SLOP = 6;
+export const CLICK_SLOP_TOUCH = 16;
+
+// Raio, em px, da varredura extra ao redor do toque quando o raio central erra
+// a foto.
+//
+// Em retrato a câmera recua pro segmento caber na largura (ver BASE_ASPECT), e
+// o preço é a altura: a foto ativa vira uma faixa de ~20% da tela. O alvo fica
+// mais estreito justamente onde a mira é mais grossa — a área que o dedo cobre
+// é maior que a faixa que ele precisa acertar. A varredura devolve essa
+// diferença, e só pra toque: no mouse a mira é a ponta da seta, e ali qualquer
+// tolerância viraria clique fantasma ao lado da foto.
+export const CLICK_TOLERANCE_TOUCH = 18;
+
 // --- a fita (ver Ribbon.ts) ---
 // Anel e fita reta são a MESMA superfície com curvaturas diferentes, então não
 // existe "largura no modo reto" separada: tudo é comprimento de arco. O passo

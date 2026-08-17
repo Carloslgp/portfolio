@@ -1,5 +1,8 @@
 import gsap from 'gsap';
-import { SEG_ANGLE, SECTIONS, LERP, WHEEL_FACTOR, DRAG_FACTOR, MOMENTUM, SNAP_DELAY } from './config';
+import {
+  SEG_ANGLE, SECTIONS, LERP, WHEEL_FACTOR, DRAG_FACTOR, MOMENTUM, SNAP_DELAY,
+  CLICK_SLOP, CLICK_SLOP_TOUCH,
+} from './config';
 
 const N = SECTIONS.length;
 
@@ -14,6 +17,8 @@ export class Input {
   enabled = false;
   private dragging = false;
   private lastX = 0;
+  private downX = 0;              // onde o gesto encostou (pra distinguir clique de arrasto)
+  private slop = CLICK_SLOP;      // folga do ponteiro DESTE gesto (dedo ≠ mouse)
   private velocity = 0;          // média suavizada do delta de arrasto (pro arremesso)
   private snapTimer = 0;
   private lastTime = performance.now();
@@ -44,6 +49,8 @@ export class Input {
       if (!this.enabled || (e.pointerType === 'mouse' && e.button !== 0)) return;
       this.dragging = true;
       this.lastX = e.clientX;
+      this.downX = e.clientX;
+      this.slop = e.pointerType === 'touch' ? CLICK_SLOP_TOUCH : CLICK_SLOP;
       this.velocity = 0;
       clearTimeout(this.snapTimer);
       gsap.killTweensOf(this);          // pega o anel exatamente onde ele está
@@ -63,7 +70,16 @@ export class Input {
       if (!this.dragging) return;
       this.dragging = false;
       this.el.releasePointerCapture?.(e.pointerId);
-      this.target += this.velocity * MOMENTUM;          // arremesso proporcional à velocidade
+
+      // Gesto que não passou da folga foi CLIQUE, e clique não arremessa: o
+      // rolar da polpa do dedo entre encostar e levantar chega ao pointermove
+      // como velocidade, e o MOMENTUM a multiplicava — era o anel dando um
+      // tranco lateral no toque que o Carousel ia, no mesmo evento, aceitar
+      // como abertura de seção. O snap continua, e daqui ele é um no-op quando
+      // nada saiu do lugar.
+      if (Math.abs(e.clientX - this.downX) > this.slop) {
+        this.target += this.velocity * MOMENTUM;        // arremesso proporcional à velocidade
+      }
       this.snap();
     };
     el.addEventListener('pointerup', endDrag);

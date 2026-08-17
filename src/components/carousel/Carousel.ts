@@ -16,6 +16,7 @@ import {
 import {
   SECTIONS, RADIUS, HEIGHT, REFLECT, CAM, BASE_ASPECT, LABEL, SEG_ANGLE, SHATTER, ABOUT,
   DEPART, GPU, coarsePointer, THETA_LEN, ARC_WIDTH,
+  CLICK_SLOP, CLICK_SLOP_TOUCH, CLICK_TOLERANCE_TOUCH,
 } from './config';
 
 const ABOUT_INDEX = SECTIONS.findIndex((s) => s.id === 'about');
@@ -25,6 +26,10 @@ const TAU = Math.PI * 2;
 // passa de um extremo pro outro faz isso no ponto mais distante da câmera, e em
 // k=1 (anel) nem é um salto — é literalmente o mesmo ponto do círculo.
 const wrapAngle = (a: number) => a - TAU * Math.round(a / TAU);
+
+// Direções da varredura de tolerância do toque (ver pick). Vertical primeiro:
+// é o lado curto da foto na tela.
+const PICK_SWEEP = [[0, -1], [0, 1], [-1, 0], [1, 0]] as const;
 
 export class Carousel {
   private renderer!: THREE.WebGLRenderer;
@@ -62,6 +67,11 @@ export class Carousel {
   private ndc = new THREE.Vector2();
   private downX = 0;
   private downY = 0;
+  // Qual ponteiro abriu o gesto. Sem isto, um pointerup cujo pointerdown não
+  // passou por aqui (começou num botão da UI, ou é o segundo dedo de um
+  // pinçar) seria medido contra um downX velho — e uma distância inventada
+  // decide entre abrir uma seção e não fazer nada.
+  private downId: number | null = null;
   private canvas!: HTMLCanvasElement;
 
   // Último ponteiro visto, aguardando um raycast. Um mouse de 1000Hz dispara
@@ -181,6 +191,7 @@ export class Carousel {
 
     // --- clique na foto → navega pra seção; hover na foto → cursor pointer ---
     canvas.addEventListener('pointerdown', (e) => {
+      this.downId = e.pointerId;
       this.downX = e.clientX;
       this.downY = e.clientY;
     });
@@ -189,10 +200,21 @@ export class Carousel {
       this.hoverY = e.clientY;
       this.hoverPending = true;
     });
+    // gesto abortado pelo sistema (chamada chegando, gesto do SO): não houve
+    // pointerup, e o gesto seguinte não pode herdar este ponto de partida
+    canvas.addEventListener('pointercancel', () => { this.downId = null; });
     canvas.addEventListener('pointerup', (e) => {
-      // só conta como clique se quase não moveu (senão foi arrasto do carrossel)
-      if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) > 6) return;
-      const seg = this.pick(e.clientX, e.clientY);
+      const started = this.downId === e.pointerId;
+      this.downId = null;
+      if (!started) return;
+
+      // só conta como clique se quase não moveu (senão foi arrasto do
+      // carrossel) — e o "quase" do dedo é bem maior que o do mouse
+      const touch = e.pointerType === 'touch';
+      const slop = touch ? CLICK_SLOP_TOUCH : CLICK_SLOP;
+      if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) > slop) return;
+
+      const seg = this.pick(e.clientX, e.clientY, touch ? CLICK_TOLERANCE_TOUCH : 0);
       if (!seg) return;
       // quem decide o que abrir é o main.ts: a cena não conhece o DOM do About
       window.dispatchEvent(new CustomEvent('section:open', {
@@ -210,8 +232,24 @@ export class Carousel {
     this.renderer.render(this.scene, this.camera);    // aloca o alvo de transmissão
   }
 
+  // O que está sob o ponteiro, com uma folga opcional de `tol` px.
+  //
+  // A varredura só roda quando o raio central erra, e testa primeiro ACIMA e
+  // ABAIXO: é na vertical que a foto é estreita em retrato (ver
+  // CLICK_TOLERANCE_TOUCH), então é ali que o toque erra por pouco. Os quatro
+  // raios extras custam nada — isto roda uma vez por toque, não por frame.
+  private pick(clientX: number, clientY: number, tol = 0): Segment | null {
+    const hit = this.rayAt(clientX, clientY);
+    if (hit || !tol) return hit;
+    for (const [dx, dy] of PICK_SWEEP) {
+      const near = this.rayAt(clientX + dx * tol, clientY + dy * tol);
+      if (near) return near;
+    }
+    return null;
+  }
+
   // raycast do ponteiro contra os segmentos visíveis; retorna o Segment atingido
-  private pick(clientX: number, clientY: number): Segment | null {
+  private rayAt(clientX: number, clientY: number): Segment | null {
     this.ndc.set(
       (clientX / window.innerWidth) * 2 - 1,
       -(clientY / window.innerHeight) * 2 + 1,

@@ -75,6 +75,10 @@
      é isso que faz TODA cor derivada (bordas, cinzas de texto) virar do tema
      junto com a tinta principal, sem uma regra dark pra cada uma */
   --ink-rgb: 10, 10, 10;
+  /* o papel pelo mesmo motivo, pra quem precisa dele TRANSLÚCIDO — o halo do
+     rolador (components/LiquidScrollbar.astro) é o caso: ele separa o polegar
+     do que estiver embaixo, e por isso é sempre a cor oposta à da tinta */
+  --paper-rgb: 255, 255, 255;
   /* a palavra gigante (a .bg-portfolio da cortina E o Backdrop 3D via
      scripts/theme.ts) — quase-preto no claro, quase-branco no escuro */
   --word: #1a1a1a;
@@ -98,6 +102,7 @@ html[data-theme='dark'] {
   --ink: #f2f2f2;
   --paper: #0e0e10;
   --ink-rgb: 242, 242, 242;
+  --paper-rgb: 14, 14, 16;
   --word: #e4e4e4;
   /* no tema escuro, inverte: seleção branca com texto preto */
   --select-bg: #f2f2f2;

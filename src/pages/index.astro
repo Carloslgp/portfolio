@@ -62,6 +62,30 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     <link rel="prefetch" href="/photos" />
   </Fragment>
 
+  <!-- ——— o papel ———
+       O fundo da página como ELEMENTO, e não como o background do <body>
+       propagado pro viewport.
+
+       A diferença só aparece nesta tela, e o motivo é que aqui o body não tem
+       NADA no fluxo: canvas, HUD, overlay e os dois toggles são todos
+       `position: fixed`, e o About nasce `hidden`. Some a isso o Lenis, que põe
+       a classe `lenis` no <html> e com ela troca o `height: 100%` do global.css
+       por `height: auto` (a regra `html.lenis body` do lenis.css) — a caixa do
+       body passa a ter altura zero, ainda que a cor dela pinte a tela inteira
+       por propagação.
+
+       É essa combinação que quebrava a troca de tema no celular: o texto
+       repintava (cada um tem caixa própria), mas o fundo propagado de uma caixa
+       de 0px não era invalidado, e a cor nova só chegava quando algo devolvia
+       altura ao body — abrir o About — ou quando a navegação ia pra /photos,
+       que nunca dependeu da propagação: lá o papel é pintado pelo .mural, um
+       retângulo fixo de verdade.
+
+       Aqui é o mesmo remédio. O body segue com a mesma cor de propósito: ela
+       ainda é a que o navegador usa fora da página (overscroll, barra de
+       endereço via color-scheme). -->
+  <div class="paper" aria-hidden="true"></div>
+
   <!-- a palavra gigante do fundo NÃO mora mais aqui: virou geometria na cena
        (Backdrop.ts), pra pegar perspectiva e descer junto com a câmera.
        A classe .bg-portfolio continua viva porque a cortina ainda a usa. -->
@@ -318,6 +342,20 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
 </script>
 
 <style>
+  /* O fundo da página (ver o comentário no HTML, junto do elemento).
+     z-index 0: debaixo de tudo — canvas 1, luz 2, overlay 3, cantos 4,
+     About 5, cortina 10. A transição é a MESMA do body: os dois pintam a
+     mesma cor, e um atravessando em tempo diferente do outro apareceria na
+     beirada de uma rolagem com overscroll. */
+  .paper {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: var(--paper);
+    transition: background-color var(--theme-fade);
+    pointer-events: none;
+  }
+
   #scene {
     position: fixed;
     inset: 0;

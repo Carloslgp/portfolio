@@ -3,6 +3,7 @@
 import '../styles/global.css';
 import 'lenis/dist/lenis.css';
 import LiquidScrollbar from '../components/LiquidScrollbar.astro';
+import Analytics from '@vercel/analytics/astro';
 ---
 <html lang="pt-BR">
   <head>
@@ -39,5 +40,16 @@ import LiquidScrollbar from '../components/LiquidScrollbar.astro';
   <body>
     <slot />
     <LiquidScrollbar />
+    <!-- Contagem de visitas da Vercel. Fica no FIM do body, e não no head, por
+         dois motivos: o script é um módulo (portanto adiado de qualquer jeito) e
+         a home tem uma cena WebGL disputando a primeira meia dúzia de frames —
+         nada que não seja a cortina tem prioridade sobre ela.
+
+         Não há chave nenhuma pra guardar: em produção o próprio domínio serve o
+         script e recebe os eventos (/_vercel/insights/*), então isto é só um
+         elemento vazio que dispara um pageview. Em `astro dev` ele detecta o
+         modo de desenvolvimento sozinho e só escreve no console — nada é
+         contado a partir daqui. -->
+    <Analytics />
   </body>
 </html>

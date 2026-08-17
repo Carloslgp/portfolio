@@ -16,14 +16,18 @@ import { ARC_WIDTH, HEIGHT } from '../components/carousel/config';
 /** A foto da emenda, pelo nome do arquivo em src/assets/photos/.
  *
  *  `anjo.jpg` é a MESMA foto do segmento "Photos" do anel
- *  (public/textures/photos.jpg), com duas diferenças gravadas nos pixels: o
- *  EXIF já aplicado e o giro de 90° que o Segment.ts faz por conta própria em
- *  toda textura da fita (`texture.rotation = -π/2`). Sem esse giro assado aqui,
- *  a mesma foto apareceria em pé no anel e deitada no mural — e a emenda, que
- *  vive de os dois enquadramentos serem idênticos, viraria um tombo de 90°.
+ *  (public/textures/photos.jpg), com uma diferença gravada nos pixels: o giro
+ *  de 90° que o Segment.ts faz por conta própria em toda textura da fita
+ *  (`texture.rotation = -π/2`). Sem esse giro assado aqui, a mesma foto
+ *  apareceria em pé no anel e deitada no mural — e a emenda, que vive de os
+ *  dois enquadramentos serem idênticos, viraria um tombo de 90°.
  *
- *  Trocar a foto do anel pede regerar este arquivo (ver o README/histórico:
- *  sharp → .rotate() pro EXIF, depois .rotate(90)). */
+ *  (Eram duas diferenças: a textura do anel dependia do navegador aplicar o
+ *  EXIF, que este arquivo já trazia aplicado. Hoje as duas pontas têm o giro
+ *  nos pixels e nenhuma tem metadado — ver components/carousel/config.ts.)
+ *
+ *  Trocar a foto do anel pede regerar este arquivo: sharp → .rotate(90) sobre
+ *  a textura nova. */
 export const SEAM_PHOTO = 'anjo.jpg';
 
 /** A variante que o MURAL desenha. 800px é a medida das linhas justificadas

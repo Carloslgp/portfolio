@@ -30,12 +30,15 @@ const POLICY = [
     // As fotos do anel 3D.
     //
     // convert: false — elas continuam JPEG, e isso é uma decisão, não um
-    // esquecimento. São as únicas imagens do site com EXIF de orientação
-    // ATIVO e diferente entre si (8, 6, 3, 1 e nenhuma), e a cena conta com o
-    // navegador aplicando essa tag antes do giro fixo do Segment.ts. Convertê-
-    // las é possível — basta o .rotate() do convert() abaixo gravar o giro nos
-    // pixels — mas passa a exigir que a cena seja conferida foto a foto, então
-    // fica fora do automático.
+    // esquecimento. Convertê-las é possível, mas passa a exigir que a cena
+    // seja conferida foto a foto, então fica fora do automático.
+    //
+    // Elas eram as únicas imagens do site com EXIF de orientação ATIVO e
+    // diferente entre si, e a cena contava com o navegador aplicar essa tag
+    // antes do giro fixo do Segment.ts — até uma limpeza de metadados derrubar
+    // as tags e deitar três das cinco. O giro está gravado nos pixels desde
+    // então, e os arquivos aqui não têm mais EXIF: o .rotate() do convert()
+    // abaixo, no thumb, é um no-op nelas e é assim que tem que ser.
     //
     // O thumb, esse sim, sai daqui: é o círculo de 48px do card na base da
     // tela, que antes apontava pra textura inteira — 4000px de JPEG

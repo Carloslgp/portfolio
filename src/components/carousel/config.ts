@@ -6,13 +6,21 @@
 // textura e o navegador decodificava 4000px de JPEG pra desenhar 48 — a cada
 // troca de seção.
 //
-// A textura segue em .jpg de propósito. Estas cinco fotos são as únicas do site
-// com EXIF de orientação ativo, e cada uma tem a sua (8, 6, 3, 1 e nenhuma): o
-// navegador aplica essa tag ao decodificar, e só DEPOIS o giro fixo de -90° do
-// Segment.ts entra em cima. Uma conversão que descarte o EXIF sem gravar o giro
-// nos pixels deixa cada foto com uma correção diferente da que ela precisa — na
-// prática, deitadas e esticadas pela UV da fita. O thumb passa por isso ileso
-// porque é gerado com a rotação já gravada (ver scripts/optimize-images.mjs).
+// A textura segue em .jpg de propósito, e agora sem metadado nenhum.
+//
+// Estas cinco fotos eram as únicas do site com EXIF de orientação ATIVO, cada
+// uma com a sua (8, 6, 3, e duas sem giro), e a cena contava com o navegador
+// aplicar essa tag antes do giro fixo de -90° do Segment.ts. Isso deixava o
+// enquadramento pendurado num metadado: a limpeza de EXIF que passou por
+// public/ derrubou as tags e três fotos apareceram deitadas e esticadas pela UV
+// da fita (craft, about) ou de cabeça pra baixo (photos), porque cada uma
+// precisava de uma correção diferente e nenhuma chegava mais.
+//
+// O giro agora está GRAVADO NOS PIXELS — todas as cinco chegam em retrato, em
+// pé, e a única correção que a fita aplica é o -90° do Segment.ts, igual para
+// todas. Trocar qualquer uma destas fotos pede o mesmo: girar o arquivo antes
+// de largá-lo aqui (`sharp(src).rotate()` resolve, se a foto ainda tiver EXIF),
+// nunca confiar na tag.
 export const SECTIONS = [
   { id: 'work',   label: 'Work',   texture: '/textures/work.jpg',   thumb: '/textures/thumbs/work.webp' },
   { id: 'craft',  label: 'Craft',  texture: '/textures/craft.jpg',  thumb: '/textures/thumbs/craft.webp' },

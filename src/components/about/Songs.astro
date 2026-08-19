@@ -207,6 +207,22 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
       transparent 0, #000 9%, #000 91%, transparent 100%);
     /* o dedo na vertical continua rolando a PÁGINA; só o lateral é do carrossel */
     touch-action: pan-y;
+    /* ——— folga pra sombra terminar ———
+       O `overflow: hidden` acima existe pelas PONTAS, mas ele recorta os quatro
+       lados. A conta era exata e cruel: o palco cortava a 24px abaixo da capa e
+       a sombra da capa da frente alcança 24,5px (offset 22 + desfoque 45/2 −
+       espalhamento 20). Ela morria numa linha reta na borda do recorte, bem
+       onde a legenda começa — parecia que a palavra estava comendo a sombra.
+
+       Estes 2.5rem afastam o corte pra 64px, longe do alcance dela. O ar não
+       vira espaço em branco: a .songs-bar sobe de volta pela mesma medida (ver
+       o margin negativo lá embaixo), então o ritmo vertical do bloco fica
+       idêntico ao de antes e a sombra passa POR TRÁS da legenda, que é como o
+       reflexo do carrossel de jogos se comporta.
+
+       Não dá pra resolver com `overflow-x: hidden` sozinho: recortar um eixo
+       força o outro pra auto, e aí o palco ganharia barra de rolagem. */
+    padding-bottom: 2.5rem;
   }
 
   /* ——— o caminho sem JS ———
@@ -345,7 +361,16 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
     align-items: center;
     gap: 0.85rem;
     max-width: 42rem;
-    margin: 1rem auto 0;
+    /* O topo é NEGATIVO de propósito: ele desfaz os 2.5rem de respiro que o
+       palco ganhou pra sombra caber (ver lá em cima), devolvendo a legenda ao
+       mesmo lugar de antes. A conta: 2.5rem de folga − 1.5rem daqui = 1rem de
+       distância real até a borda do palco, que é o que sempre houve.
+
+       `position: relative` é o que garante a ORDEM: elemento posicionado pinta
+       acima de conteúdo estático, então a palavra fica na frente e a sombra
+       corre por trás dela. Sem isto, os dois disputam a mesma camada. */
+    position: relative;
+    margin: -1.5rem auto 0;
     padding: 0 1.5rem;
   }
   .songs-title {

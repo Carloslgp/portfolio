@@ -9,7 +9,9 @@
 //     que está de frente" em translate/rotate/opacity. Fica em JS, e não em
 //     classes de CSS, porque a lista tem tamanho variável: três hoje, sete
 //     amanhã, sem uma regra nova por posição;
-//   • o LOCK da rolagem ao abrir o modal (ver scripts/scroll.ts).
+//   • o LOCK da rolagem ao abrir o modal (ver scripts/scroll.ts);
+//   • o CICLO DE VIDA do player do YouTube — ele nasce quando o modal abre e
+//     morre quando o modal fecha.
 //
 // Sem JS nada disto roda, e o que fica na tela é a tira rolável que já estava
 // no documento — o mesmo caminho do carrossel de jogos.
@@ -24,8 +26,158 @@ const WHEEL_LOCK = 320;
 /** janela em que um `click` é entendido como eco do toque já tratado */
 const ECHO = 700;
 
+// ——————————————————————————————————————————————————————————————
+// o player
+// ——————————————————————————————————————————————————————————————
+//
+// A música toca INTEIRA, e por isso ela não é nossa: quem reproduz é o YouTube,
+// dentro do modal. Hospedar o arquivo aqui seria distribuir gravação alheia; o
+// embed é o caminho que a licença já cobre — e de quebra a barra de posição, o
+// volume e o teclado do player vêm prontos, em vez de um transporte nosso por
+// cima de um <audio>.
+//
+// TUDO é adiado até o primeiro modal abrir: o script do YouTube, o iframe, os
+// cookies. Uma página que ninguém abriu não pede nada a eles. O host é o
+// youtube-nocookie.com, que é o mesmo player sem o rastreio de quem só passou.
+//
+// E o player MORRE no fecho do modal. Não é limpeza cosmética: o <dialog>
+// fechado vira `display: none`, e um iframe escondido continua tocando — o som
+// seguiria pela página sem nada na tela pra pará-lo.
+
+/** só o que de fato usamos da API — melhor que puxar @types/youtube inteiro
+ *  como dependência pra três chamadas */
+type YTPlayer = { destroy(): void };
+type YTApi = {
+  Player: new (
+    host: HTMLElement,
+    opts: {
+      videoId: string;
+      host?: string;
+      playerVars?: Record<string, number>;
+      events?: { onError?: (e: { data: number }) => void };
+    },
+  ) => YTPlayer;
+};
+
+declare global {
+  interface Window {
+    YT?: YTApi;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let api: Promise<YTApi> | null = null;
+let player: YTPlayer | null = null;
+
+/** carrega o script do YouTube uma vez só, na primeira abertura */
+function loadApi(): Promise<YTApi> {
+  if (api) return api;
+
+  api = new Promise<YTApi>((resolve, reject) => {
+    // O callback é global e tem ESTE nome porque é o script deles que o chama,
+    // pelo nome, quando termina de carregar. Não há como pedir outro.
+    window.onYouTubeIframeAPIReady = () => resolve(window.YT!);
+
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    tag.onerror = () => reject(new Error('o script do YouTube não carregou'));
+    document.head.appendChild(tag);
+  });
+
+  return api;
+}
+
+// O player NASCE NO TOQUE do botão de cartaz, e não na abertura do modal.
+//
+// A razão está no comentário do Songs.astro, junto do botão: um iframe de outra
+// origem dentro do modal não recebe toque, e o play de dentro dele fica
+// inalcançável no celular. Aqui o primeiro toque é num <button> nosso, e o
+// player já nasce tocando — a pessoa nunca precisa acertar nada dentro do
+// iframe pra música começar.
+//
+// `autoplay: 1` é seguro justamente por isso: ele só entra em cena no gesto de
+// quem pediu, nunca na abertura do modal. Nada toca sozinho.
+async function tocar(frame: HTMLElement) {
+  const id = frame.dataset.songVideo;
+  const slot = frame.querySelector<HTMLElement>('.song-video-slot');
+  const botao = frame.querySelector<HTMLElement>('[data-song-play]');
+  if (!id || !slot || player) return;           // `player` já existe: um só por vez
+
+  let YT: YTApi;
+  try {
+    YT = await loadApi();
+  } catch (e) {
+    saidaDeEmergencia(frame, id);
+    return;
+  }
+
+  // o modal pode ter fechado enquanto o script vinha da rede — sem este teste o
+  // player nasceria num <dialog> já fechado e tocaria invisível
+  if (!frame.closest('dialog')?.open) return;
+
+  // O YT.Player SUBSTITUI pelo iframe o elemento que recebe. Por isso ele nunca
+  // recebe o slot, e sim um filho descartável: o slot precisa sobreviver pra
+  // próxima abertura.
+  const alvo = document.createElement('div');
+  slot.replaceChildren(alvo);
+  if (botao) botao.hidden = true;
+
+  player = new YT.Player(alvo, {
+    videoId: id,
+    host: 'https://www.youtube-nocookie.com',
+    // rel: 0 mantém as sugestões do fim dentro do mesmo canal; modestbranding
+    // tira o logo do canto
+    playerVars: { rel: 0, playsinline: 1, modestbranding: 1, autoplay: 1 },
+    events: {
+      // Erro 101/150 é o dono do vídeo proibindo o embed — e isso pode passar a
+      // valer DEPOIS de tudo conferido, sem aviso. Sem este tratamento o que
+      // sobra na tela é um retângulo cinza sem explicação nenhuma.
+      onError: () => saidaDeEmergencia(frame, id),
+    },
+  });
+}
+
+function fecharPlayer(dialog: HTMLDialogElement) {
+  player?.destroy();
+  player = null;
+
+  const frame = dialog.querySelector<HTMLElement>('[data-song-video]');
+  if (!frame) return;
+
+  // o slot volta vazio (o destroy() leva o iframe, mas um fallback deixado por
+  // saidaDeEmergencia continuaria ali) e o cartaz reaparece pra próxima vez
+  frame.querySelector('.song-video-slot')?.replaceChildren();
+  const botao = frame.querySelector<HTMLElement>('[data-song-play]');
+  if (botao) botao.hidden = false;
+}
+
+/** quando o embed não vai rolar, o link é melhor que um buraco cinza */
+function saidaDeEmergencia(frame: HTMLElement, id: string) {
+  const a = document.createElement('a');
+  a.className = 'song-video-out';
+  a.href = `https://www.youtube.com/watch?v=${id}`;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = 'Ouvir no YouTube ↗';
+
+  // no slot, e não na moldura inteira: o cartaz é irmão dele e sai pelo hidden,
+  // senão o link nasceria escondido atrás da capa
+  frame.querySelector('.song-video-slot')?.replaceChildren(a);
+  const botao = frame.querySelector<HTMLElement>('[data-song-play]');
+  if (botao) botao.hidden = true;
+}
+
 export function initSongs() {
   document.querySelectorAll<HTMLElement>('[data-songs]').forEach(mount);
+
+  // Delegado: o botão do cartaz vive dentro de cada <dialog>, que fica fora do
+  // carrossel, e o modal pode reabrir muitas vezes. Um handler no documento
+  // atende todos sem religar nada a cada abertura.
+  document.addEventListener('click', (e) => {
+    if (!(e.target instanceof Element)) return;
+    const frame = e.target.closest('[data-song-play]')?.closest<HTMLElement>('[data-song-video]');
+    if (frame) tocar(frame);
+  });
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -254,6 +406,7 @@ function bindModal(dialog: HTMLDialogElement) {
   // passa por handler nenhum nosso.
   dialog.addEventListener('close', () => {
     unlockScroll();
+    fecharPlayer(dialog);
     // o navegador costuma devolver o foco sozinho, mas não em todos — e um
     // foco perdido no <body> jogaria a próxima tecla Tab pro topo da página
     const back = dialog.dataset.opener;

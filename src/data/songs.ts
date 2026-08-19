@@ -14,6 +14,24 @@
 //   • o verso de cada uma → `line` é OPCIONAL: quando existe, sai em itálico no
 //                           alto do modal; quando não, o modal começa direto no
 //                           texto. Hoje nenhuma tem — é só acrescentar a linha.
+//   • tocar a música     → `youtube` é o id do vídeo: o `v=` da URL
+//                           (youtube.com/watch?v=fP8ElyrwtEc → 'fP8ElyrwtEc').
+//                           O player abre dentro do modal e toca a faixa
+//                           INTEIRA, com barra de posição — é o player do
+//                           YouTube, não um nosso.
+//
+//                           DUAS ARMADILHAS ao escolher o vídeo:
+//                           1. nem todo vídeo aceita ser embutido. O dono pode
+//                              proibir, e aí o player mostra erro 150 em vez da
+//                              música. Não dá pra saber pelo link — só rodando.
+//                           2. reupload de fã, versão ao vivo e vídeo com
+//                              introdução falada são fáceis de pegar por
+//                              engano na busca.
+//                           Por isso: preferir o canal do próprio artista (ou
+//                           o "<Artista> - Topic", que é da gravadora) e
+//                           conferir se a duração bate com a do disco.
+//                           Música sem `youtube` abre o modal normalmente, só
+//                           sem player.
 //
 // Uma música fora: apagar o objeto. Uma a mais: acrescentar. O contador da
 // legenda e as pontas do carrossel saem do tamanho da lista.
@@ -31,6 +49,9 @@ export type Song = {
   alt: string;
   /** o verso que fica na boca — sai em itálico no alto do modal. Opcional. */
   line?: string;
+  /** o id do vídeo no YouTube (o `v=` da URL). O player entra no modal e toca
+   *  a faixa inteira. Opcional: sem ele, o modal é só texto. */
+  youtube?: string;
   /** o texto sobre a música, um parágrafo por item */
   note: string[];
 };
@@ -42,6 +63,7 @@ export const SONGS: Song[] = [
     artist: 'EDEN',
     album: 'i think you think too much of me',
     year: 2016,
+    youtube: 'fP8ElyrwtEc',
     cover: '/images/about_albuns_photos/1.webp',
     alt: 'Cover of EDEN’s i think you think too much of me: the title typed over and over in grey until the letters break apart',
     note: [
@@ -53,8 +75,9 @@ export const SONGS: Song[] = [
     id: 'love-not-wrong',
     title: 'love; not wrong (brave)',
     artist: 'EDEN',
-    album: 'no future',
-    year: 2020,
+    album: 'vertigo',
+    year: 2018,
+    youtube: 'Zq-TCN3aQqM',
     cover: '/images/about_albuns_photos/2.webp',
     alt: 'Cover of EDEN’s vertigo: a pale blue sky with thin clouds and a small crescent moon',
     note: [
@@ -68,6 +91,7 @@ export const SONGS: Song[] = [
     artist: 'Syd Matters',
     album: 'Someday We Will Foresee Obstacles',
     year: 2005,
+    youtube: 'jb1SkDjaXk8',
     cover: '/images/about_albuns_photos/3.webp',
     alt: 'Cover of Syd Matters’ Someday We Will Foresee Obstacles: green and teal light with small comet-like streaks',
     note: [

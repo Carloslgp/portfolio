@@ -10,6 +10,12 @@
 // Sem JS, o que fica é a tira rolável de capas com título e artista à mostra —
 // o texto de cada música é o que se perde, porque <dialog> fechado não existe
 // na tela. É o único custo do bloco.
+//
+// O player do YouTube não nasce aqui: o que este arquivo escreve é uma div
+// vazia com o id do vídeo. Quem a preenche é o scripts/songs.ts, e só quando o
+// modal abre — assim nem o script do YouTube nem o iframe pesam numa página que
+// muita gente rola sem nunca abrir uma capa. É o mesmo trato do `preload="none"`
+// que o vídeo do shots.ts faz.
 import type { Song } from '../../data/songs';
 
 interface Props {
@@ -79,7 +85,26 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
 </figure>
 
 {items.map((song) => (
-  <dialog class="song-modal" id={`song-${song.id}`} aria-labelledby={`song-${song.id}-title`}>
+  /* data-lenis-prevent — sem isto NÃO SE ROLA o texto do modal com o dedo.
+
+     O lockScroll() PARA o Lenis quando o modal abre, e o Lenis parado não fica
+     quieto: ele cancela o touchmove que chega (lenis 1.3.25, o
+     `if (this.isStopped || this.isLocked) event.preventDefault()`). Medido:
+     sem o atributo o touchmove aqui dentro chega com defaultPrevented=true, e
+     arrastar pra ler um texto longo não faz nada.
+
+     Este atributo é a saída oficial do Lenis: ele varre o composedPath do
+     evento ANTES de cancelar e, se acha o atributo, sai de cena e deixa o
+     gesto ser nativo. No <dialog> ele cobre tudo que o modal vier a ter.
+
+     (O touchSTART não é cancelado — então não era isto que impedia o toque no
+     player do YouTube. Aquilo é outra coisa; ver o comentário da moldura.) */
+  <dialog
+    class="song-modal"
+    id={`song-${song.id}`}
+    aria-labelledby={`song-${song.id}-title`}
+    data-lenis-prevent
+  >
     {/* Todo o conteúdo mora neste filho, e é isso que faz o clique no fundo
         funcionar: só o backdrop chega ao <dialog> como alvo (ver songs.ts). */}
     <div class="song-modal-inner">
@@ -93,6 +118,40 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
           <p class="song-credit song-credit-dim">{song.album} · {song.year}</p>
         </div>
       </div>
+
+      {/* ——— por que existe um botão NOSSO em cima do player ———
+
+          Um iframe de outra origem dentro deste modal não recebe TOQUE. Medido
+          e isolado: o mesmo clique de mouse toca a música, e o mesmo toque no
+          mesmo ponto não faz nada — o evento é roteado pra dentro do iframe
+          (nada nosso o intercepta: no texto aqui do lado o touchstart chega
+          normal) e morre lá. É o roteamento do navegador, não código nosso, e
+          não temos como consertá-lo daqui.
+
+          O que dá pra fazer é não DEPENDER dele: o primeiro toque acontece
+          neste botão, que é DOM nosso, na nossa página, onde o toque
+          comprovadamente funciona. Ele cria o player já tocando, e a pessoa
+          nunca precisa acertar o play de dentro do iframe.
+
+          De brinde, isto é mais leve que antes: sem o toque, nem o iframe nem
+          o script do YouTube chegam a existir — a capa que serve de cartaz já
+          está baixada, é a mesma do carrossel. */}
+      {song.youtube && (
+        <div class="song-video" data-song-video={song.youtube}>
+          {/* o player nasce aqui dentro */}
+          <div class="song-video-slot"></div>
+
+          <button
+            type="button" class="song-video-start" data-song-play
+            aria-label={`Tocar ${song.title} no YouTube`}
+          >
+            <img src={song.cover} alt="" width="640" height="640" loading="lazy" />
+            <span class="song-video-glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z" /></svg>
+            </span>
+          </button>
+        </div>
+      )}
 
       {song.line && <p class="song-line">“{song.line}”</p>}
       {song.note.map((paragraph) => <p class="song-note">{paragraph}</p>)}
@@ -443,6 +502,138 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
     color: rgba(var(--ink-rgb), 0.38);
   }
 
+  /* ——— o player ———
+     A moldura é 16/9, mas com PISO: os termos do YouTube pedem no mínimo
+     200×200px e o player à vista, e na coluna estreita do celular o 16/9
+     sozinho cairia abaixo disso. O min-height segura o piso e o vídeo só ganha
+     tarja em cima e embaixo — nestas três faixas, que são áudio oficial com
+     capa parada, isso não se distingue do enquadramento normal.
+
+     O fundo cinza é o que se vê no instante entre abrir o modal e o iframe
+     aparecer; sem ele o lugar do player pisca em branco. */
+  .song-video {
+    position: relative;
+    /* `width` explícito, e não `auto`: com a largura indefinida o navegador
+       satisfaz a proporção pelo lado que quiser, e chegou a ESTICAR a caixa
+       além do modal. Fixada a largura, a proporção só decide a altura. */
+    width: 100%;
+    /* 16/9 EXATO, sem piso de altura. A tentação era um `min-height: 200px`
+       pro mínimo que o YouTube pede, mas uma caixa fora de 16/9 faz o player
+       deles desalinhar o próprio conteúdo — o botão de play sai do centro e o
+       título é cortado. Os pixels que faltavam no celular vieram da sangria
+       abaixo, que é honesta; o piso forçado só entregava um player torto. */
+    aspect-ratio: 16 / 9;
+    margin-bottom: 1.6rem;
+    background: rgba(var(--ink-rgb), 0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  /* ——— :global() nas duas regras abaixo, e é obrigatório ———
+     O iframe é criado em TEMPO DE EXECUÇÃO pela API do YouTube, e o link de
+     saída idem (ver saidaDeEmergencia em scripts/songs.ts). O Astro escopa o
+     CSS carimbando um data-astro-cid em tudo que ELE desenha e exigindo esse
+     atributo no seletor — o que nasce por JS não tem o carimbo, e a regra
+     escopada passa longe, calada.
+
+     O sintoma era bom de guardar: sem isto o iframe ficava no tamanho padrão
+     dele (640×360) dentro de uma moldura bem menor, e como a moldura tem
+     overflow: hidden o que aparecia era um PEDAÇO do player — o botão de play
+     fora do centro e o título cortado. Parecia defeito do YouTube. */
+  .song-video :global(iframe) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  /* ——— o cartaz: a capa e o botão de play nosso ———
+     Fica por cima do lugar do player e some quando ele nasce. A capa é a MESMA
+     do carrossel, então já está no cache — nenhum byte novo, e nada é pedido ao
+     YouTube antes de a pessoa querer. */
+  .song-video-slot {
+    position: absolute;
+    inset: 0;
+  }
+
+  .song-video-start {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+  .song-video-start[hidden] {
+    display: none;
+  }
+  /* a capa é quadrada e a moldura é 16/9: o corte é inevitável, e `cover`
+     escolhe cortar as bordas em vez de deformar a arte */
+  .song-video-start img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* escurecida pra a marca do play ler por cima de capa clara ou escura */
+    filter: brightness(0.62);
+    transition: filter 0.3s ease;
+  }
+  .song-video-start:hover img,
+  .song-video-start:focus-visible img {
+    filter: brightness(0.5);
+  }
+  .song-video-glyph {
+    position: relative;         /* acima da capa, sem precisar de z-index */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 999px;
+    transition: background 0.25s ease, transform 0.25s ease;
+  }
+  .song-video-start:hover .song-video-glyph {
+    background: rgba(0, 0, 0, 0.72);
+    transform: scale(1.06);
+  }
+  :global(html[data-motion='reduced']) .song-video-start .song-video-glyph {
+    transition: none;
+    transform: none;
+  }
+  .song-video-glyph svg {
+    width: 26px;
+    height: 26px;
+    margin-left: 3px;           /* o triângulo pesa pra esquerda; isto centra */
+    fill: #fff;
+  }
+
+  /* o que ocupa a moldura quando o embed é recusado (ver saidaDeEmergencia) */
+  .song-video :global(.song-video-out) {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(var(--ink-rgb), 0.62);
+    text-decoration: none;
+    transition: color var(--theme-fade);
+  }
+  .song-video :global(.song-video-out:hover) {
+    color: var(--ink);
+  }
+
   /* o verso: o único itálico serifado da página, e é ele que separa a citação
      do texto que vem depois — sem aspas desenhadas nem caixa em volta */
   .song-line {
@@ -482,6 +673,33 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
     }
     .song-ident h4 {
       font-size: 1.25rem;
+    }
+
+    /* A caixa toda encosta mais na borda da tela, e isso é pelo vídeo: 1rem de
+       margem de cada lado, menos a barra de rolagem do miolo, deixava o player
+       3px abaixo dos 200px do YouTube. Meio rem devolve a folga — e num
+       aparelho estreito um modal quase da largura da tela é o normal, não uma
+       concessão. */
+    .song-modal {
+      width: calc(100vw - 1rem);
+      /* O `max-width` é obrigatório aqui, e não é zelo: a folha do NAVEGADOR dá
+         a todo <dialog> um teto de `calc(100% - 6px - 2em)` — 352px numa tela
+         de 390 — e ele engolia a largura pedida acima sem deixar rastro. É o
+         mesmo tipo de armadilha do `margin: auto` lá em cima: regra de agente
+         de usuário que só aparece quando se mede a caixa. */
+      max-width: none;
+    }
+
+    /* ——— o vídeo sangra até as bordas do modal ———
+       Na coluna estreita, os 1.5rem de recuo de cada lado custam 48px de
+       largura — e largura, num 16/9, é altura. Devolvê-los tira o player de
+       ~170px e o põe em ~200px num aparelho de 390px, que é o mínimo que o
+       YouTube pede. O raio some junto: encostado na borda, canto arredondado
+       vira falha de encaixe, não acabamento. */
+    .song-video {
+      width: calc(100% + 3rem);
+      margin-inline: -1.5rem;
+      border-radius: 0;
     }
   }
 </style>

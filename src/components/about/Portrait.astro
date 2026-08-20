@@ -1,0 +1,251 @@
+---
+type PortraitIndex = 0 | 1 | 2 | 3 | 4;
+
+interface Props {
+  index: PortraitIndex;
+  side?: 'left' | 'right';
+  mode?: 'desktop' | 'collage';
+}
+
+const portraits = [
+  {
+    src: '/images/about/Me/Me1.webp',
+    alt: 'Mirror self-portrait of Carlos Leonardo wearing a light jacket',
+    width: 563,
+    height: 1000,
+    position: '50% 34%',
+    tilt: '-5deg',
+    driftTime: '7.6s',
+    driftDelay: '-1.8s',
+  },
+  {
+    src: '/images/about/Me/Me2.webp',
+    alt: 'Mirror self-portrait of Carlos Leonardo wearing a light suit',
+    width: 630,
+    height: 1000,
+    position: '50% 44%',
+    tilt: '4deg',
+    driftTime: '8.4s',
+    driftDelay: '-4.1s',
+  },
+  {
+    src: '/images/about/Me/Me3.webp',
+    alt: 'Black-and-white mirror self-portrait of Carlos Leonardo in sunglasses',
+    width: 906,
+    height: 1000,
+    position: '50% 50%',
+    tilt: '3deg',
+    driftTime: '8s',
+    driftDelay: '-5.6s',
+  },
+  {
+    src: '/images/about/Me/Me4.webp',
+    alt: 'Mirror self-portrait of Carlos Leonardo smiling',
+    width: 563,
+    height: 1000,
+    position: '50% 58%',
+    tilt: '-4deg',
+    driftTime: '7.2s',
+    driftDelay: '-3.2s',
+  },
+  {
+    src: '/images/about/Me/Me5.webp',
+    alt: 'Carlos Leonardo in front of a waterfall surrounded by forest',
+    width: 1000,
+    height: 1000,
+    position: '50% 50%',
+    tilt: '5deg',
+    driftTime: '8.2s',
+    driftDelay: '-2.7s',
+  },
+] as const;
+
+const { index, side = 'left', mode = 'desktop' } = Astro.props;
+const portrait = portraits[index];
+const hoverAxis = side === 'right' ? 1 : -1;
+---
+
+<figure
+  class:list={['portrait', `portrait-${index + 1}`, `is-${side}`, `is-${mode}`]}
+  style={`--portrait-position:${portrait.position};--tilt:${portrait.tilt};--hover-axis:${hoverAxis};--drift-time:${portrait.driftTime};--drift-delay:${portrait.driftDelay}`}
+>
+  <div class="portrait-frame">
+    <img
+      src={portrait.src}
+      alt={portrait.alt}
+      width={portrait.width}
+      height={portrait.height}
+      loading="lazy"
+      decoding="async"
+    />
+  </div>
+</figure>
+
+<style>
+  .portrait {
+    aspect-ratio: 4 / 5;
+    margin: 0;
+    transform: rotate(var(--tilt));
+  }
+  .portrait.is-desktop {
+    display: none;
+  }
+
+  /* Na colagem mobile cada foto é uma célula normal da grade. Nada absoluto:
+     a altura real dos quatro cartões passa a fazer parte do fluxo da página. */
+  .portrait.is-collage {
+    position: relative;
+    width: 100%;
+  }
+  .portrait.is-collage .portrait-frame {
+    box-shadow: 0 0.7rem 1.8rem rgba(0, 0, 0, 0.14);
+  }
+
+  .portrait-frame {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid rgba(var(--ink-rgb), 0.16);
+    border-radius: 2px;
+    background: var(--paper);
+    box-shadow: 0 1rem 2.8rem rgba(0, 0, 0, 0.16);
+    transform: translateZ(0);
+    transition:
+      transform 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color var(--theme-fade),
+      background-color var(--theme-fade);
+  }
+
+  .portrait-frame::after {
+    content: '';
+    position: absolute;
+    inset: -35%;
+    z-index: 1;
+    background: linear-gradient(
+      112deg,
+      transparent 35%,
+      rgba(255, 255, 255, 0.34) 49%,
+      transparent 63%
+    );
+    transform: translateX(-85%);
+    transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+  }
+
+  .portrait img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: cover;
+    object-position: var(--portrait-position);
+    transform: scale(1.01);
+    filter: saturate(0.94) contrast(1.01);
+    transition:
+      transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+      filter 0.55s ease;
+  }
+
+  /* Em tela larga o retrato sai da coluna, mas continua ancorado à seção em
+     que foi declarado. Assim cada foto acompanha um ponto diferente da página. */
+  @media (min-width: 68rem) {
+    .portrait.is-desktop {
+      display: block;
+      position: absolute;
+      top: 50%;
+      z-index: 1;
+      width: clamp(11.5rem, 16vw, 15.5rem);
+      margin: 0;
+      animation: portrait-drift var(--drift-time) ease-in-out
+        var(--drift-delay) infinite;
+      will-change: transform;
+      pointer-events: auto;
+    }
+    .portrait.is-desktop.is-left {
+      left: calc(21.5rem - 50vw);
+    }
+    .portrait.is-desktop.is-right {
+      right: calc(21.5rem - 50vw);
+      margin-left: 0;
+    }
+  }
+
+  @media (min-width: 68rem) and (hover: hover) and (pointer: fine) {
+    .portrait:hover {
+      z-index: 10;
+    }
+    .portrait:hover .portrait-frame {
+      transform: translateY(-0.8rem) scale(1.08)
+        rotate3d(1, var(--hover-axis), 0, 3deg);
+      border-color: rgba(var(--ink-rgb), 0.34);
+      box-shadow: 0 2rem 4.5rem rgba(0, 0, 0, 0.25);
+    }
+    .portrait:hover .portrait-frame::after {
+      transform: translateX(85%);
+    }
+    .portrait:hover img {
+      transform: scale(1.075);
+      filter: saturate(1.08) contrast(1.04);
+    }
+  }
+
+  @keyframes portrait-drift {
+    0%, 100% {
+      transform: translate3d(0, calc(-50% - 6px), 0) rotate(var(--tilt));
+    }
+    50% {
+      transform: translate3d(0, calc(-50% + 6px), 0)
+        rotate(calc(var(--tilt) + 0.5deg));
+    }
+  }
+
+  :global(html[data-motion='reduced']) .portrait {
+    animation: none;
+    will-change: auto;
+  }
+  :global(html[data-motion='reduced']) .portrait-frame,
+  :global(html[data-motion='reduced']) .portrait-frame::after,
+  :global(html[data-motion='reduced']) .portrait img {
+    transition: none;
+  }
+  :global(html[data-motion='reduced']) .portrait:hover .portrait-frame,
+  :global(html[data-motion='reduced']) .portrait:hover img {
+    transform: none;
+  }
+  :global(html[data-motion='reduced']) .portrait:hover .portrait-frame::after {
+    transform: translateX(-85%);
+  }
+
+  @media (min-width: 68rem) {
+    :global(html[data-motion='reduced']) .portrait {
+      transform: translateY(-50%) rotate(var(--tilt));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .portrait {
+      animation: none;
+      will-change: auto;
+    }
+    .portrait-frame,
+    .portrait-frame::after,
+    .portrait img {
+      transition: none;
+    }
+    .portrait:hover .portrait-frame,
+    .portrait:hover img {
+      transform: none;
+    }
+    .portrait:hover .portrait-frame::after {
+      transform: translateX(-85%);
+    }
+  }
+
+  @media (min-width: 68rem) and (prefers-reduced-motion: reduce) {
+    .portrait {
+      transform: translateY(-50%) rotate(var(--tilt));
+    }
+  }
+</style>

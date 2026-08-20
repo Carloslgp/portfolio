@@ -9,6 +9,8 @@ import { SEAM_ASPECT, SEAM_PHOTO, FULL } from '../data/gallery';
 // de desenhar cada tipo de bloco — nenhuma frase da página passa por este
 // arquivo, então editar o conteúdo é sempre lá.
 import { LEAD, TOPICS, isPhoto, isCarousel, isSongs } from '../data/about';
+import Portrait from '../components/about/Portrait.astro';
+import PortraitCollage from '../components/about/PortraitCollage.astro';
 import Reel from '../components/about/Reel.astro';
 import Songs from '../components/about/Songs.astro';
 
@@ -200,8 +202,14 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
 
       <div class="about-inner">
         <header class="about-head">
-          <h2>About</h2>
-          <p class="lead">{LEAD}</p>
+          <div class="about-copy">
+            <h2>About</h2>
+            <p class="lead">{LEAD}</p>
+          </div>
+
+          <PortraitCollage />
+          <Portrait index={0} side="left" mode="desktop" />
+          <Portrait index={4} side="right" mode="desktop" />
         </header>
 
         <!-- Um <section> por tópico, na ordem de TOPICS. Cada bloco é um
@@ -257,6 +265,10 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
                   {isSongs(block) && <Songs title={block.songs} items={block.items} />}
                 </Fragment>
               ))}
+
+              {topic.id === 'play' && <Portrait index={1} side="right" mode="desktop" />}
+              {topic.id === 'art' && <Portrait index={2} side="left" mode="desktop" />}
+              {topic.id === 'closing' && <Portrait index={3} side="right" mode="desktop" />}
             </section>
           ))}
         </div>
@@ -1078,6 +1090,24 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     padding: 4rem 1.5rem 6rem;
   }
 
+  .about-head {
+    position: relative;
+  }
+  .about-copy {
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Em tela larga o cabeçalho ganha altura para as fotos realmente cercarem
+     a apresentação. A coluna de leitura não muda; só o espaço ao redor dela. */
+  @media (min-width: 68rem) {
+    .about-head {
+      min-height: clamp(26rem, 48svh, 32rem);
+      display: grid;
+      align-items: center;
+    }
+  }
+
   .about h2 {
     font-family: "Playfair Display", Georgia, serif;
     font-weight: 600;
@@ -1112,6 +1142,9 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      caixa — o título já é a fronteira. */
   .topic + .topic {
     margin-top: 3.5rem;
+  }
+  .topic {
+    position: relative;
   }
   .topic h3 {
     /* mais discreto que os títulos de fora (Stack, Let's talk): estes são

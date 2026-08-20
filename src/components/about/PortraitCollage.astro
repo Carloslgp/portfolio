@@ -1,0 +1,33 @@
+---
+import Portrait from './Portrait.astro';
+---
+
+<!-- No mobile os retratos formam uma grade única logo depois da apresentação.
+     No desktop este bloco nem participa do layout: as quatro instâncias
+     ancoradas aos tópicos em index.astro assumem o lugar. -->
+<div class="portrait-collage">
+  <Portrait index={0} side="left" mode="collage" />
+  <Portrait index={1} side="right" mode="collage" />
+  <Portrait index={2} side="left" mode="collage" />
+  <Portrait index={3} side="right" mode="collage" />
+</div>
+
+<style>
+  .portrait-collage {
+    position: relative;
+    width: min(100%, 22rem);
+    margin: 1.75rem auto 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+    align-items: start;
+    isolation: isolate;
+    pointer-events: none;
+  }
+
+  @media (min-width: 68rem) {
+    .portrait-collage {
+      display: none;
+    }
+  }
+</style>

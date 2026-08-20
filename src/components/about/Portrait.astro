@@ -83,6 +83,13 @@ const hoverAxis = side === 'right' ? 1 : -1;
 
 <style>
   .portrait {
+    /* Onde o ponteiro está DENTRO da foto, em -1..1 a partir do centro — quem
+       escreve é portraits.ts, e em repouso (ou sem JS) o valor é o centro, o
+       que zera toda a conta de rotação abaixo. */
+    --mx: 0;
+    --my: 0;
+    --gx: 50%;
+    --gy: 50%;
     aspect-ratio: 4 / 5;
     margin: 0;
     transform: rotate(var(--tilt));
@@ -112,7 +119,7 @@ const hoverAxis = side === 'right' ? 1 : -1;
     box-shadow: 0 1rem 2.8rem rgba(0, 0, 0, 0.16);
     transform: translateZ(0);
     transition:
-      transform 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+      transform var(--tilt-ease, 0.55s) cubic-bezier(0.16, 1, 0.3, 1),
       box-shadow 0.55s cubic-bezier(0.16, 1, 0.3, 1),
       border-color var(--theme-fade),
       background-color var(--theme-fade);
@@ -134,6 +141,24 @@ const hoverAxis = side === 'right' ? 1 : -1;
     pointer-events: none;
   }
 
+  /* O reflexo que acompanha o ponteiro. É ele que faz a inclinação ler como um
+     plano 3D, e não como um esticar da imagem: a luz bate onde o dedo está. */
+  .portrait-frame::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: radial-gradient(
+      42% 42% at var(--gx) var(--gy),
+      rgba(255, 255, 255, 0.26),
+      rgba(255, 255, 255, 0.06) 55%,
+      transparent 78%
+    );
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+  }
+
   .portrait img {
     display: block;
     width: 100%;
@@ -144,7 +169,7 @@ const hoverAxis = side === 'right' ? 1 : -1;
     transform: scale(1.01);
     filter: saturate(0.94) contrast(1.01);
     transition:
-      transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+      transform var(--tilt-ease, 0.75s) cubic-bezier(0.16, 1, 0.3, 1),
       filter 0.55s ease;
   }
 
@@ -173,6 +198,11 @@ const hoverAxis = side === 'right' ? 1 : -1;
   }
 
   @media (min-width: 68rem) and (hover: hover) and (pointer: fine) {
+    /* A profundidade mora na figure, pai do quadro: sem ela o rotateX/rotateY
+       do rastreio seria uma deformação plana, sem canto que se afasta. */
+    .portrait {
+      perspective: 62rem;
+    }
     .portrait:hover {
       z-index: 10;
     }
@@ -187,6 +217,40 @@ const hoverAxis = side === 'right' ? 1 : -1;
     }
     .portrait:hover img {
       transform: scale(1.075);
+      filter: saturate(1.08) contrast(1.04);
+    }
+
+    /* ——— com o ponteiro DENTRO da foto ———
+       Vem depois do :hover de propósito: mesma especificidade, ganha a última.
+       O hover acima continua sendo o que quem não tem JS (ou tem baixa
+       animação) recebe — a inclinação fixa de sempre. Aqui ela deixa de ser um
+       estado e vira função da posição: o canto apontado cede pra trás, o oposto
+       avança, e a foto por dentro anda um fio no sentido contrário — o
+       paralaxe que separa a imagem do vidro do quadro.
+       Só reage enquanto o ponteiro está dentro: a classe nasce no
+       pointerenter e morre no pointerleave (ver portraits.ts). */
+    .portrait.is-tilting {
+      --tilt-ease: 0.18s;
+      z-index: 10;
+    }
+    .portrait.is-tilting .portrait-frame {
+      transform: translate3d(
+          calc(var(--mx) * 0.45rem),
+          calc(var(--my) * 0.35rem - 0.8rem),
+          0
+        )
+        rotateX(calc(var(--my) * -8deg))
+        rotateY(calc(var(--mx) * 10deg))
+        scale(1.08);
+      border-color: rgba(var(--ink-rgb), 0.34);
+      box-shadow: 0 2rem 4.5rem rgba(0, 0, 0, 0.25);
+    }
+    .portrait.is-tilting .portrait-frame::before {
+      opacity: 1;
+    }
+    .portrait.is-tilting img {
+      transform: translate3d(calc(var(--mx) * -1.4%), calc(var(--my) * -1.4%), 0)
+        scale(1.075);
       filter: saturate(1.08) contrast(1.04);
     }
   }
@@ -207,12 +271,18 @@ const hoverAxis = side === 'right' ? 1 : -1;
   }
   :global(html[data-motion='reduced']) .portrait-frame,
   :global(html[data-motion='reduced']) .portrait-frame::after,
+  :global(html[data-motion='reduced']) .portrait-frame::before,
   :global(html[data-motion='reduced']) .portrait img {
     transition: none;
   }
   :global(html[data-motion='reduced']) .portrait:hover .portrait-frame,
-  :global(html[data-motion='reduced']) .portrait:hover img {
+  :global(html[data-motion='reduced']) .portrait.is-tilting .portrait-frame,
+  :global(html[data-motion='reduced']) .portrait:hover img,
+  :global(html[data-motion='reduced']) .portrait.is-tilting img {
     transform: none;
+  }
+  :global(html[data-motion='reduced']) .portrait.is-tilting .portrait-frame::before {
+    opacity: 0;
   }
   :global(html[data-motion='reduced']) .portrait:hover .portrait-frame::after {
     transform: translateX(-85%);
@@ -231,15 +301,21 @@ const hoverAxis = side === 'right' ? 1 : -1;
     }
     .portrait-frame,
     .portrait-frame::after,
+    .portrait-frame::before,
     .portrait img {
       transition: none;
     }
     .portrait:hover .portrait-frame,
-    .portrait:hover img {
+    .portrait.is-tilting .portrait-frame,
+    .portrait:hover img,
+    .portrait.is-tilting img {
       transform: none;
     }
     .portrait:hover .portrait-frame::after {
       transform: translateX(-85%);
+    }
+    .portrait.is-tilting .portrait-frame::before {
+      opacity: 0;
     }
   }
 
@@ -249,3 +325,8 @@ const hoverAxis = side === 'right' ? 1 : -1;
     }
   }
 </style>
+
+<script>
+  import { initPortraitTilt } from '../../scripts/portraits';
+  initPortraitTilt();
+</script>

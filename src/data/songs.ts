@@ -58,6 +58,45 @@ export type Song = {
 
 export const SONGS: Song[] = [
   {
+    id: 'rock-roll',
+    title: 'rock + roll',
+    artist: 'EDEN',
+    album: 'i think you think too much of me',
+    year: 2016,
+    // o canal do próprio EDEN. É o vídeo oficial, e não um "official audio":
+    // ele tem 5:13 contra os 4:56 do disco — a diferença é a abertura falada
+    // (o diálogo de Lost in Translation que a faixa já cita), não outra versão.
+    youtube: 'geZ_5Ri7ANg',
+    // a MESMA capa de 'circles', de propósito: é o mesmo disco. Duas capas
+    // iguais na fila é o preço de não inventar arte que a gravadora não fez —
+    // e ficam a duas posições de distância, com 'End Credits' entre elas.
+    cover: '/images/about_albuns_photos/1.webp',
+    alt: 'Cover of EDEN’s i think you think too much of me: the title typed over and over in grey until the letters break apart',
+    // TODO(Carlos): texto seu. Isto é só marcação de lugar — está em PT-BR pra
+    // não passar batido num deploy: o resto da página é tudo em inglês.
+    note: [
+      'RASCUNHO: o primeiro parágrafo desta música.',
+      'RASCUNHO: e o segundo, se ela pedir dois — o modal aceita quantos forem.',
+    ],
+  },
+  {
+    id: 'end-credits',
+    title: 'End Credits',
+    artist: 'EDEN',
+    album: 'End Credits',
+    year: 2015,
+    // "EDEN - Topic" é o canal da gravadora, e os 4:00 batem com o do EP — os
+    // uploads mais achados desta (MrSuicideSheep, Aminium) são de terceiros.
+    youtube: 'Y34BhEOqzRY',
+    cover: '/images/about_albuns_photos/4.webp',
+    alt: 'Cover of EDEN’s End Credits: an empty small-town street under a pale sky, shot through a faded film border, with EDEN and END CREDITS printed over it',
+    // TODO(Carlos): idem — texto seu.
+    note: [
+      'RASCUNHO: o primeiro parágrafo desta música.',
+      'RASCUNHO: e o segundo, se ela pedir dois — o modal aceita quantos forem.',
+    ],
+  },
+  {
     id: 'circles',
     title: 'circles',
     artist: 'EDEN',

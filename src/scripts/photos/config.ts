@@ -35,16 +35,56 @@ export const MURAL = {
 
   /** o tile precisa de pelo menos tantas fotos pra repetição não gritar: com
    *  poucas fotos na pasta, a lista é repetida (embaralhada por semente a cada
-   *  repetição) até passar deste mínimo. Com fotos suficientes, vale 1x. */
-  TILE_MIN_PHOTOS: 24,
+   *  repetição) até passar deste mínimo. Com fotos suficientes, vale 1x.
+   *
+   *  O que este número compra NÃO é foto nova na tela — quantas cabem por tela
+   *  é a pasta que decide. É o tamanho do PADRÃO: com uma repetição só, o
+   *  arranjo inteiro voltava a cada ~2,6 telas de caminhada, e um mural que se
+   *  repete tão perto deixa de parecer um mural infinito. */
+  TILE_MIN_PHOTOS: 160,
 
   /** semente do embaralhamento determinístico — mesmo build, mesmo mural */
   SEED: 7,
 
   /** a mesma foto não pode reaparecer a menos de tantas posições na sequência
    *  do tile: é o que impede a fronteira entre duas repetições embaralhadas de
-   *  colar a foto do lado (ou quase do lado) dela mesma numa linha */
-  REPEAT_WINDOW: 2,
+   *  colar a foto do lado (ou quase do lado) dela mesma numa linha.
+   *
+   *  Uma linha tem ~13 fotos, então a janela cobre a linha inteira e sobra:
+   *  duas cópias nunca caem na mesma linha. Isto é só a primeira defesa, em
+   *  UMA dimensão — quem cuida da distância de verdade, no plano, é o
+   *  espalhamento abaixo. */
+  REPEAT_WINDOW: 16,
+
+  /** ——— espalhamento em 2D (layout.ts) ———
+   *
+   *  A janela acima conta POSIÇÕES na sequência, e a sequência é uma fita: ela
+   *  não sabe que a posição 20 pode cair exatamente embaixo da posição 4. O
+   *  empacotamento é refeito algumas vezes, medindo a distância real entre as
+   *  cópias no plano (com o ladrilhamento e o meio tile das colunas ímpares
+   *  inclusos) e sorteando outro lugar pra quem ficou perto demais.
+   *
+   *  A distância mínima é medida em ALTURAS DE LINHA e não em px, pra régua
+   *  acompanhar o tamanho que as fotos têm naquela tela. */
+  /**  A distância é medida em ALTURAS DE LINHA, não em px, pra régua acompanhar
+   *  o tamanho que as fotos têm naquela tela. Seis é uma MIRA, e uma que não se
+   *  alcança: com esta pasta o melhor arranjo achado põe as cópias a ~4 alturas
+   *  uma da outra. Isso é de propósito — como ninguém chega no alvo, o custo
+   *  continua empurrando todo mundo pra longe até o fim das passadas, em vez de
+   *  parar assim que o último par cruza uma linha arbitrária. */
+  MIN_COPY_DIST: 6,
+
+  /** Teto de passadas. Custa ~60ms no desktop e a busca estaciona por volta
+   *  daqui: 1500 passadas devolvem exatamente o mesmo mural que 800. */
+  SPREAD_PASSES: 800,
+
+  /** quantas TELAS de largura tem o tile.
+   *
+   *  Ele nascia com a largura EXATA do viewport, que é o pior valor possível:
+   *  cada foto tinha uma cópia a exatamente uma tela de distância, e andar de
+   *  lado devolvia o mural inteiro igualzinho. Mais largo que a tela, a volta
+   *  não fecha em lugar nenhum que a pessoa consiga reconhecer. */
+  TILE_W_SCREENS: 1.6,
 
   /** largura mínima do tile, em px. O tile nasce com a largura do viewport,
    *  mas nunca menor que isto: num celular estreito um tile da largura da
@@ -380,6 +420,9 @@ export const LIGHTBOX = {
   CLOSE_EASE: 'power2.inOut',
   /** crossfade da troca de foto pelas setas, em s */
   SWAP_DUR: 0.22,
+  /** o quarto de volta do botão de girar, em s */
+  ROTATE_DUR: 0.32,
+  ROTATE_EASE: 'power2.inOut',
   /** fração do viewport que a foto ampliada pode ocupar */
   MAX_W: 0.92,
   MAX_H: 0.88,

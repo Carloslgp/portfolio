@@ -180,6 +180,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   <dialog class="lightbox" data-lightbox aria-label="Foto ampliada">
     <div class="lightbox-inner">
       <button type="button" class="lightbox-close" data-lightbox-close aria-label="Fechar">×</button>
+      <button type="button" class="lightbox-rotate" data-lightbox-rotate aria-label="Girar 90°">⟳</button>
 
       <figure class="lightbox-figure" data-lightbox-figure>
         <img data-lightbox-img alt="" />
@@ -502,8 +503,19 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   }
   .lightbox-figure img {
     display: block;
-    width: 100%;
-    height: 100%;
+    /* absoluta e ancorada no centro da figura: a medida (sem giro) e o
+       -50%/-50% entram inline, pelo lightbox.ts, porque são a mesma matriz que
+       o botão de girar anima. A figura é o bounding box do que se vê; a
+       imagem, o retângulo de verdade girando dentro dele. */
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    /* o preflight do Tailwind manda `img { max-width: 100% }`, e deitada a
+       imagem é MAIS LARGA que a figura por definição — o que era altura virou
+       largura. Sem soltar o teto aqui, ela era espremida na caixa da figura e
+       o object-fit ainda a encolhia de novo dentro dessa caixa errada. */
+    max-width: none;
+    max-height: none;
     object-fit: contain;
   }
 
@@ -533,6 +545,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   }
 
   .lightbox-close,
+  .lightbox-rotate,
   .lightbox-nav {
     position: fixed;
     z-index: 2;
@@ -551,10 +564,12 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
     transition: background 0.2s ease;
   }
   .lightbox-close:hover,
+  .lightbox-rotate:hover,
   .lightbox-nav:hover {
     background: rgba(255, 255, 255, 0.26);
   }
   .lightbox-close:focus-visible,
+  .lightbox-rotate:focus-visible,
   .lightbox-nav:focus-visible {
     outline: 2px solid #fff;
     outline-offset: 2px;
@@ -562,6 +577,12 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   .lightbox-close {
     top: 1.5rem;
     right: 1.5rem;
+  }
+  /* à esquerda do X, na mesma fileira: 44px de pastilha + o vão entre elas */
+  .lightbox-rotate {
+    top: 1.5rem;
+    right: calc(1.5rem + 44px + 0.6rem);
+    font-size: 1.15rem;
   }
   .lightbox-nav {
     top: 50%;

@@ -154,7 +154,8 @@ export function initMural() {
     exit = null;
   });
 
-  const tileWidth = () => Math.max(window.innerWidth, MURAL.MIN_TILE_W);
+  const tileWidth = () =>
+    Math.round(Math.max(window.innerWidth * MURAL.TILE_W_SCREENS, MURAL.MIN_TILE_W));
   // A largura do TILE e a altura da LINHA vêm de lugares diferentes de
   // propósito: o tile é largo pra repetição não gritar, e a linha é fração da
   // TELA pra um celular ver um MURAL, e não uma foto por vez (ver layout.ts).

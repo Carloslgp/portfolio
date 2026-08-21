@@ -38,6 +38,14 @@ export class Lightbox {
   /** ids cuja versão grande já foi pedida — o navegador guarda os bytes, aqui
    *  só se guarda a lembrança de já ter pedido (ver warmNeighbours) */
   private warmed = new Set<string>();
+  /** quartos de volta que o botão de girar aplicou na foto ATUAL. Cresce sem
+   *  voltar a zero de propósito: o GSAP anima até o ângulo ABSOLUTO, e trocar
+   *  270 por 0 no quarto clique daria um giro inverso de três quartos. */
+  private turns = 0;
+  /** um giro em curso pode ser interrompido por OUTRO giro — clicar de novo
+   *  antes de acabar é o uso normal do botão. Os outros gestos continuam
+   *  esperando, daí este par com `busy` em vez de mais um estado solto. */
+  private rotating = false;
 
   constructor(private photos: Photo[], root: HTMLElement, private hooks: LightboxHooks) {
     this.dialog = root.querySelector<HTMLDialogElement>('[data-lightbox]')!;
@@ -52,6 +60,8 @@ export class Lightbox {
       ?.addEventListener('click', () => this.step(-1));
     this.dialog.querySelector('[data-lightbox-next]')
       ?.addEventListener('click', () => this.step(1));
+    this.dialog.querySelector('[data-lightbox-rotate]')
+      ?.addEventListener('click', () => this.rotate());
 
     // Esc dispara 'cancel': desvia pro fechamento animado em vez do corte
     this.dialog.addEventListener('cancel', (e) => {
@@ -68,6 +78,7 @@ export class Lightbox {
     this.dialog.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowLeft') { e.preventDefault(); this.step(-1); }
       if (e.key === 'ArrowRight') { e.preventDefault(); this.step(1); }
+      if (e.key === 'r' || e.key === 'R') { e.preventDefault(); this.rotate(); }
     });
   }
 
@@ -200,18 +211,12 @@ export class Lightbox {
 
   /** põe a foto `photo` na figura: thumb na hora, full quando decodificar */
   private mount(photo: Photo) {
-    const ar = photo.w / photo.h;
-    // a caixa da figura sai da proporção + dos tetos do config: largura no
-    // máximo MAX_W do viewport E altura no máximo MAX_H (via a divisão por ar)
-    // duas escritas, e a segunda é a que vale: `dvh` mede a janela que se
-    // ENXERGA no celular (vh conta com as barras do navegador recolhidas, e a
-    // foto passava do pé da tela). Onde dvh não existe, a atribuição é
-    // descartada em silêncio e sobra a primeira linha — ver .lightbox no CSS.
-    this.figure.style.width =
-      `min(${LIGHTBOX.MAX_W * 100}vw, calc(${LIGHTBOX.MAX_H * 100}vh * ${ar}))`;
-    this.figure.style.width =
-      `min(${LIGHTBOX.MAX_W * 100}dvw, calc(${LIGHTBOX.MAX_H * 100}dvh * ${ar}))`;
-    this.figure.style.aspectRatio = String(ar);
+    // foto nova, giro zerado: o ângulo é de quem está olhando ESTA foto, não
+    // um estado do modal. O -50%/-50% mora aqui (e não no CSS) porque é a
+    // mesma matriz que o giro vai mexer — duas fontes brigariam.
+    this.turns = 0;
+    gsap.set(this.img, { xPercent: -50, yPercent: -50, rotation: 0, scale: 1 });
+    this.layout(photo);
 
     // o thumb já está decodificado (é o que o mural desenha): aparece no
     // primeiro frame, sem flash — a full entra por cima quando estiver pronta
@@ -243,6 +248,120 @@ export class Lightbox {
     this.subEl.textContent = sub;
     this.subEl.hidden = !sub;
     this.dialog.setAttribute('aria-label', `Foto ampliada: ${photo.alt}`);
+  }
+
+  /** Escreve a caixa da FIGURA e a da IMAGEM para o giro atual.
+   *
+   *  As duas saem em CSS (`min` + dvw/dvh) e não em pixels: assim o modal
+   *  continua respondendo a virar o celular e à barra do navegador que
+   *  recolhe, sem handler de resize nenhum — que é como esta página sempre fez.
+   *
+   *  A divisão de trabalho entre as duas é o ponto:
+   *
+   *  - a IMAGEM guarda SEMPRE a medida sem giro. O giro é transform, não
+   *    layout, então a caixa de layout dela nunca muda de proporção e a foto
+   *    não tem como distorcer no meio do caminho;
+   *  - a FIGURA usa a proporção já girada, porque ela é o bounding box do que
+   *    se VÊ: é a borda que a legenda acompanha e a caixa que o FLIP de
+   *    fechamento mede. */
+  private layout(photo: Photo) {
+    const ar = photo.w / photo.h;
+    const lying = this.turns % 2 !== 0;
+    const box = lying ? 1 / ar : ar;   // deitada, a proporção inverte
+
+    // duas escritas por medida, e a segunda é a que vale: `dvh` mede a janela
+    // que se ENXERGA no celular (vh conta com as barras do navegador
+    // recolhidas, e a foto passava do pé da tela). Onde dvh não existe, a
+    // atribuição é descartada em silêncio e sobra a primeira — ver .lightbox
+    // no CSS.
+    for (const [vw, vh] of [['vw', 'vh'], ['dvw', 'dvh']] as const) {
+      const maxW = `${LIGHTBOX.MAX_W * 100}${vw}`;
+      const maxH = `${LIGHTBOX.MAX_H * 100}${vh}`;
+      // largura no máximo MAX_W do viewport E altura no máximo MAX_H — a
+      // segunda entra pela divisão pela proporção
+      this.figure.style.width = `min(${maxW}, calc(${maxH} * ${box}))`;
+      // deitada, a imagem troca de eixo com a figura: o teto de LARGURA da
+      // tela passa a limitar a ALTURA do arquivo, e vice-versa. Escrito assim,
+      // o retângulo já nasce do tamanho final — o giro não precisa corrigir
+      // medida nenhuma depois.
+      this.img.style.width = lying
+        ? `min(calc(${maxW} * ${ar}), ${maxH})`
+        : `min(${maxW}, calc(${maxH} * ${ar}))`;
+      this.img.style.height = lying
+        ? `min(${maxW}, calc(${maxH} / ${ar}))`
+        : `min(calc(${maxW} / ${ar}), ${maxH})`;
+    }
+    this.figure.style.height = '';   // a altura volta a sair da proporção
+    this.figure.style.aspectRatio = String(box);
+  }
+
+  /** Gira a foto aberta um quarto de volta no sentido horário.
+   *
+   *  É só apresentação: nada é gravado, e a próxima foto — ou a próxima
+   *  abertura desta — volta ao ângulo do arquivo. Serve pra foto que foi parar
+   *  deitada na pasta: o mural desenha o que o arquivo diz, e as fotos daqui
+   *  não têm EXIF pra corrigir a orientação sozinhas (ver data/gallery.ts).
+   *
+   *  O TAMANHO final é do CSS (layout()), nunca de uma conta em JS: a imagem
+   *  já nasce da medida certa e o scale existe só pra SAIR da medida anterior
+   *  — ele parte de onde a imagem estava e chega sempre em 1. Assim o giro é
+   *  uniforme (a proporção não distorce em nenhum frame), erro de medida se
+   *  desfaz no fim em vez de ficar gravado, e a foto girada continua se
+   *  ajustando sozinha quando a janela muda de tamanho. */
+  private rotate() {
+    if (!this.open || (this.busy && !this.rotating)) return;
+    const photo = this.photos[this.index];
+
+    const box = this.figure.getBoundingClientRect();
+    // largura RENDERIZADA agora: no meio de um giro interrompido a imagem está
+    // em algum scale entre um e outro, e é de lá que o próximo tem que partir
+    const was = this.img.offsetWidth * (Number(gsap.getProperty(this.img, 'scaleX')) || 1);
+
+    this.turns += 1;
+    this.layout(photo);
+
+    const to = this.figure.getBoundingClientRect();
+    const rotation = this.turns * 90;
+    const scale = was / this.img.offsetWidth;
+
+    if (this.hooks.reduced) return gsap.set(this.img, { rotation, scale: 1 });
+
+    this.busy = true;
+    this.rotating = true;
+
+    // A caixa viaja em pixels e só no fim volta às strings responsivas: não há
+    // o que interpolar dentro de um `min(...)`. `overwrite` porque o clique
+    // repetido é o uso normal do botão — o tween novo MATA o antigo em vez de
+    // disputar as mesmas propriedades com ele (e só o último devolve o modal
+    // aos outros gestos, já que o onComplete do morto não roda).
+    this.figure.style.aspectRatio = 'auto';
+    gsap.fromTo(
+      this.figure,
+      { width: box.width, height: box.height },
+      {
+        width: to.width,
+        height: to.height,
+        duration: LIGHTBOX.ROTATE_DUR,
+        ease: LIGHTBOX.ROTATE_EASE,
+        overwrite: true,
+        onComplete: () => {
+          this.layout(photo);
+          this.rotating = false;
+          this.busy = false;
+        },
+      },
+    );
+    gsap.fromTo(
+      this.img,
+      { scale },
+      {
+        rotation,
+        scale: 1,
+        duration: LIGHTBOX.ROTATE_DUR,
+        ease: LIGHTBOX.ROTATE_EASE,
+        overwrite: true,
+      },
+    );
   }
 
   /** Pede as versões grandes das fotos VIZINHAS, pra seta ‹ › não esperar rede.

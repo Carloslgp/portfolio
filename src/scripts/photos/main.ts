@@ -6,7 +6,7 @@
 // o loop do Three.js e o Lenis juntos, sem teardown manual).
 import gsap from 'gsap';
 import { readPhotos, type Photo } from './photos';
-import { buildTile } from './layout';
+import { buildTile, targetRowHeight } from './layout';
 import { InfiniteCanvas, type PlacedRect } from './infiniteCanvas';
 import { MotionBlur } from './motionBlur';
 import { Lightbox } from './lightbox';
@@ -155,8 +155,13 @@ export function initMural() {
   });
 
   const tileWidth = () => Math.max(window.innerWidth, MURAL.MIN_TILE_W);
+  // A largura do TILE e a altura da LINHA vêm de lugares diferentes de
+  // propósito: o tile é largo pra repetição não gritar, e a linha é fração da
+  // TELA pra um celular ver um MURAL, e não uma foto por vez (ver layout.ts).
+  const rowHeight = () => targetRowHeight(window.innerWidth);
   let lastTileW = tileWidth();
-  canvas.setTile(buildTile(photos, lastTileW));
+  let lastRowH = rowHeight();
+  canvas.setTile(buildTile(photos, lastTileW, lastRowH));
 
   // A chegada vinda do anel. Tudo o que ela muda no mural acontece AQUI, entre
   // montar o tile e ligar o loop: são escritas de estilo numa tacada só, sem
@@ -197,9 +202,11 @@ export function initMural() {
     timer = window.setTimeout(() => {
       canvas.resize();
       const w = tileWidth();
-      if (w !== lastTileW) {
+      const rh = rowHeight();
+      if (w !== lastTileW || rh !== lastRowH) {
         lastTileW = w;
-        canvas.setTile(buildTile(photos, w));
+        lastRowH = rh;
+        canvas.setTile(buildTile(photos, w, rh));
       }
     }, MURAL.RESIZE_DEBOUNCE);
   });

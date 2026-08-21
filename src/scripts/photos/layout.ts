@@ -88,7 +88,23 @@ function sequence(photos: Photo[], rand: () => number): Photo[] {
   return seq;
 }
 
-export function buildTile(photos: Photo[], tileW: number): Tile {
+/** A altura-alvo das linhas para uma dada largura de VIEWPORT (não de tile: o
+ *  tile é sempre largo, ver MURAL.MIN_TILE_W — quem decide quantas fotos cabem
+ *  de ponta a ponta é a tela). Fração da largura, presa entre piso e teto. */
+export function targetRowHeight(viewportW: number): number {
+  return Math.round(
+    Math.min(
+      MURAL.TARGET_ROW_HEIGHT,
+      Math.max(MURAL.MIN_ROW_HEIGHT, viewportW * MURAL.ROW_HEIGHT_VW),
+    ),
+  );
+}
+
+export function buildTile(
+  photos: Photo[],
+  tileW: number,
+  rowH: number = MURAL.TARGET_ROW_HEIGHT,
+): Tile {
   const rand = mulberry32(MURAL.SEED);
   const seq = sequence(photos, rand);
   const contentW = tileW - MURAL.GAP;   // as linhas fecham AQUI; o gap final é a costura
@@ -122,7 +138,7 @@ export function buildTile(photos: Photo[], tileW: number): Tile {
   };
 
   const rowFits = () =>
-    aspectSum * MURAL.TARGET_ROW_HEIGHT + MURAL.GAP * (row.length - 1) >= contentW;
+    aspectSum * rowH + MURAL.GAP * (row.length - 1) >= contentW;
 
   for (const photo of seq) {
     row.push(photo);

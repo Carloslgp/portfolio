@@ -207,7 +207,16 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   .mural {
     position: fixed;
     inset: 0;
+    /* As duas linhas são UMA declaração em cascata, e a segunda é o que
+       importa: `hidden` faz deste elemento uma CAIXA ROLÁVEL — invisível pro
+       dedo, mas rolável por programa. Tocar num tile que só aparece pela
+       beirada dá foco nele, o navegador o traz "pra dentro da vista" rolando
+       esta caixa, e o mural inteiro sobe deixando papel branco no pé da tela.
+       `clip` corta igual e NÃO cria caixa rolável, então não há o que rolar.
+       Quem não conhece `clip` (Safari < 16) ignora a segunda e fica com a
+       primeira — daí a guarda de rolagem no infiniteCanvas, pra esses. */
     overflow: hidden;
+    overflow: clip;
     background: var(--paper);
     /* o gesto de um dedo é do mural; o pinch continua sendo zoom do navegador */
     touch-action: pinch-zoom;
@@ -452,7 +461,12 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
     position: fixed;
     inset: 0;
     width: 100vw;
+    /* dvh, não vh: no celular `100vh` é a janela SEM as barras do navegador,
+       maior que o que se enxerga — o modal nascia com o pé escondido atrás da
+       barra de endereço e a foto centralizada abaixo do centro real. A linha
+       de vh fica de baixo como reserva para quem não conhece dvh. */
     height: 100vh;
+    height: 100dvh;
     max-width: none;
     max-height: none;
     margin: 0;

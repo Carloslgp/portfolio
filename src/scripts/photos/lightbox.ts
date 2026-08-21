@@ -124,8 +124,11 @@ export class Lightbox {
       gsap.set(this.figure, { clearProps: 'transform' });
       this.hooks.unfreeze();
       // devolve o foco ao tile de origem — ele segue no DOM: o mural ficou
-      // congelado o tempo todo, então nenhum place() o reciclou
-      this.source?.focus();
+      // congelado o tempo todo, então nenhum place() o reciclou.
+      // preventScroll porque o tile pode estar meio fora da janela, e o
+      // "traz pra dentro da vista" padrão do foco arrastaria o mural inteiro
+      // (a mesma rolagem que a guarda do infiniteCanvas desfaz).
+      this.source?.focus({ preventScroll: true });
       this.source = null;
       this.open = false;
       this.busy = false;
@@ -200,8 +203,14 @@ export class Lightbox {
     const ar = photo.w / photo.h;
     // a caixa da figura sai da proporção + dos tetos do config: largura no
     // máximo MAX_W do viewport E altura no máximo MAX_H (via a divisão por ar)
+    // duas escritas, e a segunda é a que vale: `dvh` mede a janela que se
+    // ENXERGA no celular (vh conta com as barras do navegador recolhidas, e a
+    // foto passava do pé da tela). Onde dvh não existe, a atribuição é
+    // descartada em silêncio e sobra a primeira linha — ver .lightbox no CSS.
     this.figure.style.width =
       `min(${LIGHTBOX.MAX_W * 100}vw, calc(${LIGHTBOX.MAX_H * 100}vh * ${ar}))`;
+    this.figure.style.width =
+      `min(${LIGHTBOX.MAX_W * 100}dvw, calc(${LIGHTBOX.MAX_H * 100}dvh * ${ar}))`;
     this.figure.style.aspectRatio = String(ar);
 
     // o thumb já está decodificado (é o que o mural desenha): aparece no

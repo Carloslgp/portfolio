@@ -141,6 +141,7 @@ export class InfiniteCanvas {
     this.bindPointer();
     this.bindWheel();
     this.bindKeys();
+    this.bindScrollGuard();
   }
 
   /** (re)define o tile — no boot e a cada resize com debounce. O DOM inteiro é
@@ -658,6 +659,30 @@ export class InfiniteCanvas {
   private release(node: HTMLButtonElement) {
     node.hidden = true;
     this.pool.push(node);
+  }
+
+  /** ——— o mural NUNCA rola ———
+   *
+   *  Aqui não existe rolagem: a câmera anda por transform, e o viewport é uma
+   *  janela parada. Mas o navegador não sabe disso — tocar num tile que só
+   *  aparece pela beirada dá foco no botão, e o foco vem com um "traz isso pra
+   *  dentro da vista" que ele atende ROLANDO o ancestral rolável mais próximo.
+   *  O resultado era o mural inteiro subindo e deixando papel no pé da tela.
+   *
+   *  O `overflow: clip` do CSS já tira o viewport da lista de caixas roláveis
+   *  onde ele existe; esta guarda é para quem não o conhece (Safari < 16) e
+   *  para o documento, que também pode ser o alvo da vez. Roda antes do
+   *  próximo quadro, então o desvio nem chega a ser pintado. */
+  private bindScrollGuard() {
+    const pin = (el: Element) => {
+      if (el.scrollTop) el.scrollTop = 0;
+      if (el.scrollLeft) el.scrollLeft = 0;
+    };
+    this.viewport.addEventListener('scroll', () => pin(this.viewport));
+    window.addEventListener('scroll', () => {
+      const root = document.scrollingElement;
+      if (root) pin(root);
+    });
   }
 
   // ——— gesto: Pointer Events (mouse e touch no mesmo caminho) ———

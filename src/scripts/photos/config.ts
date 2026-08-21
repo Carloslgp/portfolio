@@ -4,10 +4,29 @@
 
 // ——— o mural (layout do tile) ———
 export const MURAL = {
-  /** altura-alvo das linhas justificadas, em px. As linhas reais variam em
-   *  torno disto: a justificação estica/encolhe cada linha pra fechar a
-   *  largura exata do tile. */
+  /** altura-alvo das linhas justificadas, em px, na tela larga. As linhas
+   *  reais variam em torno disto: a justificação estica/encolhe cada linha
+   *  pra fechar a largura exata do tile.
+   *
+   *  É um TETO, não um valor fixo — ver ROW_HEIGHT_VW logo abaixo. */
   TARGET_ROW_HEIGHT: 300,
+
+  /** ——— a altura da linha é uma fração da TELA, não um número absoluto ———
+   *
+   *  O tile é sempre largo (MIN_TILE_W abaixo), então uma altura fixa de 300px
+   *  significa coisas opostas em telas diferentes: num notebook de 1440px cabem
+   *  ~7 fotos de ponta a ponta; num celular de 390px cabem DUAS, e o mural
+   *  deixa de ser um mural — vira uma foto por vez, com zoom.
+   *
+   *  Aqui a altura-alvo passa a ser uma fração da largura do viewport, presa
+   *  entre um piso (senão numa tela minúscula as fotos viram selo) e o teto
+   *  acima (senão num ultrawide as linhas cresceriam sem parar). A conta
+   *  reproduz o teto a partir de ~670px de largura: do tablet pra cima nada
+   *  muda, e só as telas estreitas ganham mais fotos por tela — num celular de
+   *  390px a fração leva de ~2 fotos visíveis de ponta a ponta para ~3, com
+   *  ~12 na tela em vez de ~5. */
+  ROW_HEIGHT_VW: 0.45,
+  MIN_ROW_HEIGHT: 120,
 
   /** respiro entre fotos, em px — o MESMO valor vale dentro do tile e na
    *  costura entre cópias (o passo do tile já embute um gap no fim de cada

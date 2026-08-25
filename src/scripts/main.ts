@@ -10,6 +10,7 @@ import {
 import { setProgress, hideLoader, awaitGate } from './loading';
 import { reducedMotion } from './motion';
 import { registerScroll } from './scroll';
+import { WORK_ENTRY_KEY, WORK_HOME_KEY, WORK_RETURN_KEY } from './workNavigation';
 
 // Esta chegada à home veio de DENTRO do site? (o "‹ Voltar" do /photos, o
 // botão voltar do navegador.) A distinção importa porque uma volta não é uma
@@ -62,6 +63,19 @@ function takeSeamBack(): boolean {
   }
 }
 
+/** Consome a marca deixada pelo botão de voltar da /work. Ela não depende de
+ * `document.referrer`: a página pode ter sido descartada do BFCache e ainda
+ * assim precisa renascer diretamente no anel, com Work na frente. */
+function takeWorkReturn(): boolean {
+  try {
+    if (!sessionStorage.getItem(WORK_RETURN_KEY)) return false;
+    sessionStorage.removeItem(WORK_RETURN_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function bootstrap() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
   if (!canvas) return;
@@ -69,7 +83,8 @@ export async function bootstrap() {
   // Numa volta interna a escolha da sessão vale sem perguntar; numa chegada
   // de verdade o portão pergunta, como sempre.
   const returningFromPhotos = takePhotosReturn();
-  const internal = returningFromPhotos || isInternalArrival();
+  const returningFromWork = takeWorkReturn();
+  const internal = returningFromPhotos || returningFromWork || isInternalArrival();
 
   // Este documento nasceu agora, então não há avanço congelado pra rebobinar: a
   // cortina de carregamento é que cobre a troca, e a home reaparece no segmento
@@ -103,6 +118,10 @@ export async function bootstrap() {
     const photosIndex = SECTIONS.findIndex((section) => section.id === 'photos');
     if (photosIndex >= 0) carousel.focusSectionInstant(photosIndex);
   }
+  if (returningFromWork) {
+    const workIndex = SECTIONS.findIndex((section) => section.id === 'work');
+    if (workIndex >= 0) carousel.focusSectionInstant(workIndex);
+  }
   carousel.run();                       // cena viva na pose de topo
   await gate;                           // a cortina não sai sem a escolha feita
   await hideLoader();                   // cortina sai, mostrando o anel de cima
@@ -120,6 +139,154 @@ export async function bootstrap() {
 
   initAbout(carousel, lenis);
   initPhotosLink(carousel);
+  initWorkLink(carousel, returningFromWork);
+}
+
+// ——— Work: o segmento vira uma folha que ocupa a tela ———
+
+function initWorkLink(carousel: Carousel, returningFromWork = false) {
+  const portal = document.querySelector<HTMLElement>('[data-work-portal]');
+  const frame = portal?.querySelector<HTMLElement>('[data-work-portal-frame]');
+  const title = portal?.querySelector<HTMLElement>('[data-work-portal-title]');
+  if (!portal || !frame || !title) return;
+
+  let leaving = false;
+  let revealed: Promise<unknown> = Promise.resolve();
+
+  window.addEventListener('pagereveal', (event) => {
+    const transition = (event as any).viewTransition;
+    if (transition) revealed = transition.finished.catch(() => {});
+  });
+
+  const coverSize = () => {
+    const aspect = 1492 / 2651;
+    const width = Math.max(window.innerWidth, window.innerHeight * aspect) * 1.02;
+    return { width, height: width / aspect };
+  };
+
+  const rememberHome = (animate: boolean) => {
+    try {
+      sessionStorage.setItem(WORK_HOME_KEY, location.href);
+      if (animate) sessionStorage.setItem(WORK_ENTRY_KEY, '1');
+      else sessionStorage.removeItem(WORK_ENTRY_KEY);
+    } catch {}
+  };
+
+  const settle = () => {
+    leaving = false;
+    document.body.classList.remove('is-diving');
+    document.documentElement.removeAttribute('data-work-return');
+    portal.style.visibility = '';
+    frame.removeAttribute('style');
+    title.removeAttribute('style');
+  };
+
+  const returnToRing = async (rewindDeparture: boolean) => {
+    portal.style.visibility = 'visible';
+    document.body.classList.add('is-diving');
+
+    const rememberedWidth = Number(frame.dataset.startWidth);
+    const rememberedHeight = Number(frame.dataset.startHeight);
+    const current = carousel.frontPhotoSize();
+    const target = {
+      width: rememberedWidth || current.w,
+      height: rememberedHeight || current.h,
+    };
+
+    gsap.set(frame, { opacity: 1 });
+    gsap.set(title, { opacity: 1 });
+
+    const rewind = rewindDeparture ? carousel.returnFromDeparture() : null;
+    const fold = gsap.timeline()
+      .to(title, { opacity: 0, letterSpacing: '0.22em', duration: 0.28, ease: 'power2.in' }, 0)
+      .to(frame, {
+        width: target.width,
+        height: target.height,
+        borderRadius: 12,
+        duration: 0.82,
+        ease: 'power4.inOut',
+      }, 0)
+      .to(frame, { opacity: 0, duration: 0.18, ease: 'power1.out' }, 0.7);
+
+    await Promise.all([fold.then(), rewind ?? Promise.resolve()]);
+    if (rewindDeparture && !rewind) carousel.cancelDeparture();
+    settle();
+  };
+
+  // Documento novo: o script inline do <head> já deixou o portal cobrindo a
+  // cortina de carregamento. Depois que a cena nasce pronta em Work, ele volta
+  // ao tamanho do segmento e entrega o quadro ao anel.
+  if (returningFromWork) {
+    if (reducedMotion()) settle();
+    else requestAnimationFrame(() => revealed.then(() => returnToRing(false)));
+  }
+
+  window.addEventListener('section:open', async (event) => {
+    const detail = (event as CustomEvent).detail;
+    if (detail?.id !== 'work' || leaving) return;
+    leaving = true;
+
+    const animate = !reducedMotion();
+    rememberHome(animate);
+
+    if (!animate) {
+      location.href = '/work';
+      return;
+    }
+
+    document.body.classList.add('is-diving');
+    portal.style.visibility = 'visible';
+
+    const start = carousel.frontPhotoSize();
+    const cover = coverSize();
+    frame.dataset.startWidth = `${start.w}`;
+    frame.dataset.startHeight = `${start.h}`;
+
+    gsap.set(frame, {
+      width: start.w,
+      height: start.h,
+      borderRadius: 12,
+      opacity: 0,
+    });
+    gsap.set(title, { opacity: 0, letterSpacing: '0.22em' });
+
+    const movement = carousel.departInto(detail.index);
+    movement
+      .to(frame, { opacity: 1, duration: 0.2, ease: 'power1.out' }, 0.26)
+      .to(frame, {
+        width: cover.width,
+        height: cover.height,
+        borderRadius: 0,
+        duration: 0.86,
+        ease: 'power4.inOut',
+      }, 0.3)
+      .to(title, {
+        opacity: 1,
+        letterSpacing: '0.08em',
+        duration: 0.42,
+        ease: 'power2.out',
+      }, 0.68)
+      .to({}, { duration: 0.08 });
+
+    await movement;
+    location.href = '/work';
+  });
+
+  // Volta viva pelo BFCache: a timeline que levou ao Work ainda existe. A
+  // imagem encolhe e essa mesma timeline anda ao contrário, devolvendo câmera,
+  // curvatura, labels e controle ao estado exato do anel.
+  window.addEventListener('pageshow', (event) => {
+    if (!(event as PageTransitionEvent).persisted || !leaving) return;
+    try {
+      sessionStorage.removeItem(WORK_RETURN_KEY);
+      sessionStorage.removeItem(WORK_HOME_KEY);
+    } catch {}
+    if (reducedMotion()) {
+      settle();
+      return;
+    }
+    requestAnimationFrame(() => revealed.then(() => returnToRing(true)));
+  });
 }
 
 // ——— Photos: página própria (/photos), aberta pelo clique no anel ———
@@ -560,12 +727,6 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
   window.addEventListener('section:open', (e) => {
     const id = (e as CustomEvent).detail?.id;
     if (id === 'about') openAbout();
-    // /work é navegação e nada mais: sem mergulho, sem emenda. A coreografia
-    // do /photos existe porque as duas páginas compartilham UMA foto e a
-    // transição costura as duas metades do mesmo movimento; aqui não há foto
-    // em comum pra costurar, e um mergulho que termina em papel branco é
-    // teatro. A view transition nativa (global.css) dá o cross-fade.
-    else if (id === 'work') location.href = '/work';
   });
 
   // qualquer link pra #about abre a seção em vez de pular a âncora — inclusive

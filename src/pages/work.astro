@@ -44,11 +44,36 @@ function hasDetails(entry: Entry) {
       content="Carlos Leonardo's professional experience, projects and recognition."
     />
     <link rel="prefetch" href="/" />
+
+    {/* A home termina coberta pela pintura do segmento Work. Esta marca nasce
+        antes do primeiro paint para a página começar no mesmo quadro e só
+        então abrir as duas folhas sobre o conteúdo. */}
+    <script is:inline>
+      try {
+        if (sessionStorage.getItem('portfolio:work-entry')) {
+          sessionStorage.removeItem('portfolio:work-entry');
+          document.documentElement.dataset.workEntry = 'armed';
+        }
+      } catch (e) {}
+    </script>
   </Fragment>
 
   <div class="paper" aria-hidden="true"></div>
 
-  <a class="back" href="/">‹ Back</a>
+  <div class="work-transition" data-work-transition aria-hidden="true">
+    <div class="work-transition-panel is-left">
+      <img src="/textures/work.jpg" alt="" />
+    </div>
+    <div class="work-transition-panel is-right">
+      <img src="/textures/work.jpg" alt="" />
+    </div>
+    <span class="work-transition-title">
+      <small>Selected</small>
+      <strong>WORK</strong>
+    </span>
+  </div>
+
+  <a class="back" href="/" data-work-back>‹ Back</a>
 
   <button
     class="theme"
@@ -233,6 +258,129 @@ function hasDetails(entry: Entry) {
 
   :global(body.has-work-dialog) {
     overflow: hidden !important;
+  }
+
+  :global(html[data-work-entry='armed'] body),
+  :global(body.has-work-transition) {
+    overflow: hidden !important;
+  }
+
+  /* ——— a pintura se abre em duas folhas ———
+     Cada metade carrega uma cópia com 200% da largura: juntas elas recompõem
+     uma única imagem sem emenda, mas podem sair por lados opostos. */
+  .work-transition {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    visibility: hidden;
+    overflow: hidden;
+    pointer-events: none;
+    perspective: 1200px;
+  }
+
+  .work-transition-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    overflow: hidden;
+    background: #171411;
+    transform: translateX(var(--closed-x));
+    transition: transform 0.82s cubic-bezier(0.76, 0, 0.24, 1);
+    will-change: transform;
+  }
+
+  .work-transition-panel.is-left {
+    --closed-x: -102%;
+    left: 0;
+    transform-origin: right center;
+  }
+
+  .work-transition-panel.is-right {
+    --closed-x: 102%;
+    right: 0;
+    transform-origin: left center;
+  }
+
+  .work-transition-panel img {
+    position: absolute;
+    top: 0;
+    width: 200%;
+    height: 100%;
+    display: block;
+    max-width: none;
+    object-fit: cover;
+  }
+
+  .work-transition-panel.is-left img {
+    left: 0;
+  }
+
+  .work-transition-panel.is-right img {
+    right: 0;
+  }
+
+  .work-transition-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(8, 7, 6, 0.08), rgba(8, 7, 6, 0.48));
+  }
+
+  .work-transition-title {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-content: center;
+    color: #fff;
+    text-align: center;
+    text-shadow: 0 2px 28px rgba(0, 0, 0, 0.42);
+    opacity: 0;
+    transition: opacity 0.28s ease, letter-spacing 0.45s ease;
+  }
+
+  .work-transition-title small {
+    margin-bottom: 0.4rem;
+    font-size: clamp(0.6rem, 1vw, 0.75rem);
+    font-weight: 650;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  .work-transition-title strong {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(4rem, 15vw, 12rem);
+    font-weight: 600;
+    line-height: 0.8;
+    letter-spacing: -0.065em;
+  }
+
+  :global(html[data-work-entry='armed']) .work-transition,
+  .work-transition.is-preparing-exit,
+  .work-transition.is-closing {
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  :global(html[data-work-entry='armed']) .work-transition-panel,
+  .work-transition.is-closing .work-transition-panel {
+    transform: translateX(0);
+  }
+
+  :global(html[data-work-entry='armed']) .work-transition-title,
+  .work-transition.is-closing .work-transition-title {
+    opacity: 1;
+    letter-spacing: 0.08em;
+  }
+
+  .work-transition.is-opening .work-transition-panel {
+    transform: translateX(var(--closed-x));
+  }
+
+  .work-transition.is-opening .work-transition-title {
+    opacity: 0;
+    letter-spacing: 0.22em;
   }
 
   .back {
@@ -750,7 +898,9 @@ function hasDetails(entry: Entry) {
   @media (prefers-reduced-motion: reduce) {
     .back::after,
     .read-more svg,
-    .work-dialog {
+    .work-dialog,
+    .work-transition-panel,
+    .work-transition-title {
       transition: none;
     }
   }

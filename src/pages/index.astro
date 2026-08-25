@@ -42,6 +42,16 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   <Fragment slot="head">
     <title>Carlos Leonardo — Developer</title>
 
+    {/* Se a /work precisou reconstruir a home em vez de recuperá-la do
+        BFCache, o último quadro da página anterior já é esta imagem. Armar o
+        portal no head impede que a cortina de loading pisque entre os dois. */}
+    <script is:inline>
+      try {
+        if (sessionStorage.getItem('portfolio:work-return'))
+          document.documentElement.dataset.workReturn = 'armed';
+      } catch (e) {}
+    </script>
+
     {/* As fotos do anel, pedidas já na análise do HTML.
 
         Sem isto elas só eram descobertas lá no fim: o navegador tinha que
@@ -169,6 +179,18 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
       aria-hidden="true"
     />
   )}
+
+  <!-- A ponte visual para /work. Ela nasce sobre o segmento 3D, cresce até
+       ocupar a tela e atravessa a troca de documento no mesmo quadro. -->
+  <div class="work-portal" data-work-portal aria-hidden="true">
+    <div class="work-portal-frame" data-work-portal-frame>
+      <img src="/textures/work.jpg" alt="" />
+      <span class="work-portal-title" data-work-portal-title>
+        <small>Selected</small>
+        <strong>WORK</strong>
+      </span>
+    </div>
+  </div>
 
   <!-- toggle de tema claro/escuro (ver scripts/theme.ts). Fica FORA do .overlay
        de propósito: o overlay some no About (body.is-about) e o tema é da página
@@ -406,6 +428,91 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
        travada na da janela e a foto chegava espremida no fim do avanço. */
     max-width: none;
     max-height: none;
+  }
+
+  /* ——— ponte para Work ———
+     O frame mantém a proporção retrato do segmento. Em tela larga ele cresce
+     pela largura; em tela alta, pela altura. Assim a pintura nunca estica no
+     quadro em que cruza de uma página para a outra. */
+  .work-portal {
+    position: fixed;
+    inset: 0;
+    z-index: 14;
+    visibility: hidden;
+    pointer-events: auto;
+  }
+
+  .work-portal-frame {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #171411;
+    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.32);
+    opacity: 0;
+    transform: translate(-50%, -50%);
+  }
+
+  .work-portal-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(8, 7, 6, 0.08), rgba(8, 7, 6, 0.48));
+  }
+
+  .work-portal-frame img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    max-width: none;
+    object-fit: cover;
+  }
+
+  .work-portal-title {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-content: center;
+    color: #fff;
+    text-align: center;
+    text-shadow: 0 2px 28px rgba(0, 0, 0, 0.42);
+    opacity: 0;
+  }
+
+  .work-portal-title small {
+    margin-bottom: 0.4rem;
+    font-size: clamp(0.6rem, 1vw, 0.75rem);
+    font-weight: 650;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  .work-portal-title strong {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(4rem, 15vw, 12rem);
+    font-weight: 600;
+    line-height: 0.8;
+    letter-spacing: -0.065em;
+  }
+
+  :global(html[data-work-return='armed']) .work-portal {
+    visibility: visible;
+  }
+
+  :global(html[data-work-return='armed']) .work-portal-frame {
+    width: max(100vw, calc(100vh * 0.563));
+    height: max(100vh, calc(100vw / 0.563));
+    border-radius: 0;
+    opacity: 1;
+  }
+
+  :global(html[data-work-return='armed']) .work-portal-title {
+    opacity: 1;
+    letter-spacing: 0.08em;
   }
 
   /* cortina de carregamento — acima de tudo (canvas 1, cursor 2, overlay 3) */

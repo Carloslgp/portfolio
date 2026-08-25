@@ -47,6 +47,11 @@ export const WORK_SEAM = {
    *  para o ponto que a transição existe para esconder. */
   titleFrom: 0.42,
 
+  /** Quanto o título está MAIOR quando ainda não chegou. Ele assenta na escala
+   *  1 junto com a pintura — é o mesmo gesto da cortina da /work do outro lado
+   *  da troca (ver --title-scale em work.astro). */
+  titleScale: 0.06,
+
   /** A VOLTA sem BFCache: a home nasce coberta pela pintura e precisa devolvê-la
    *  ao segmento. Quando o navegador serve a home viva, quem dirige é o
    *  rebobinamento do avanço (ver Carousel.returnFromDeparture) e estes números

@@ -176,6 +176,15 @@ function initWorkLink(carousel: Carousel, returningFromWork = false) {
   // de usar do outro lado.
   let seam = workSeamBox();
 
+  // A pintura é a mesma textura que o anel já baixou, mas o DOM tem a própria
+  // decodificação — e no traço de um celular emulado ela é a tarefa mais cara
+  // do documento (~20ms). Aqui ela não seria feita antes da hora: a emenda
+  // nasce invisível, e um elemento que não pinta não decodifica nada — a conta
+  // cairia no quadro do avanço em que ela aparece. Pedida agora, na ociosidade
+  // depois da abertura da cena, sai do caminho. É o mesmo cuidado que a emenda
+  // do /photos já toma (ver `arm`, mais abaixo).
+  seamEl.querySelector('img')?.decode?.().catch(() => {});
+
   const rememberHome = (animate: boolean) => {
     try {
       sessionStorage.setItem(WORK_HOME_KEY, location.href);
@@ -212,11 +221,16 @@ function initWorkLink(carousel: Carousel, returningFromWork = false) {
     seamEl.style.opacity = `${f * f * (3 - 2 * f)}`;
 
     // o título entra depois (ver WORK_SEAM.titleFrom), quando a pintura já
-    // parou de se descolar da cena
+    // parou de se descolar da cena.
+    //
+    // Opacidade e ESCALA, nunca letter-spacing: o espaçamento do contêiner não
+    // chega aos filhos (eles declaram o próprio) mas invalida a subárvore, e
+    // escrevê-lo a cada quadro punha um layout de uma palavra em Playfair de
+    // 15vw dentro do mergulho — a mesma coisa que travava a cortina da /work.
     const t = Math.max(0, (k - WORK_SEAM.titleFrom) / (1 - WORK_SEAM.titleFrom));
     const e = t * t * (3 - 2 * t);
     title.style.opacity = `${e}`;
-    title.style.letterSpacing = `${0.22 - 0.14 * e}em`;
+    title.style.transform = `scale(${1 + WORK_SEAM.titleScale * (1 - e)})`;
   };
 
   // A segunda metade do avanço, pendurada no relógio da primeira: recebe o

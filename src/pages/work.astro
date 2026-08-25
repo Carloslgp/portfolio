@@ -32,6 +32,15 @@ function preview(entry: Entry) {
   return entry.summary.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() ?? entry.summary;
 }
 
+/** Quantas linhas da lista entram animadas junto com a cortina.
+ *
+ *  Só as que cabem na tela: mesmo no monitor mais alto a sétima já está
+ *  abaixo da dobra, e animar as dezesseis significava pôr o navegador para
+ *  compor treze camadas que ninguém vê — com os últimos atrasos caindo já no
+ *  fim da abertura, que é onde apareciam os quadros longos no celular. As
+ *  demais nascem prontas. */
+const REVEAL_ITEMS = 6;
+
 function hasDetails(entry: Entry) {
   return Boolean(entry.summary || entry.impact?.length || entry.stack?.length || entry.badge || entry.href);
 }
@@ -121,7 +130,10 @@ function hasDetails(entry: Entry) {
           const dialogId = `work-details-${entry.id}`;
 
           return (
-            <li class="experience-item" style={`--i:${index + 1}`}>
+            <li
+              class:list={['experience-item', index < REVEAL_ITEMS && 'is-arriving']}
+              style={index < REVEAL_ITEMS ? `--i:${index + 1}` : undefined}
+            >
               <div
                 class:list={['experience-mark', entry.logo && 'has-image']}
                 style={`--mark-hue:${(index * 47 + 258) % 360}`}
@@ -399,6 +411,14 @@ function hasDetails(entry: Entry) {
     background: linear-gradient(180deg, rgba(8, 7, 6, 0.08), rgba(8, 7, 6, 0.48));
   }
 
+  /* O título entra e sai por opacidade e ESCALA, nunca por letter-spacing.
+     Havia uma animação de tracking aqui, e ela era invisível: `small` e
+     `strong` declaram o próprio espaçamento, então o do contêiner não chegava
+     a lugar nenhum. Custava, porém, o preço cheio — mexer numa propriedade
+     herdada invalida a subárvore, e o navegador refazia layout e pintura de
+     uma palavra em Playfair de 15vw a cada quadro. Medido num celular emulado:
+     82 layouts e 194 pinturas na abertura, contra 16 e 63 sem ela. Era essa a
+     travada do celular; escala e opacidade ficam no compositor. */
   .work-transition-title {
     position: absolute;
     inset: 0;
@@ -409,6 +429,7 @@ function hasDetails(entry: Entry) {
     text-align: center;
     text-shadow: 0 2px 28px rgba(0, 0, 0, 0.42);
     opacity: 0;
+    transform: scale(var(--title-scale, 1));
   }
 
   .work-transition-title small {
@@ -440,7 +461,26 @@ function hasDetails(entry: Entry) {
 
   :global(html[data-work-entry]) .work-transition-title {
     opacity: 1;
-    letter-spacing: 0.08em;
+  }
+
+  /* A promoção a camada acontece enquanto a pintura ainda está PARADA, não no
+     quadro em que ela começa a andar. Com o will-change só nos estados de
+     movimento, a primeira rasterização das duas folhas (imagem grande, em tela
+     de celular densa) caía dentro do primeiro quadro da abertura — e era um
+     quadro de 50 a 80ms, o tranco inicial. Aqui ele cabe na espera pela thread
+     livre (ver work.ts → calmFrame), onde não custa nada. E sai junto com a
+     cortina: fora dela seriam duas camadas do tamanho da tela guardadas numa
+     página que rola. */
+  :global(html[data-work-entry]) .work-transition-panel,
+  .work-transition.is-preparing-exit .work-transition-panel,
+  .work-transition.is-closing .work-transition-panel {
+    will-change: transform, opacity;
+  }
+
+  :global(html[data-work-entry]) .work-seam,
+  .work-transition.is-preparing-exit .work-seam,
+  .work-transition.is-closing .work-seam {
+    will-change: transform;
   }
 
   /* ABERTA. O mesmo estado serve para o fim da entrada e para o começo da
@@ -476,18 +516,17 @@ function hasDetails(entry: Entry) {
   .work-transition.is-opening .work-transition-title,
   .work-transition.is-preparing-exit .work-transition-title {
     opacity: 0;
-    letter-spacing: 0.22em;
+    --title-scale: 1.06;
   }
 
   /* Só quem ABRE ou FECHA transiciona. `is-preparing-exit` sozinho é uma pose,
      não um movimento: é ela que dá às folhas um ponto de partida real antes de
      `is-closing` entrar.
 
-     O will-change mora aqui, e não na regra base, porque fora da transição
-     estas são duas camadas do tamanho da tela paradas numa página que rola. */
+     O will-change não mora aqui: ele é aplicado antes, com a cortina ainda
+     fechada — ver a regra da promoção acima. */
   .work-transition.is-opening .work-transition-panel,
   .work-transition.is-closing .work-transition-panel {
-    will-change: transform, opacity;
     transition:
       transform var(--open-dur) var(--open-ease),
       opacity calc(var(--open-dur) * 0.4) linear calc(var(--open-dur) * 0.6);
@@ -496,12 +535,11 @@ function hasDetails(entry: Entry) {
   .work-transition.is-opening .work-seam,
   .work-transition.is-closing .work-seam {
     transition: transform var(--open-dur) var(--open-ease);
-    will-change: transform;
   }
 
   .work-transition.is-opening .work-transition-title,
   .work-transition.is-closing .work-transition-title {
-    transition: opacity calc(var(--open-dur) * 0.4) ease, letter-spacing var(--open-dur) var(--open-ease);
+    transition: opacity calc(var(--open-dur) * 0.4) ease, transform var(--open-dur) var(--open-ease);
   }
 
   /* FECHANDO. Vem depois da regra de "aberta" de propósito: as duas têm a
@@ -526,10 +564,10 @@ function hasDetails(entry: Entry) {
      ainda em papel branco, e a palavra aparecia antes do fundo dela. */
   .work-transition.is-closing .work-transition-title {
     opacity: 1;
-    letter-spacing: 0.08em;
+    --title-scale: 1;
     transition:
       opacity calc(var(--close-dur) * 0.45) ease calc(var(--close-dur) * 0.4),
-      letter-spacing var(--close-dur) var(--close-ease);
+      transform var(--close-dur) var(--close-ease);
   }
 
   /* ——— o conteúdo CHEGA, não estava esperando ———
@@ -539,13 +577,13 @@ function hasDetails(entry: Entry) {
      fechada, e o escalonamento faz a leitura descer com ela. Sem marca de
      entrada (link direto, reload, baixa animação) nada disso existe. */
   :global(html[data-work-entry]) .work-head,
-  :global(html[data-work-entry]) .experience-item {
+  :global(html[data-work-entry]) .experience-item.is-arriving {
     opacity: 0;
     transform: translateY(18px);
   }
 
   :global(html[data-work-entry='opening']) .work-head,
-  :global(html[data-work-entry='opening']) .experience-item {
+  :global(html[data-work-entry='opening']) .experience-item.is-arriving {
     opacity: 1;
     transform: none;
     transition:
@@ -1073,7 +1111,7 @@ function hasDetails(entry: Entry) {
     .work-transition .work-seam,
     .work-transition-title,
     .work-head,
-    .experience-item {
+    .experience-item.is-arriving {
       transition: none;
     }
   }

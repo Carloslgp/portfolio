@@ -1,6 +1,16 @@
 import { storedMotionMode } from './motion';
 import { WORK_HOME_KEY, WORK_RETURN_KEY } from './workNavigation';
 
+/** Teto da espera pela thread livre, em ms (ver calmFrame). Escolhido pelo que
+ *  se mediu: o carregamento da /work num celular lento leva uns 400ms para
+ *  soltar a thread, e o dobro disso ainda é uma pausa que se lê como o pouso da
+ *  pintura, não como travamento. */
+const CURTAIN_CALM_CAP = 800;
+
+/** O mesmo, para quem não tem requestIdleCallback (Safari antigo): sem a
+ *  pergunta, resta esperar o tempo típico. */
+const CURTAIN_CALM_FALLBACK = 420;
+
 export function initWork() {
   const dialogs = document.querySelectorAll<HTMLDialogElement>('[data-work-dialog]');
   const transition = document.querySelector<HTMLElement>('[data-work-transition]');
@@ -42,6 +52,29 @@ export function initWork() {
     if (transition) transition.style.visibility = 'hidden';
   };
 
+  /** Resolve quando a thread principal tem quadro sobrando.
+   *
+   *  A cortina abria num `requestAnimationFrame` logo depois do bundle rodar, e
+   *  isso é o PIOR instante possível: o documento ainda está avaliando script,
+   *  aplicando a fonte e decodificando os logos da lista. Medindo num celular
+   *  emulado (CPU 6x), os primeiros ~400ms do documento têm quadros de 50 a
+   *  80ms — e eles continuam lá com a cortina ESCONDIDA, então não é a
+   *  animação que custa: ela é que estava sendo posta em cima de uma thread
+   *  ocupada. Daí a abertura sair aos trancos no celular e lisa no desktop.
+   *
+   *  requestIdleCallback é exatamente a pergunta certa ("sobrou quadro?"), e o
+   *  timeout é o teto: numa rede ruim a página pode nunca ficar ociosa, e é
+   *  melhor abrir com tranco do que não abrir. Esperar aqui não aparece — a
+   *  pintura cobrindo a tela É a cortina, e ela é o mesmo quadro que a home
+   *  entregou. */
+  const calmFrame = () => new Promise<void>((resolve) => {
+    const go = () => requestAnimationFrame(() => resolve());
+    // chamada PELO window: solta da dona, a função joga "Illegal invocation"
+    const idle = (window as any).requestIdleCallback;
+    if (typeof idle === 'function') idle.call(window, go, { timeout: CURTAIN_CALM_CAP });
+    else window.setTimeout(go, CURTAIN_CALM_FALLBACK);
+  });
+
   // A primeira metade aconteceu no anel. Aqui a pintura se parte ao meio e
   // revela a lista — sem marcador (link direto ou reload), nada é encenado.
   //
@@ -54,7 +87,7 @@ export function initWork() {
     if (reduced || !transition) {
       finishEntry();
     } else {
-      requestAnimationFrame(() => {
+      void calmFrame().then(() => {
         document.documentElement.dataset.workEntry = 'opening';
         transition.classList.add('is-opening');
         void waitForPanel().then(finishEntry);

@@ -62,6 +62,10 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
         prefetch resolve isso na ociosidade, com prioridade mínima: quando o
         clique vier, a página já está no cache. */}
     <link rel="prefetch" href="/photos" />
+
+    {/* /work é uma página de texto e sai barata; o clique no segmento "Work"
+        do anel vai direto pra ela (ver scripts/main.ts → section:open). */}
+    <link rel="prefetch" href="/work" />
   </Fragment>
 
   <!-- ——— o papel ———

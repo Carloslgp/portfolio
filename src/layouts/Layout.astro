@@ -4,8 +4,21 @@ import '../styles/global.css';
 import 'lenis/dist/lenis.css';
 import LiquidScrollbar from '../components/LiquidScrollbar.astro';
 import Analytics from '@vercel/analytics/astro';
+
+// O idioma do DOCUMENTO. O padrão segue pt-BR (a home e a /photos: a moldura
+// delas é escrita em português), e quem é inteiramente escrito em outra língua
+// pede a sua — é o caso da /work.
+//
+// Não é preciosismo de marcação: o lang é o que diz ao leitor de tela QUAL voz
+// usar. Uma página em inglês declarada pt-BR sai lida com fonemas portugueses,
+// e "Founder & CDO" vira ruído pra quem depende dele.
+interface Props {
+  lang?: string;
+}
+
+const { lang = 'pt-BR' } = Astro.props;
 ---
-<html lang="pt-BR">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

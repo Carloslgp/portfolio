@@ -558,7 +558,14 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
   // clique numa foto do carrossel (o Carousel só avisa QUAL seção; a decisão é
   // aqui — e a de 'photos' mora em initPhotosLink, fora deste closure do About)
   window.addEventListener('section:open', (e) => {
-    if ((e as CustomEvent).detail?.id === 'about') openAbout();
+    const id = (e as CustomEvent).detail?.id;
+    if (id === 'about') openAbout();
+    // /work é navegação e nada mais: sem mergulho, sem emenda. A coreografia
+    // do /photos existe porque as duas páginas compartilham UMA foto e a
+    // transição costura as duas metades do mesmo movimento; aqui não há foto
+    // em comum pra costurar, e um mergulho que termina em papel branco é
+    // teatro. A view transition nativa (global.css) dá o cross-fade.
+    else if (id === 'work') location.href = '/work';
   });
 
   // qualquer link pra #about abre a seção em vez de pular a âncora — inclusive

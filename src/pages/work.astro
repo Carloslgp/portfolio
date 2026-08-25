@@ -1,0 +1,952 @@
+---
+// work.astro — emprego e trabalho acadêmico na MESMA linha, de propósito.
+//
+// A página inteira sai de src/data/work.ts: nenhuma frase daqui é escrita
+// neste arquivo, e nenhuma DATA é digitada duas vezes — o que se lê embaixo de
+// cada título é derivado de start/end pelo `range()`.
+//
+// A única estrutura nova que esta página introduz é a linha do tempo. Fora
+// isso tudo é vocabulário que já existia: Playfair nos títulos, Inter no
+// corpo, as variáveis de tinta/papel do global.css, o "voltar" com a linha que
+// cresce (o mesmo do /photos e do About) e o botão de tema do index.astro.
+import Layout from '../layouts/Layout.astro';
+import { timeline, range, laneRow, laneRowAbove, CRAFT_NOTE } from '../data/work';
+
+const segments = timeline();
+
+// A maior simultaneidade da PÁGINA (não de um segmento). É ela que dimensiona
+// a calha, e por dois motivos ela precisa ser a máxima:
+//
+//   1. alinhamento — com cada segmento reservando a sua própria largura, a
+//      coluna dos cards mudaria de lugar entre "Now" e "Before", e a linha do
+//      tempo deixaria de ter UMA vertical só.
+//   2. a variável — `--lanes-w` é declarada no `.work`, e um `var(--lanes)`
+//      dentro de uma custom property é substituído NO ELEMENTO ONDE ELA É
+//      DECLARADA, não onde é usada. Definir `--lanes` só no `.timeline`
+//      (como estava) fazia o `--lanes-w` do `.work` cair no fallback 0: a
+//      coluna das pistas nascia com 0px e as pistas transbordavam por cima do
+//      texto. Quem declara a largura tem que enxergar a contagem.
+//
+// Cada `.timeline` ainda declara o SEU `--lanes`, e isso continua certo: é o
+// que dá a contagem de colunas de cada calha. Só a largura reservada é comum.
+const maxLanes = Math.max(...segments.map((s) => s.lanes));
+
+// Agrupa os pesos 3 CONSECUTIVOS num bloco só (§4): eles são um murmúrio, não
+// três entradas que falharam em virar card. A ordenação do work.ts é quem
+// garante que eles cheguem aqui grudados; este laço só os embrulha.
+type Group =
+  | { kind: 'entry'; row: (typeof segments)[number]['rows'][number] }
+  | { kind: 'cluster'; rows: (typeof segments)[number]['rows'] };
+
+function group(rows: (typeof segments)[number]['rows']): Group[] {
+  const out: Group[] = [];
+  for (const row of rows) {
+    const last = out[out.length - 1];
+    if (row.entry.weight === 3) {
+      if (last?.kind === 'cluster') last.rows.push(row);
+      else out.push({ kind: 'cluster', rows: [row] });
+    } else {
+      out.push({ kind: 'entry', row });
+    }
+  }
+  return out;
+}
+---
+
+<Layout lang="en">
+  <Fragment slot="head">
+    <title>Work — Carlos Leonardo</title>
+    <meta
+      name="description"
+      content="Employment history and academic work on a single timeline — roles, builds and recognition, overlapping."
+    />
+
+    {/* Quem chega aqui pelo anel veio da home e provavelmente volta pra ela. */}
+    <link rel="prefetch" href="/" />
+
+    {/* ——— a decisão de movimento, ANTES do primeiro pixel ———
+
+        Mesma pergunta que a /photos faz (scripts/photos/main.ts): a escolha do
+        portão da home manda; quem entrou direto aqui nunca viu o portão, e aí
+        vale a preferência do sistema.
+
+        Precisa ser inline e no head, e não no módulo lá embaixo, por causa do
+        `data-reveal`: é ele que esconde os cards pro GSAP ter o que revelar. Um
+        módulo roda depois da análise do HTML, então os cards apareceriam
+        inteiros por um quadro e SÓ ENTÃO sumiriam pra entrar de novo — o
+        piscar clássico. Aqui o atributo já existe quando o CSS pinta.
+
+        O `reveal` esconde com opacity e nada mais: a página nasce com a altura
+        final em qualquer um dos caminhos, então nenhum deles desloca layout. */}
+    <script is:inline>
+      try {
+        var stored = null;
+        try { stored = sessionStorage.getItem('motion-mode'); } catch (e) {}
+        var reduced = stored === 'reduced' || stored === 'full'
+          ? stored === 'reduced'
+          : matchMedia('(prefers-reduced-motion: reduce)').matches;
+        document.documentElement.dataset.motion = reduced ? 'reduced' : 'full';
+        if (!reduced) document.documentElement.dataset.workReveal = 'armed';
+      } catch (e) {}
+    </script>
+  </Fragment>
+
+  <div class="paper" aria-hidden="true"></div>
+
+  <a class="back" href="/">‹ Back</a>
+
+  <!-- o mesmo botão do index.astro, ligado pelo mesmo scripts/theme.ts: o tema
+       é da página inteira, e uma rota que não deixa trocá-lo é uma rota que
+       esquece a escolha de quem já a fez -->
+  <button class="theme" data-theme-toggle aria-pressed="false" aria-label="Toggle dark theme" title="Light / dark theme">
+    <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+    </svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  </button>
+
+  <main class="work" style={`--lanes:${maxLanes}`}>
+    <div class="work-inner">
+      <header class="work-head">
+        <h1>Work</h1>
+        <p class="lead">
+          Jobs, university and the things that came out of both — on one line, because
+          that’s how they happened. Where the tracks run side by side, they were running
+          at the same time.
+        </p>
+      </header>
+
+      {segments.map((segment) => (
+        <section class="segment" aria-labelledby={`segment-${segment.id}`}>
+          <h2 class="segment-label" id={`segment-${segment.id}`}>{segment.label}</h2>
+
+          {/* --lanes dimensiona a calha: é a maior simultaneidade DESTE
+              segmento, calculada no build (data/work.ts → lanesFor). */}
+          <div class="timeline" style={`--lanes:${segment.lanes}`}>
+            {/* O trilho apagado existe sempre — é ele que reserva o espaço e
+                que É a linha em baixa animação. A tinta por cima é a que se
+                desenha na rolagem (scripts/work.ts). */}
+            <span class="spine-rail" aria-hidden="true"></span>
+            <span class="spine-ink" data-spine aria-hidden="true"></span>
+
+            <ol class="entries">
+              {group(segment.rows).map((item) =>
+                item.kind === 'entry' ? (
+                  (() => {
+                    const { entry, row, year } = item.row;
+                    const dates = range(entry);
+                    return (
+                      <li class:list={['entry', `w${entry.weight}`]} data-entry>
+                        {year !== null && <span class="year" data-reveal>{year}</span>}
+                        <span class:list={['node', `is-${entry.kind}`]} data-reveal aria-hidden="true"></span>
+
+                        {/* A calha. aria-hidden porque ela não guarda NENHUM
+                            fato próprio: o que ela mostra em forma — quem
+                            convivia com quem — já está nas datas de cada card,
+                            que um leitor de tela lê em sequência. */}
+                        <div class="lanes" aria-hidden="true">
+                          {laneRow(segment, row).map((cell) => (
+                            <i class:list={['lane', cell && `is-${cell}`]}></i>
+                          ))}
+                        </div>
+
+                        <article class="card">
+                          <h3 data-reveal>{entry.title}</h3>
+
+                          <p class="meta" data-reveal>
+                            {entry.org && (
+                              <>
+                                {entry.href ? (
+                                  <a class="org" href={entry.href} rel="noopener noreferrer" target="_blank">{entry.org}</a>
+                                ) : (
+                                  <span class="org">{entry.org}</span>
+                                )}
+                                <span class="sep" aria-hidden="true">·</span>
+                              </>
+                            )}
+                            <span class="dates">
+                              <time datetime={dates.from.dt}>{dates.from.label}</time>
+                              {dates.to && <> – <time datetime={dates.to.dt}>{dates.to.label}</time></>}
+                              {dates.present && <> – present</>}
+                            </span>
+                          </p>
+
+                          {entry.badge && <p class="badge" data-reveal>{entry.badge}</p>}
+
+                          {entry.summary && <p class="summary" data-reveal>{entry.summary}</p>}
+
+                          {entry.impact && (
+                            <ul class="impact" data-reveal>
+                              {entry.impact.slice(0, 3).map((line) => <li>{line}</li>)}
+                            </ul>
+                          )}
+
+                          {entry.stack && (
+                            <ul class="chips" data-reveal>
+                              {entry.stack.map((tech) => <li>{tech}</li>)}
+                            </ul>
+                          )}
+                        </article>
+                      </li>
+                    );
+                  })()
+                ) : (
+                  /* O bloco condensado: UM nó na linha para os três, e as
+                     pistas continuando linha a linha por dentro dele — sem
+                     isso o encontro de quatro coisas ao mesmo tempo morria
+                     justamente aqui, que é onde ele acontece. */
+                  <li class="entry cluster" data-entry>
+                    <span class="node is-role" data-reveal aria-hidden="true"></span>
+
+                    <div class="cluster-body">
+                      {/* O rótulo tem calha própria: sem ela as pistas que só
+                          estão de passagem abriam um vão branco na altura
+                          dele — ver laneRowAbove, em data/work.ts. */}
+                      <div class="cluster-head">
+                        <span class="lanes" aria-hidden="true">
+                          {laneRowAbove(segment, item.rows[0].row).map((cell) => (
+                            <i class:list={['lane', cell && `is-${cell}`]}></i>
+                          ))}
+                        </span>
+                        <h3 class="cluster-label" data-reveal>Alongside</h3>
+                      </div>
+
+                      <ul class="cluster-rows">
+                        {item.rows.map(({ entry, row }) => {
+                          const dates = range(entry);
+                          return (
+                            <li class="cluster-row" data-reveal>
+                              <span class="lanes" aria-hidden="true">
+                                {laneRow(segment, row).map((cell) => (
+                                  <i class:list={['lane', cell && `is-${cell}`]}></i>
+                                ))}
+                              </span>
+                              <span class="cluster-text">
+                                <span class="cluster-title">{entry.title}</span>
+                                {entry.org && (
+                                  <>
+                                    <span class="sep" aria-hidden="true">·</span>
+                                    <span class="org">{entry.org}</span>
+                                  </>
+                                )}
+                                <span class="sep" aria-hidden="true">·</span>
+                                <span class="dates">
+                                  <time datetime={dates.from.dt}>{dates.from.label}</time>
+                                  {dates.to && <> – <time datetime={dates.to.dt}>{dates.to.label}</time></>}
+                                </span>
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </li>
+                ),
+              )}
+            </ol>
+          </div>
+        </section>
+      ))}
+
+      <!-- A saída. Uma linha e mais nada: o que é feito por gosto não divide
+           página com o que é feito por contrato. -->
+      <p class="craft-note">{CRAFT_NOTE} <a href="/craft">/craft</a>.</p>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { initTheme } from '../scripts/theme';
+  import { initWork } from '../scripts/work';
+  initTheme();
+  initWork();
+</script>
+
+<style>
+  /* O papel como ELEMENTO, pelo mesmo motivo do index.astro: o body desta
+     página não carrega o fundo sozinho de forma confiável quando o conteúdo é
+     fixo/curto, e um retângulo de verdade repinta na troca de tema sempre. */
+  .paper {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--paper);
+    transition: background-color var(--theme-fade);
+  }
+
+  /* ——— quem rola nesta página é o DOCUMENTO ———
+     O global.css trava o body em `height: 100%` e `overflow: hidden` por causa
+     da home, onde tudo é fixo e o canvas manda. Aqui isso precisa voltar ao
+     normal, e não basta devolver o overflow ao body: com o body rolando por
+     conta própria, `window.scrollY` fica parado em 0 — e é dele que dependem
+     TANTO a scrollbar desenhada do Layout (scripts/liquidScrollbar.ts) quanto
+     o ScrollTrigger, que sem isso não veria rolagem nenhuma e nunca revelaria
+     um card. Devolvendo altura automática aos dois, o documento volta a ser o
+     elemento de rolagem e os dois funcionam sem configuração especial. */
+  /* `overflow: visible` NOS DOIS EIXOS, e isso é obrigatório, não preferência.
+     A tentação aqui é escrever `overflow-x: hidden` junto, por garantia contra
+     estouro lateral — e é exatamente isso que quebra a roda do mouse. Misturar
+     `visible` num eixo com `hidden` no outro é combinação ilegal: a
+     especificação manda o eixo `visible` virar `auto`. O body então vira um
+     CONTÊINER DE ROLAGEM com `height: auto` — ou seja, um contêiner cuja altura
+     já é a do próprio conteúdo e que, portanto, não tem o que rolar. A roda
+     encontra esse contêiner primeiro, não acha folga nenhuma, e o
+     `overscroll-behavior: none` que o global.css põe aqui (ele existe pro
+     carrossel da home, onde o gesto lateral não pode virar "voltar página")
+     impede o movimento de subir pro viewport. Resultado: roda morta, enquanto
+     teclado e scrollTo() continuam funcionando — os dois falam com o
+     scrollingElement direto e não passam por essa cadeia.
+
+     Deixando os dois eixos em `visible`, ninguém aqui é contêiner de rolagem e
+     quem rola é o viewport, que é o certo: é dele que a scrollbar do Layout
+     (scripts/liquidScrollbar.ts) e o ScrollTrigger leem a posição. */
+  :global(html:has(.work)),
+  :global(body:has(.work)) {
+    height: auto;
+    overflow: visible;
+  }
+
+  /* ——— voltar: a MESMA linha que cresce do .about-close e do .mural-back ——— */
+  .back {
+    position: fixed;
+    top: 1.5rem;
+    left: 2rem;
+    z-index: 6;
+    padding: 0.35rem 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--ink);
+    text-decoration: none;
+    transition: color var(--theme-fade);
+  }
+  .back::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .back:hover::after,
+  .back:focus-visible::after {
+    transform: scaleX(1);
+  }
+  :global(html[data-motion='reduced']) .back::after {
+    transition: none;
+  }
+
+  /* ——— tema: a cápsula do index.astro, sem mudar medida nenhuma ——— */
+  .theme {
+    position: fixed;
+    top: 1.3rem;
+    right: 1.5rem;
+    z-index: 6;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(var(--ink-rgb), 0.12);
+    border-radius: 999px;
+    background: rgba(90, 90, 90, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.2s, color var(--theme-fade), border-color var(--theme-fade);
+  }
+  .theme:hover {
+    background: rgba(90, 90, 90, 0.42);
+  }
+  .theme svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    transition: opacity var(--theme-fade), transform var(--theme-fade);
+  }
+  .theme .icon-sun {
+    opacity: 0;
+    transform: rotate(-90deg);
+  }
+  :global(html[data-theme='dark']) .theme .icon-moon {
+    opacity: 0;
+    transform: rotate(90deg);
+  }
+  :global(html[data-theme='dark']) .theme .icon-sun {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ——— medidas da linha do tempo ———
+     Tudo que a calha e a linha precisam sai daqui, e só daqui: mexer no número
+     de pistas ou na largura do ano não pede tocar em regra nenhuma abaixo. */
+  .work {
+    --year-w: 3.25rem;
+    /* larga o bastante pra AFASTAR a primeira pista do nó: encostadas, a pista
+       e a linha da cronologia viram um par de traços gêmeos e deixam de se ler
+       como duas coisas diferentes */
+    --spine-w: 2.1rem;
+    --lane-col: 0.55rem;     /* passo entre pistas */
+    --lane-line: 2px;        /* espessura da pista */
+    /* O `--lanes` que esta conta enxerga é o do PRÓPRIO .work, posto como
+       style inline no elemento (a maior simultaneidade da página). Não é
+       detalhe: `var()` dentro de custom property resolve no elemento que a
+       declara, então um `--lanes` que só existisse mais pra dentro, no
+       .timeline, nunca chegaria aqui. Ver o comentário do maxLanes lá em cima. */
+    --lanes-w: calc(var(--lanes, 0) * var(--lane-col));
+    /* onde a linha vertical passa: o meio da coluna do nó */
+    --spine-x: calc(var(--year-w) + var(--spine-w) / 2);
+    --node: 9px;
+    /* o recuo que separa o card das pistas. Vive numa variavel porque o
+       cabecalho, os rotulos de segmento e a linha do /craft se penduram no
+       MESMO numero pra alinhar com o texto dos cards — uma vertical so. */
+    --card-pad: 1.5rem;
+    /* a linha começa NO primeiro nó, não no topo da caixa: um toco acima do
+       primeiro ponto se lê como uma linha que vem de algum lugar anterior */
+    --spine-top: 0.9rem;
+  }
+
+  .work-inner {
+    /* a coluna de LEITURA continua sendo a do About (42rem); o que cresce aqui
+       é só a moldura à esquerda dela — ano, nó e calha */
+    max-width: calc(42rem + var(--year-w) + var(--spine-w) + var(--lanes-w) + var(--card-pad));
+    margin: 0 auto;
+    padding: 6rem 1.5rem 7rem;
+  }
+
+  .work-head {
+    /* alinha a abertura com os CARDS, não com a borda da página: o título
+       nascendo na mesma vertical do texto das entradas é o que faz a linha
+       parecer que sai de dentro da página, e não colada nela */
+    padding-left: calc(var(--year-w) + var(--spine-w) + var(--lanes-w) + var(--card-pad));
+    margin-bottom: 4rem;
+  }
+
+  h1 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(2.2rem, 5.5vw, 3.4rem);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin-bottom: 1rem;
+  }
+
+  .lead {
+    max-width: 42rem;
+    font-size: 1.05rem;
+    line-height: 1.65;
+    color: rgba(var(--ink-rgb), 0.7);
+    transition: color var(--theme-fade);
+  }
+
+  /* ——— segmentos: Now / Before ——— */
+  .segment + .segment {
+    margin-top: 4.5rem;
+  }
+  .segment-label {
+    padding-left: calc(var(--year-w) + var(--spine-w) + var(--lanes-w) + var(--card-pad));
+    margin-bottom: 1.75rem;
+    font-family: "Inter", sans-serif;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(var(--ink-rgb), 0.6);
+    transition: color var(--theme-fade);
+  }
+
+  /* ——— a linha ———
+     Dois elementos empilhados no mesmo lugar: o trilho apagado, que existe
+     sempre, e a tinta, que se desenha de cima pra baixo conforme a página rola
+     (scripts/work.ts). Em baixa animação a tinta já nasce inteira. */
+  .timeline {
+    position: relative;
+  }
+  .spine-rail,
+  .spine-ink {
+    position: absolute;
+    top: var(--spine-top);
+    bottom: 0;
+    left: var(--spine-x);
+    width: 1px;
+  }
+  .spine-rail {
+    background: rgba(var(--ink-rgb), 0.14);
+    transition: background-color var(--theme-fade);
+  }
+  .spine-ink {
+    background: rgba(var(--ink-rgb), 0.42);
+    transform-origin: top;
+    transition: background-color var(--theme-fade);
+  }
+
+  .entries {
+    list-style: none;
+  }
+
+  /* Uma linha da grade por entrada. As colunas são fixas à esquerda (ano, nó,
+     calha) e elásticas à direita (o card).
+
+     O respiro entre entradas é PADDING, nunca margin: a calha é desenhada
+     dentro da célula de cada linha, e uma margem abriria um vão branco entre a
+     pista de uma linha e a da seguinte — a coluna deixaria de se ler como uma
+     coisa contínua. */
+  .entry {
+    display: grid;
+    grid-template-columns: var(--year-w) var(--spine-w) var(--lanes-w) minmax(0, 1fr);
+    align-items: stretch;
+    position: relative;
+  }
+
+  /* Onde o nó fica na vertical, medido do topo da linha: é o meio da primeira
+     linha do título. As pistas usam a MESMA medida pra começar e terminar
+     exatamente na altura do nó. */
+  .entry.w1 { --node-y: 0.95rem; --gap: 3.25rem; }
+  .entry.w2 { --node-y: 0.8rem;  --gap: 2.75rem; }
+  .entry.cluster { --node-y: 0.72rem; --gap: 2.75rem; }
+
+  /* O respiro entre entradas mora no CARD, e não como padding da <li>.
+     A diferença não é de gosto: as faixas de uma grade vivem dentro da caixa
+     de CONTEÚDO, então um padding na <li> fica FORA da faixa — e a pista, que
+     se estica pela faixa, parava na última linha do card e recomeçava só na
+     entrada seguinte, com um vão branco no meio. Empurrando pelo card, é a
+     própria faixa que cresce, e a pista atravessa o intervalo inteira. */
+  .card,
+  .cluster-body {
+    margin-bottom: var(--gap);
+  }
+  .entries > .entry:last-child .card,
+  .entries > .entry:last-child .cluster-body {
+    margin-bottom: 0;
+  }
+
+  .year {
+    grid-column: 1;
+    align-self: start;
+    margin-top: calc(var(--node-y) - 0.5em);
+    padding-right: 0.9rem;
+    text-align: right;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    line-height: 1;
+    color: rgba(var(--ink-rgb), 0.6);
+    transition: color var(--theme-fade);
+  }
+
+  /* ——— os nós: a forma diz a trilha, sem legenda ———
+     cheio = cargo · vazado = coisa construída · losango = reconhecimento.
+     O anel de papel em volta é o que abre o buraco na linha por trás. */
+  .node {
+    grid-column: 2;
+    align-self: start;
+    justify-self: center;
+    width: var(--node);
+    height: var(--node);
+    margin-top: calc(var(--node-y) - var(--node) / 2);
+    border-radius: 999px;
+    background: var(--ink);
+    box-shadow: 0 0 0 4px var(--paper);
+    transition: background-color var(--theme-fade), box-shadow var(--theme-fade),
+      border-color var(--theme-fade);
+  }
+  .node.is-build {
+    background: var(--paper);
+    border: 1.5px solid rgba(var(--ink-rgb), 0.55);
+  }
+  /* ——— o nó acende quando a tinta da linha chega nele ———
+
+     Repare no sentido das regras: o estado ACESO é o que as declarações acima
+     já descrevem, e o que se escreve aqui é só o APAGADO. Isso não é economia
+     de linha — é o que mantém o caminho sem JavaScript correto de graça. Quem
+     abre em baixa animação, com o script quebrado ou sem JS nenhum não tem o
+     data-work-reveal no <html>, então nada disto casa e todo nó nasce cheio,
+     que é o estado final. O apagado é o transitório, e transitório é
+     exatamente o que não pode ser o padrão.
+
+     A borda entra no lugar do preenchimento, e não somada a ele: com o
+     box-sizing: border-box do global.css o quadrado segue com os mesmos 9px
+     aceso ou apagado, então acender não mexe em medida nenhuma.
+
+     Quem manda no acender é scripts/work.ts, pendurado no mesmo ScrollTrigger
+     que escala a linha. */
+     A transição rápida vive DENTRO do estado armado, e não na regra base: só
+     ali existe acender, e assim o caminho sem movimento fica com o
+     var(--theme-fade) da regra de cima intacto — quem nunca vê o nó acender
+     não devia ter o fade de tema encurtado por causa disso. */
+  :global(html[data-work-reveal='armed']) .node {
+    transition: background-color 260ms ease, border-color 260ms ease,
+      box-shadow var(--theme-fade);
+  }
+  :global(html[data-work-reveal='armed']) .node:not(.is-lit) {
+    background: transparent;
+    border: 1.5px solid rgba(var(--ink-rgb), 0.22);
+  }
+
+  .node.is-recognition {
+    /* o mesmo raio de 2px da moldura de foto do About — sem valor novo */
+    border-radius: 2px;
+    transform: rotate(45deg);
+  }
+
+  /* ——— a calha das pistas ———
+     Uma coluna por pista, e cada linha desenha só o pedaço que passa por ela:
+     início (do nó pra baixo), passagem (a linha inteira), fim (até o nó) ou
+     solo. Como o pedaço é sempre LOCAL à linha, não há nada a medir em
+     JavaScript — a coluna se costura sozinha, e por isso não existe momento
+     nenhum em que ela mude de tamanho depois de pintada. */
+  .lanes {
+    grid-column: 3;
+    display: grid;
+    grid-template-columns: repeat(var(--lanes, 0), var(--lane-col));
+    align-items: stretch;
+  }
+  /* A coluna vazia existe de propósito e continua sem traço nenhum: sem ela as
+     pistas escorregariam de coluna de uma linha pra outra. Por isso o fundo é
+     dos ESTADOS, nunca da base. */
+  /* Sem raio na base, e ISSO importa: uma pista longa é montada em pedaços,
+     um por linha da grade, e arredondar todos faria a coluna aparecer
+     estrangulada em cada emenda — uma fieira de contas em vez de um traço. O
+     raio fica só nas PONTAS de verdade, embaixo. */
+  .lane {
+    width: var(--lane-line);
+  }
+  .lane.is-start,
+  .lane.is-through,
+  .lane.is-end,
+  .lane.is-solo {
+    background: rgba(var(--ink-rgb), 0.28);
+    transition: background-color var(--theme-fade);
+  }
+  .lane.is-start {
+    margin-top: var(--node-y);
+    border-radius: 999px 999px 0 0;
+  }
+  .lane.is-end {
+    align-self: start;
+    height: var(--node-y);
+    border-radius: 0 0 999px 999px;
+  }
+  .lane.is-solo {
+    align-self: start;
+    margin-top: calc(var(--node-y) - 0.55rem);
+    height: 1.1rem;
+    border-radius: 999px;
+  }
+
+  /* ——— os cards ———
+     O hover é UMA propriedade e nada mais, no mesmo cinza translúcido que o
+     About já usa nas molduras vazias. */
+  .card {
+    grid-column: 4;
+    padding: 0 0 0 var(--card-pad);
+    border-radius: 2px;
+    transition: background-color 160ms ease;
+  }
+  .w1 .card:hover,
+  .w2 .card:hover {
+    background-color: rgba(var(--ink-rgb), 0.02);
+  }
+  :global(html[data-motion='reduced']) .card {
+    transition: none;
+  }
+
+  .card h3 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+  }
+  .w1 .card h3 {
+    font-size: clamp(1.35rem, 3.4vw, 1.6rem);
+  }
+  .w2 .card h3 {
+    font-size: 1.15rem;
+  }
+
+  .meta {
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: rgba(var(--ink-rgb), 0.6);
+    transition: color var(--theme-fade);
+  }
+  .sep {
+    margin: 0 0.45em;
+  }
+  .org {
+    font-weight: 600;
+    color: rgba(var(--ink-rgb), 0.75);
+    transition: color var(--theme-fade);
+  }
+  a.org {
+    text-decoration: none;
+    border-bottom: 1px solid rgba(var(--ink-rgb), 0.3);
+    transition: border-color 160ms ease, color var(--theme-fade);
+  }
+  a.org:hover,
+  a.org:focus-visible {
+    border-bottom-color: currentColor;
+  }
+
+  /* o reconhecimento dito por extenso — o losango na linha diz que existe, e
+     isto diz o quê */
+  .badge {
+    display: inline-block;
+    margin-top: 0.7rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid rgba(var(--ink-rgb), 0.22);
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(var(--ink-rgb), 0.6);
+    transition: color var(--theme-fade), border-color var(--theme-fade);
+  }
+
+  .summary {
+    margin-top: 0.9rem;
+    line-height: 1.75;
+    color: rgba(var(--ink-rgb), 0.78);
+    transition: color var(--theme-fade);
+  }
+  .w2 .summary {
+    font-size: 0.95rem;
+  }
+
+  .impact {
+    margin-top: 1.1rem;
+    padding-left: 1.1rem;
+    list-style: none;
+  }
+  .impact li {
+    position: relative;
+    margin-bottom: 0.6rem;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: rgba(var(--ink-rgb), 0.72);
+    transition: color var(--theme-fade);
+  }
+  .impact li::before {
+    content: '';
+    position: absolute;
+    left: -1.1rem;
+    top: 0.62em;
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(var(--ink-rgb), 0.35);
+  }
+  .impact li:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ——— chips: TEXTO, e nada além disso ———
+     Mesma micro-tipografia do .slot-note do About. */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 1.2rem;
+    list-style: none;
+  }
+  .chips li {
+    padding: 0.28rem 0.6rem;
+    border: 1px solid rgba(var(--ink-rgb), 0.16);
+    border-radius: 999px;
+    background: rgba(var(--ink-rgb), 0.02);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(var(--ink-rgb), 0.6);
+    transition: color var(--theme-fade), border-color var(--theme-fade),
+      background-color var(--theme-fade);
+  }
+
+  /* ——— o bloco condensado ———
+     Um nó só, e por dentro as pistas seguem linha a linha: é aqui que duas das
+     quatro coisas simultâneas de mar–jun 2025 moram, e uma calha de bloco
+     inteiro apagaria justamente o encontro. */
+  .entry.cluster {
+    grid-template-columns: var(--year-w) var(--spine-w) minmax(0, 1fr);
+  }
+  .cluster-body {
+    grid-column: 3;
+  }
+  /* o rótulo e a calha que atravessa a altura dele, lado a lado */
+  .cluster-head {
+    display: grid;
+    grid-template-columns: var(--lanes-w) minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .cluster-head .lanes {
+    grid-column: 1;
+  }
+  .cluster-label {
+    grid-column: 2;
+    padding-left: var(--card-pad);
+    font-family: "Inter", sans-serif;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(var(--ink-rgb), 0.6);
+    transition: color var(--theme-fade);
+  }
+  /* o respiro abaixo do rótulo é do RÓTULO, não da lista: posto na lista ele
+     ficaria fora das duas faixas e abriria de novo um vão na pista */
+  .cluster-label {
+    margin-bottom: 0.5rem;
+  }
+  .cluster-rows {
+    list-style: none;
+  }
+  .cluster-row {
+    /* --node-y aqui é o meio da linha de texto, não do título do bloco: é onde
+       as pistas desta linha começam e terminam */
+    --node-y: 0.72rem;
+    display: grid;
+    grid-template-columns: var(--lanes-w) minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .cluster-row .lanes {
+    grid-column: 1;
+  }
+  /* mesmo motivo do .card lá em cima: o respiro precisa estar DENTRO da faixa
+     da grade, senão a pista não atravessa o intervalo entre as linhas */
+  .cluster-row:not(:last-child) .cluster-text {
+    margin-bottom: 0.7rem;
+  }
+  .cluster-text {
+    grid-column: 2;
+    padding-left: var(--card-pad);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: rgba(var(--ink-rgb), 0.6);
+    transition: color var(--theme-fade);
+  }
+  .cluster-title {
+    color: rgba(var(--ink-rgb), 0.75);
+    transition: color var(--theme-fade);
+  }
+  .cluster-row .org {
+    font-weight: 400;
+    color: rgba(var(--ink-rgb), 0.6);
+  }
+
+  /* ——— a saída pro /craft ——— */
+  .craft-note {
+    margin-top: 5rem;
+    padding-left: calc(var(--year-w) + var(--spine-w) + var(--lanes-w) + var(--card-pad));
+    font-size: 0.9rem;
+    color: rgba(var(--ink-rgb), 0.6);
+    transition: color var(--theme-fade);
+  }
+  .craft-note a {
+    color: rgba(var(--ink-rgb), 0.75);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(var(--ink-rgb), 0.3);
+    transition: border-color 160ms ease, color var(--theme-fade);
+  }
+  .craft-note a:hover,
+  .craft-note a:focus-visible {
+    border-bottom-color: currentColor;
+  }
+
+  /* ——— foco: a mesma linha visível do resto do site ——— */
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* ——— a revelação ———
+     O sinalizador vive no <html> com nome PRÓPRIO (data-work-reveal), separado
+     do [data-reveal] que marca cada pedaço a revelar: fossem o mesmo nome, um
+     querySelectorAll('[data-reveal]') solto acharia o <html> junto com os
+     cards e tentaria animar a raiz do documento.
+     Ele é posto pelo script inline do <head>, e SÓ quando há movimento:
+     sem JS, com JS quebrado ou em baixa animação, nada aqui existe e a página
+     nasce no estado final. Só opacity — a altura é a mesma nos dois casos. */
+  :global(html[data-work-reveal='armed']) [data-reveal] {
+    opacity: 0;
+  }
+
+  /* ——— telas estreitas ———
+     A linha vira um trilho à esquerda e a calha aperta, mas nenhum card perde
+     conteúdo: peso 1 continua com parágrafo, tópicos e chips. */
+  @media (max-width: 46rem) {
+    .work {
+      --year-w: 2.4rem;
+      --spine-w: 1.4rem;
+      --lane-col: 0.4rem;
+      --node: 8px;
+      --card-pad: 1rem;
+    }
+    .work-inner {
+      padding: 5rem 1rem 5rem;
+    }
+    .card,
+    .cluster-text {
+      padding-left: var(--card-pad);
+    }
+    .cluster-label {
+      padding-left: calc(var(--lanes-w) + var(--card-pad));
+    }
+    .craft-note {
+      padding-left: calc(var(--year-w) + var(--spine-w) + var(--lanes-w) + var(--card-pad));
+    }
+    .back {
+      left: 1rem;
+    }
+    .theme {
+      right: 1rem;
+      width: 40px;
+      height: 40px;
+    }
+    .year {
+      padding-right: 0.5rem;
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+    }
+  }
+
+  /* 320px. A moldura à esquerda (ano + nó + calha) é fixa, então cada décimo
+     que ela ocupa sai direto da medida do texto — aqui ela é espremida até o
+     mínimo legível pra sobrarem ~200px de coluna de leitura. A calha continua
+     com as quatro pistas: é justamente na tela mais estreita que a informação
+     "isto tudo ao mesmo tempo" tem menos chance de aparecer sozinha. */
+  @media (max-width: 22.5rem) {
+    .work {
+      --year-w: 2rem;
+      --spine-w: 1.2rem;
+      --lane-col: 0.35rem;
+      --lane-line: 2px;
+      --card-pad: 0.75rem;
+    }
+    .card,
+    .cluster-text {
+      padding-left: var(--card-pad);
+    }
+    .cluster-label {
+      padding-left: calc(var(--lanes-w) + var(--card-pad));
+    }
+    .craft-note {
+      padding-left: calc(var(--year-w) + var(--spine-w) + var(--lanes-w) + var(--card-pad));
+    }
+    .year {
+      padding-right: 0.35rem;
+      font-size: 0.6rem;
+      letter-spacing: 0;
+    }
+  }
+</style>

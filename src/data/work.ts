@@ -40,6 +40,7 @@ export interface Entry {
   stack?: string[];
   href?: string;
   badge?: string;
+  logo?: string;
 }
 
 export const ENTRIES: Entry[] = [
@@ -53,6 +54,7 @@ export const ENTRIES: Entry[] = [
     end: 'present',
     badge: 'PIBEP 2026',
     href: 'https://usenock.com/',
+    logo: '/images/work/nock.svg',
     summary:
       'B2B lead enrichment for the Brazilian market. I work across the product as a ' +
       'generalist and increasingly on the data side — right now I’m structuring the ' +
@@ -71,6 +73,7 @@ export const ENTRIES: Entry[] = [
     weight: 1,
     title: 'Data Analyst Intern',
     org: 'Bradesco Seguros',
+    logo: '/images/work/bradesco-seguros.png',
     start: '2025-11',
     end: 'present',
     summary:
@@ -91,6 +94,7 @@ export const ENTRIES: Entry[] = [
     weight: 1,
     title: 'Web Development Intern',
     org: 'Trade Stars',
+    logo: '/images/work/trade-stars.png',
     start: '2025-05',
     end: '2025-10',
     summary:
@@ -130,6 +134,7 @@ export const ENTRIES: Entry[] = [
     weight: 2,
     title: 'President',
     org: 'Builders Club, PUCPR',
+    logo: '/images/work/pucpr.png',
     start: '2026-04',
     end: 'present',
     summary:
@@ -166,6 +171,7 @@ export const ENTRIES: Entry[] = [
     weight: 3,
     title: 'Academic Monitor, Business Process Modeling',
     org: 'PUCPR',
+    logo: '/images/work/pucpr.png',
     start: '2025-03',
     end: '2025-06',
   },
@@ -184,6 +190,7 @@ export const ENTRIES: Entry[] = [
     weight: 3,
     title: 'Volunteer organizer',
     org: 'CBSoft 2024 · Curitiba',
+    logo: '/images/work/cbsoft.png',
     start: '2024',
     end: '2024',
   },

@@ -13,7 +13,10 @@ export function initWork() {
   const reduced = mode === 'reduced' ||
     (!mode && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-  const waitForPanel = (timeout = 1000) => {
+  // A cortina dura mais que antes de propósito (ver --open-dur em work.astro),
+  // e a rede de segurança tem que caber a duração inteira: cortá-la no meio
+  // deixaria a folha congelada em cima da página.
+  const waitForPanel = (timeout = 1600) => {
     const panel = transition?.querySelector<HTMLElement>('.work-transition-panel');
     if (!panel) return Promise.resolve();
 
@@ -41,11 +44,18 @@ export function initWork() {
 
   // A primeira metade aconteceu no anel. Aqui a pintura se parte ao meio e
   // revela a lista — sem marcador (link direto ou reload), nada é encenado.
+  //
+  // A marca troca de valor em vez de sair: 'armed' é o quadro parado que a home
+  // entregou, 'opening' é ele se abrindo. Quem responde ao segundo valor é o
+  // CONTEÚDO (ver work.astro), que entra escalonado com a cortina ainda quase
+  // fechada — antes ele já estava montado por baixo e a abertura só o
+  // descobria, então o movimento morria na borda das folhas.
   if (document.documentElement.dataset.workEntry === 'armed') {
     if (reduced || !transition) {
       finishEntry();
     } else {
       requestAnimationFrame(() => {
+        document.documentElement.dataset.workEntry = 'opening';
         transition.classList.add('is-opening');
         void waitForPanel().then(finishEntry);
       });

@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { ENTRIES, range, type Entry } from '../data/work';
+import { WORK_SEAM } from '../scripts/workNavigation';
 
 const entries = [...ENTRIES].sort((a, b) => {
   const aCurrent = a.end === 'present';
@@ -47,8 +48,23 @@ function hasDetails(entry: Entry) {
 
     {/* A home termina coberta pela pintura do segmento Work. Esta marca nasce
         antes do primeiro paint para a página começar no mesmo quadro e só
-        então abrir as duas folhas sobre o conteúdo. */}
-    <script is:inline>
+        então abrir as duas folhas sobre o conteúdo.
+
+        As três medidas da emenda descem junto, e pelo mesmo motivo do outro
+        lado da troca (ver index.astro): elas são o contrato entre os dois
+        documentos, e um número que só valesse aqui já seria uma emenda
+        visível. */}
+    <script
+      is:inline
+      define:vars={{
+        seamAspect: WORK_SEAM.aspect,
+        seamOverscan: WORK_SEAM.overscan,
+        seamRotation: WORK_SEAM.rotation,
+      }}
+    >
+      document.documentElement.style.setProperty('--seam-aspect', seamAspect);
+      document.documentElement.style.setProperty('--seam-overscan', seamOverscan);
+      document.documentElement.style.setProperty('--seam-rotation', seamRotation + 'deg');
       try {
         if (sessionStorage.getItem('portfolio:work-entry')) {
           sessionStorage.removeItem('portfolio:work-entry');
@@ -62,10 +78,10 @@ function hasDetails(entry: Entry) {
 
   <div class="work-transition" data-work-transition aria-hidden="true">
     <div class="work-transition-panel is-left">
-      <img src="/textures/work.jpg" alt="" />
+      <div class="work-seam"><img src="/textures/work.jpg" alt="" /></div>
     </div>
     <div class="work-transition-panel is-right">
-      <img src="/textures/work.jpg" alt="" />
+      <div class="work-seam"><img src="/textures/work.jpg" alt="" /></div>
     </div>
     <span class="work-transition-title">
       <small>Selected</small>
@@ -105,7 +121,7 @@ function hasDetails(entry: Entry) {
           const dialogId = `work-details-${entry.id}`;
 
           return (
-            <li class="experience-item">
+            <li class="experience-item" style={`--i:${index + 1}`}>
               <div
                 class:list={['experience-mark', entry.logo && 'has-image']}
                 style={`--mark-hue:${(index * 47 + 258) % 360}`}
@@ -256,26 +272,69 @@ function hasDetails(entry: Entry) {
     overflow: visible;
   }
 
+  /* A goteira da barra de rolagem fica reservada SEMPRE. Sem isto, travar a
+     rolagem (na cortina e nos diálogos) devolvia ~15px de largura à página, e
+     a lista inteira dava um pulo lateral no meio da abertura — bem no momento
+     em que ela está entrando. Como esta página rola de qualquer jeito, o
+     espaço reservado não custa nada fora da transição. */
+  :global(html:has(.work-page)) {
+    scrollbar-gutter: stable;
+  }
+
   :global(body.has-work-dialog) {
     overflow: hidden !important;
   }
 
-  :global(html[data-work-entry='armed'] body),
+  /* Vale enquanto a cortina existe — armada E abrindo. Só em 'armed' a
+     rolagem voltava assim que a abertura começava. */
+  :global(html[data-work-entry] body),
   :global(body.has-work-transition) {
     overflow: hidden !important;
   }
 
   /* ——— a pintura se abre em duas folhas ———
-     Cada metade carrega uma cópia com 200% da largura: juntas elas recompõem
-     uma única imagem sem emenda, mas podem sair por lados opostos. */
+     As folhas são MÁSCARAS, não cópias: cada uma recorta metade da mesma
+     emenda — a pintura inteira, na proporção da fita e girada como a fita a
+     gira (ver scripts/workNavigation.ts → WORK_SEAM). É o mesmo retângulo que
+     a home desenha no último quadro dela, com a mesma conta, então a troca de
+     documento não troca o desenho.
+
+     Os números da abertura estão logo abaixo, e cada um responde a uma coisa
+     que fazia o corte parecer duro:
+
+     --open-dur / --open-ease  A curva anterior (cubic-bezier(0.76,0,0.24,1))
+        para, chicoteia e para de novo, e o chicote caía justamente no meio da
+        tela. Esta sai depressa — herdando a velocidade com que a pintura
+        chegou — e passa o resto do tempo assentando.
+
+     --seam-parallax  Quanto a pintura ANDA CONTRA a folha que a descobre. Em 1
+        ela ficaria imóvel e só a máscara correria; em 0 a folha vira um cartão
+        rígido voando pro lado, que era o efeito antigo. Perto de 1 é o que faz
+        a página parecer descoberta, e não empurrada.
+
+     --seam-breath  A pintura continua crescendo enquanto abre. Sem isso ela
+        congela no quadro em que a página troca e só então a cortina se mexe —
+        e parada seguida de movimento é exatamente o que se lê como tranco. */
   .work-transition {
+    --open-dur: 1.15s;
+    --open-ease: cubic-bezier(0.32, 0.12, 0.16, 1);
+    --close-dur: 0.9s;
+    --close-ease: cubic-bezier(0.36, 0, 0.22, 1);
+    --seam-parallax: 0.86;
+    --seam-breath: 1.05;
+    --panel-travel: 51vw;
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    /* 100vw, e não `inset: 0`: com a goteira reservada, o bloco de contenção
+       de um fixo para 15px antes da beirada da janela, e a cortina deixava uma
+       tira de papel aparecendo à direita. vw conta a janela inteira. */
+    width: 100vw;
+    height: 100vh;
     z-index: 20;
     visibility: hidden;
     overflow: hidden;
     pointer-events: none;
-    perspective: 1200px;
   }
 
   .work-transition-panel {
@@ -284,43 +343,56 @@ function hasDetails(entry: Entry) {
     bottom: 0;
     width: 50%;
     overflow: hidden;
-    background: #171411;
-    transform: translateX(var(--closed-x));
-    transition: transform 0.82s cubic-bezier(0.76, 0, 0.24, 1);
-    will-change: transform;
+    transform: translateX(var(--panel-x, 0px));
   }
 
   .work-transition-panel.is-left {
-    --closed-x: -102%;
     left: 0;
-    transform-origin: right center;
   }
 
   .work-transition-panel.is-right {
-    --closed-x: 102%;
     right: 0;
-    transform-origin: left center;
   }
 
-  .work-transition-panel img {
+  /* A emenda vive DENTRO de cada folha, mas é medida pela JANELA: por isso ela
+     se ancora na beirada que encosta no centro da tela (100% na folha da
+     esquerda, 0 na da direita). As duas cópias caem no mesmo lugar e a costura
+     entre elas some. */
+  .work-transition .work-seam {
+    --seam-w: calc(max(100vw, 100vh * var(--seam-aspect)) * var(--seam-overscan));
+    --seam-h: calc(var(--seam-w) / var(--seam-aspect));
     position: absolute;
-    top: 0;
-    width: 200%;
-    height: 100%;
-    display: block;
-    max-width: none;
-    object-fit: cover;
+    top: 50%;
+    width: var(--seam-w);
+    height: var(--seam-h);
+    overflow: hidden;
+    background: #171411;
+    transform: translate(-50%, -50%) translateX(var(--seam-x, 0px)) scale(var(--seam-scale, 1));
   }
 
-  .work-transition-panel.is-left img {
+  .work-transition-panel.is-left .work-seam {
+    left: 100%;
+  }
+
+  .work-transition-panel.is-right .work-seam {
     left: 0;
   }
 
-  .work-transition-panel.is-right img {
-    right: 0;
+  /* a pintura chega deitada da fita — ver a mesma regra em index.astro */
+  .work-transition .work-seam img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--seam-h);
+    height: var(--seam-w);
+    display: block;
+    max-width: none;
+    max-height: none;
+    object-fit: fill;
+    transform: translate(-50%, -50%) rotate(var(--seam-rotation));
   }
 
-  .work-transition-panel::after {
+  .work-transition .work-seam::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -337,7 +409,6 @@ function hasDetails(entry: Entry) {
     text-align: center;
     text-shadow: 0 2px 28px rgba(0, 0, 0, 0.42);
     opacity: 0;
-    transition: opacity 0.28s ease, letter-spacing 0.45s ease;
   }
 
   .work-transition-title small {
@@ -356,31 +427,130 @@ function hasDetails(entry: Entry) {
     letter-spacing: -0.065em;
   }
 
-  :global(html[data-work-entry='armed']) .work-transition,
+  /* ——— os três estados da cortina ———
+     FECHADA é o estado natural das regras acima (folhas em 0, pintura em 1):
+     é o quadro que a home entrega e o quadro em que a saída termina. Só a
+     visibilidade precisa ser dita. */
+  :global(html[data-work-entry]) .work-transition,
   .work-transition.is-preparing-exit,
   .work-transition.is-closing {
     visibility: visible;
     pointer-events: auto;
   }
 
-  :global(html[data-work-entry='armed']) .work-transition-panel,
-  .work-transition.is-closing .work-transition-panel {
-    transform: translateX(0);
-  }
-
-  :global(html[data-work-entry='armed']) .work-transition-title,
-  .work-transition.is-closing .work-transition-title {
+  :global(html[data-work-entry]) .work-transition-title {
     opacity: 1;
     letter-spacing: 0.08em;
   }
 
-  .work-transition.is-opening .work-transition-panel {
-    transform: translateX(var(--closed-x));
+  /* ABERTA. O mesmo estado serve para o fim da entrada e para o começo da
+     saída — descrever "aberto" duas vezes seria deixar as duas pontas livres
+     para divergirem no próximo ajuste. */
+  .work-transition.is-opening .work-transition-panel,
+  .work-transition.is-preparing-exit .work-transition-panel {
+    opacity: 0;
   }
 
-  .work-transition.is-opening .work-transition-title {
+  /* Folha e pintura são poses da MESMA folha: as duas variáveis moram no
+     painel e a emenda as herda. Não é arrumação — é o que mantém todos os
+     estados com a mesma forma de seletor. Com `--seam-x` escrito no
+     `.work-seam`, a regra de "aberta" ficava com uma classe a mais que a de
+     "fechando", e como as duas classes convivem na saída (a pose primeiro, o
+     movimento depois) a mais específica vencia: as folhas voltavam ao centro
+     mas a pintura ficava parada no deslocamento do parallax — dois retângulos
+     no meio da tela e papel nas beiradas. */
+  .work-transition.is-opening .is-left,
+  .work-transition.is-preparing-exit .is-left {
+    --panel-x: calc(var(--panel-travel) * -1);
+    --seam-x: calc(var(--panel-travel) * var(--seam-parallax));
+    --seam-scale: var(--seam-breath);
+  }
+
+  .work-transition.is-opening .is-right,
+  .work-transition.is-preparing-exit .is-right {
+    --panel-x: var(--panel-travel);
+    --seam-x: calc(var(--panel-travel) * var(--seam-parallax) * -1);
+    --seam-scale: var(--seam-breath);
+  }
+
+  .work-transition.is-opening .work-transition-title,
+  .work-transition.is-preparing-exit .work-transition-title {
     opacity: 0;
     letter-spacing: 0.22em;
+  }
+
+  /* Só quem ABRE ou FECHA transiciona. `is-preparing-exit` sozinho é uma pose,
+     não um movimento: é ela que dá às folhas um ponto de partida real antes de
+     `is-closing` entrar.
+
+     O will-change mora aqui, e não na regra base, porque fora da transição
+     estas são duas camadas do tamanho da tela paradas numa página que rola. */
+  .work-transition.is-opening .work-transition-panel,
+  .work-transition.is-closing .work-transition-panel {
+    will-change: transform, opacity;
+    transition:
+      transform var(--open-dur) var(--open-ease),
+      opacity calc(var(--open-dur) * 0.4) linear calc(var(--open-dur) * 0.6);
+  }
+
+  .work-transition.is-opening .work-seam,
+  .work-transition.is-closing .work-seam {
+    transition: transform var(--open-dur) var(--open-ease);
+    will-change: transform;
+  }
+
+  .work-transition.is-opening .work-transition-title,
+  .work-transition.is-closing .work-transition-title {
+    transition: opacity calc(var(--open-dur) * 0.4) ease, letter-spacing var(--open-dur) var(--open-ease);
+  }
+
+  /* FECHANDO. Vem depois da regra de "aberta" de propósito: as duas têm a
+     mesma especificidade, e é a ordem que faz o estado final vencer o inicial
+     no mesmo elemento. A curva é outra — quem fecha tem que ENCOSTAR, não
+     assentar, senão o último quadro daqui não bate com o primeiro da home. */
+  .work-transition.is-closing .work-transition-panel {
+    --panel-x: 0px;
+    --seam-x: 0px;
+    --seam-scale: 1;
+    opacity: 1;
+    transition:
+      transform var(--close-dur) var(--close-ease),
+      opacity calc(var(--close-dur) * 0.4) linear;
+  }
+
+  .work-transition.is-closing .work-seam {
+    transition: transform var(--close-dur) var(--close-ease);
+  }
+
+  /* O título espera a pintura chegar. Sem o atraso ele acendia sobre a lista
+     ainda em papel branco, e a palavra aparecia antes do fundo dela. */
+  .work-transition.is-closing .work-transition-title {
+    opacity: 1;
+    letter-spacing: 0.08em;
+    transition:
+      opacity calc(var(--close-dur) * 0.45) ease calc(var(--close-dur) * 0.4),
+      letter-spacing var(--close-dur) var(--close-ease);
+  }
+
+  /* ——— o conteúdo CHEGA, não estava esperando ———
+     Antes a lista já estava montada por baixo e a cortina só a descobria: o
+     movimento acabava na borda das folhas e a página aparecia inteira, parada.
+     O atraso base põe a primeira linha em movimento com a cortina ainda quase
+     fechada, e o escalonamento faz a leitura descer com ela. Sem marca de
+     entrada (link direto, reload, baixa animação) nada disso existe. */
+  :global(html[data-work-entry]) .work-head,
+  :global(html[data-work-entry]) .experience-item {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  :global(html[data-work-entry='opening']) .work-head,
+  :global(html[data-work-entry='opening']) .experience-item {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.7s ease calc(0.16s + var(--i, 0) * 0.06s),
+      transform 0.8s cubic-bezier(0.2, 0.86, 0.24, 1) calc(0.16s + var(--i, 0) * 0.06s);
   }
 
   .back {
@@ -900,7 +1070,10 @@ function hasDetails(entry: Entry) {
     .read-more svg,
     .work-dialog,
     .work-transition-panel,
-    .work-transition-title {
+    .work-transition .work-seam,
+    .work-transition-title,
+    .work-head,
+    .experience-item {
       transition: none;
     }
   }

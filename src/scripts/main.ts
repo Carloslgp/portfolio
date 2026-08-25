@@ -10,7 +10,7 @@ import {
 import { setProgress, hideLoader, awaitGate } from './loading';
 import { reducedMotion } from './motion';
 import { registerScroll } from './scroll';
-import { WORK_ENTRY_KEY, WORK_HOME_KEY, WORK_RETURN_KEY } from './workNavigation';
+import { WORK_ENTRY_KEY, WORK_HOME_KEY, WORK_RETURN_KEY, WORK_SEAM, workSeamBox } from './workNavigation';
 
 // Esta chegada à home veio de DENTRO do site? (o "‹ Voltar" do /photos, o
 // botão voltar do navegador.) A distinção importa porque uma volta não é uma
@@ -142,13 +142,25 @@ export async function bootstrap() {
   initWorkLink(carousel, returningFromWork);
 }
 
-// ——— Work: o segmento vira uma folha que ocupa a tela ———
-
+// ——— Work: o segmento do anel vira a página inteira ———
+//
+// A transição é uma EMENDA, igual à do /photos: o último quadro desta página e
+// o primeiro da /work são a MESMA pintura, no mesmo enquadramento. A diferença
+// para a versão anterior está aí — antes o DOM entrava com um recorte próprio
+// da imagem (`object-fit: cover`) e num tamanho medido no clique, então o que
+// atravessava a troca eram dois desenhos parecidos da mesma pintura, um
+// crescendo por cima do outro. Era isso que se via como a imagem se
+// transformando no meio do caminho.
+//
+// Aqui a emenda contém a pintura INTEIRA, na proporção da fita e girada como a
+// fita a gira (ver scripts/workNavigation.ts → WORK_SEAM). Como ela nunca muda
+// de recorte, sobra um movimento só: uma escala, colada na foto 3D no começo e
+// solta no quadro da emenda no fim.
 function initWorkLink(carousel: Carousel, returningFromWork = false) {
   const portal = document.querySelector<HTMLElement>('[data-work-portal]');
-  const frame = portal?.querySelector<HTMLElement>('[data-work-portal-frame]');
+  const seamEl = portal?.querySelector<HTMLElement>('[data-work-portal-seam]');
   const title = portal?.querySelector<HTMLElement>('[data-work-portal-title]');
-  if (!portal || !frame || !title) return;
+  if (!portal || !seamEl || !title) return;
 
   let leaving = false;
   let revealed: Promise<unknown> = Promise.resolve();
@@ -158,11 +170,11 @@ function initWorkLink(carousel: Carousel, returningFromWork = false) {
     if (transition) revealed = transition.finished.catch(() => {});
   });
 
-  const coverSize = () => {
-    const aspect = 1492 / 2651;
-    const width = Math.max(window.innerWidth, window.innerHeight * aspect) * 1.02;
-    return { width, height: width / aspect };
-  };
+  // O quadro da emenda DESTA janela. Vive aqui fora, e não dentro do avanço,
+  // porque a volta precisa remedi-lo: a janela pode ter mudado de tamanho
+  // enquanto a pessoa lia a /work, e é a medida nova que a outra página acabou
+  // de usar do outro lado.
+  let seam = workSeamBox();
 
   const rememberHome = (animate: boolean) => {
     try {
@@ -172,50 +184,94 @@ function initWorkLink(carousel: Carousel, returningFromWork = false) {
     } catch {}
   };
 
+  // Desenha a emenda no PESO k: 0 = em cima da foto 3D deste quadro, 1 = quadro
+  // da emenda. É a única função que desenha, e por isso ida e volta não podem
+  // divergir — a volta é esta mesma conta com k andando para trás.
+  //
+  // A foto 3D é medida A CADA CHAMADA (frontPhotoSize projeta pela matriz da
+  // câmera deste frame). Medir uma vez e interpolar dali, que é o que estava
+  // aqui antes, dá tamanho certo só no primeiro quadro: a cena continua se
+  // aproximando por baixo, e a diferença entre as duas velocidades é o tranco.
+  const drawSeamAt = (k: number) => {
+    const now = carousel.frontPhotoSize();
+
+    // smootherstep, e não o smoothstep comum: a derivada sai do zero mais
+    // devagar (30k²(1−k)² contra 6k(1−k)), e é justo no comecinho que o
+    // desprendimento apareceria — dali até o quadro da emenda ainda falta muito
+    // caminho, então um peso que cresce rápido demais vira aceleração
+    // repentina mesmo saindo do zero.
+    const w = k * k * k * (k * (k * 6 - 15) + 10);
+    seamEl.style.transform =
+      `translate(-50%, -50%) scale(${(now.w + (seam.w - now.w) * w) / seam.w}, ` +
+      `${(now.h + (seam.h - now.h) * w) / seam.h})`;
+
+    // o crossfade atravessa depressa a faixa do meio, que é onde as duas
+    // imagens aparecem somadas: a fita ainda tem um resto de curvatura e o DOM
+    // é plano, então o miolo delas nunca casa perfeitamente
+    const f = Math.min(1, k / DEPART.flatFade);
+    seamEl.style.opacity = `${f * f * (3 - 2 * f)}`;
+
+    // o título entra depois (ver WORK_SEAM.titleFrom), quando a pintura já
+    // parou de se descolar da cena
+    const t = Math.max(0, (k - WORK_SEAM.titleFrom) / (1 - WORK_SEAM.titleFrom));
+    const e = t * t * (3 - 2 * t);
+    title.style.opacity = `${e}`;
+    title.style.letterSpacing = `${0.22 - 0.14 * e}em`;
+  };
+
+  // A segunda metade do avanço, pendurada no relógio da primeira: recebe o
+  // MESMO progresso já suavizado que move a câmera (ver Carousel.departInto →
+  // onDive). A emenda só começa depois de `flatAt`, quando a curvatura da fita
+  // já chegou a zero e a câmera já pousou.
+  const drawSeam = (p: number) => {
+    if (p < DEPART.flatAt) return;
+    drawSeamAt(Math.min(1, (p - DEPART.flatAt) / (1 - DEPART.flatAt)));
+  };
+
   const settle = () => {
     leaving = false;
     document.body.classList.remove('is-diving');
     document.documentElement.removeAttribute('data-work-return');
     portal.style.visibility = '';
-    frame.removeAttribute('style');
+    seamEl.removeAttribute('style');
     title.removeAttribute('style');
   };
 
   const returnToRing = async (rewindDeparture: boolean) => {
+    seam = workSeamBox();
     portal.style.visibility = 'visible';
     document.body.classList.add('is-diving');
 
-    const rememberedWidth = Number(frame.dataset.startWidth);
-    const rememberedHeight = Number(frame.dataset.startHeight);
-    const current = carousel.frontPhotoSize();
-    const target = {
-      width: rememberedWidth || current.w,
-      height: rememberedHeight || current.h,
-    };
+    if (rewindDeparture) {
+      // Home viva pelo BFCache: a timeline que levou até a /work ainda existe,
+      // e a emenda está pendurada nela pelo onDive. Rebobinar é o bastante —
+      // câmera, curvatura, labels e pintura voltam pelas MESMAS curvas, na
+      // ordem inversa. Um tween à parte para a pintura, como havia antes, era
+      // um segundo dono escrevendo na mesma propriedade a cada quadro.
+      const rewind = carousel.returnFromDeparture();
+      if (rewind) await rewind;
+      else carousel.cancelDeparture();
+    } else {
+      // Documento novo: não há timeline para rebobinar (ver o estado armado em
+      // index.astro). O peso anda sozinho, do quadro da emenda até a foto do
+      // anel, pela mesma função de desenho.
+      drawSeamAt(1);
+      document.documentElement.removeAttribute('data-work-return');
+      const at = { k: 1 };
+      await gsap.to(at, {
+        k: 0,
+        duration: WORK_SEAM.returnDur,
+        ease: WORK_SEAM.returnEase,
+        onUpdate: () => drawSeamAt(at.k),
+      });
+    }
 
-    gsap.set(frame, { opacity: 1 });
-    gsap.set(title, { opacity: 1 });
-
-    const rewind = rewindDeparture ? carousel.returnFromDeparture() : null;
-    const fold = gsap.timeline()
-      .to(title, { opacity: 0, letterSpacing: '0.22em', duration: 0.28, ease: 'power2.in' }, 0)
-      .to(frame, {
-        width: target.width,
-        height: target.height,
-        borderRadius: 12,
-        duration: 0.82,
-        ease: 'power4.inOut',
-      }, 0)
-      .to(frame, { opacity: 0, duration: 0.18, ease: 'power1.out' }, 0.7);
-
-    await Promise.all([fold.then(), rewind ?? Promise.resolve()]);
-    if (rewindDeparture && !rewind) carousel.cancelDeparture();
     settle();
   };
 
-  // Documento novo: o script inline do <head> já deixou o portal cobrindo a
-  // cortina de carregamento. Depois que a cena nasce pronta em Work, ele volta
-  // ao tamanho do segmento e entrega o quadro ao anel.
+  // Documento novo: o script inline do <head> já deixou a emenda cobrindo a
+  // cortina de carregamento. Depois que a cena nasce pronta em Work, a pintura
+  // encolhe até o segmento e entrega o quadro ao anel.
   if (returningFromWork) {
     if (reducedMotion()) settle();
     else requestAnimationFrame(() => revealed.then(() => returnToRing(false)));
@@ -234,46 +290,21 @@ function initWorkLink(carousel: Carousel, returningFromWork = false) {
       return;
     }
 
+    // a HUD sai antes do impacto, com a MESMA classe do mergulho do About
     document.body.classList.add('is-diving');
     portal.style.visibility = 'visible';
+    seam = workSeamBox();
+    drawSeamAt(0);   // nasce em cima da foto 3D, ainda invisível
 
-    const start = carousel.frontPhotoSize();
-    const cover = coverSize();
-    frame.dataset.startWidth = `${start.w}`;
-    frame.dataset.startHeight = `${start.h}`;
-
-    gsap.set(frame, {
-      width: start.w,
-      height: start.h,
-      borderRadius: 12,
-      opacity: 0,
-    });
-    gsap.set(title, { opacity: 0, letterSpacing: '0.22em' });
-
-    const movement = carousel.departInto(detail.index);
-    movement
-      .to(frame, { opacity: 1, duration: 0.2, ease: 'power1.out' }, 0.26)
-      .to(frame, {
-        width: cover.width,
-        height: cover.height,
-        borderRadius: 0,
-        duration: 0.86,
-        ease: 'power4.inOut',
-      }, 0.3)
-      .to(title, {
-        opacity: 1,
-        letterSpacing: '0.08em',
-        duration: 0.42,
-        ease: 'power2.out',
-      }, 0.68)
-      .to({}, { duration: 0.08 });
-
+    const movement = carousel.departInto(detail.index, drawSeam);
+    movement.to({}, { duration: DEPART.hold });   // o pouso, com a tela já coberta
     await movement;
+
     location.href = '/work';
   });
 
   // Volta viva pelo BFCache: a timeline que levou ao Work ainda existe. A
-  // imagem encolhe e essa mesma timeline anda ao contrário, devolvendo câmera,
+  // pintura encolhe e essa mesma timeline anda ao contrário, devolvendo câmera,
   // curvatura, labels e controle ao estado exato do anel.
   window.addEventListener('pageshow', (event) => {
     if (!(event as PageTransitionEvent).persisted || !leaving) return;
@@ -288,6 +319,7 @@ function initWorkLink(carousel: Carousel, returningFromWork = false) {
     requestAnimationFrame(() => revealed.then(() => returnToRing(true)));
   });
 }
+
 
 // ——— Photos: página própria (/photos), aberta pelo clique no anel ———
 //

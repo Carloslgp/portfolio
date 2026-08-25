@@ -5,6 +5,7 @@ import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
 import { SECTIONS } from '../components/carousel/config';
 import { SEAM_ASPECT, SEAM_PHOTO, FULL } from '../data/gallery';
+import { WORK_SEAM } from '../scripts/workNavigation';
 // O texto do About mora em src/data/about.ts. Aqui embaixo só existe a forma
 // de desenhar cada tipo de bloco — nenhuma frase da página passa por este
 // arquivo, então editar o conteúdo é sempre lá.
@@ -44,8 +45,25 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
 
     {/* Se a /work precisou reconstruir a home em vez de recuperá-la do
         BFCache, o último quadro da página anterior já é esta imagem. Armar o
-        portal no head impede que a cortina de loading pisque entre os dois. */}
-    <script is:inline>
+        portal no head impede que a cortina de loading pisque entre os dois.
+
+        As duas medidas da emenda descem para o CSS aqui, e não como literais na
+        folha de estilo: elas são o contrato com a /work (ver
+        scripts/workNavigation.ts) e o mesmo par de números tem que valer nos
+        dois documentos. Ficam no <html> em vez de num elemento porque o CSS que
+        as usa é da página inteira, e chegam antes do primeiro pixel porque este
+        script é inline e sem type=module. */}
+    <script
+      is:inline
+      define:vars={{
+        seamAspect: WORK_SEAM.aspect,
+        seamOverscan: WORK_SEAM.overscan,
+        seamRotation: WORK_SEAM.rotation,
+      }}
+    >
+      document.documentElement.style.setProperty('--seam-aspect', seamAspect);
+      document.documentElement.style.setProperty('--seam-overscan', seamOverscan);
+      document.documentElement.style.setProperty('--seam-rotation', seamRotation + 'deg');
       try {
         if (sessionStorage.getItem('portfolio:work-return'))
           document.documentElement.dataset.workReturn = 'armed';
@@ -180,16 +198,22 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     />
   )}
 
-  <!-- A ponte visual para /work. Ela nasce sobre o segmento 3D, cresce até
-       ocupar a tela e atravessa a troca de documento no mesmo quadro. -->
+  <!-- ——— a emenda com /work ———
+       A MESMA pintura do segmento 3D, no mesmo enquadramento: ela nasce
+       exatamente em cima da foto da fita, cresce colada nela até o quadro da
+       emenda e atravessa a troca de documento sem mudar de desenho (ver
+       scripts/workNavigation.ts → WORK_SEAM e scripts/main.ts → initWorkLink).
+
+       O arquivo é o mesmo que o anel já baixou; o giro que a fita faz na
+       textura é desfeito aqui em CSS. -->
   <div class="work-portal" data-work-portal aria-hidden="true">
-    <div class="work-portal-frame" data-work-portal-frame>
+    <div class="work-seam" data-work-portal-seam>
       <img src="/textures/work.jpg" alt="" />
-      <span class="work-portal-title" data-work-portal-title>
-        <small>Selected</small>
-        <strong>WORK</strong>
-      </span>
     </div>
+    <span class="work-portal-title" data-work-portal-title>
+      <small>Selected</small>
+      <strong>WORK</strong>
+    </span>
   </div>
 
   <!-- toggle de tema claro/escuro (ver scripts/theme.ts). Fica FORA do .overlay
@@ -430,10 +454,18 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     max-height: none;
   }
 
-  /* ——— ponte para Work ———
-     O frame mantém a proporção retrato do segmento. Em tela larga ele cresce
-     pela largura; em tela alta, pela altura. Assim a pintura nunca estica no
-     quadro em que cruza de uma página para a outra. */
+  /* ——— a emenda com /work ———
+     Ela NÃO é uma moldura que cresce: é a pintura do segmento, inteira, na
+     proporção em que a fita a desenha. O elemento nasce já do tamanho final e
+     quem anda é uma escala — a mesma escolha da emenda com /photos, e pelo
+     mesmo motivo: escalar não relayouta e, principalmente, não reenquadra. Uma
+     moldura com `object-fit: cover` mudava o RECORTE da pintura a cada quadro,
+     e era isso que se via como a imagem se transformando no meio da troca.
+
+     O tamanho vem das mesmas duas medidas que a /work usa (--seam-aspect e
+     --seam-overscan, postas no <html> pelo script do <head>), então o retângulo
+     é o mesmo nos dois documentos. Em calc() para acompanhar o redimensionar da
+     janela sem passar por JS. */
   .work-portal {
     position: fixed;
     inset: 0;
@@ -442,33 +474,44 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     pointer-events: auto;
   }
 
-  .work-portal-frame {
+  .work-seam {
+    --seam-w: calc(max(100vw, 100vh * var(--seam-aspect)) * var(--seam-overscan));
+    --seam-h: calc(var(--seam-w) / var(--seam-aspect));
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 0;
-    height: 0;
+    width: var(--seam-w);
+    height: var(--seam-h);
     overflow: hidden;
-    border-radius: 12px;
     background: #171411;
-    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.32);
     opacity: 0;
     transform: translate(-50%, -50%);
+    transform-origin: center;
+    will-change: transform, opacity;
   }
 
-  .work-portal-frame::after {
+  .work-seam::after {
     content: '';
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg, rgba(8, 7, 6, 0.08), rgba(8, 7, 6, 0.48));
   }
 
-  .work-portal-frame img {
-    width: 100%;
-    height: 100%;
+  /* A pintura DEITADA: a fita gira toda textura -90° (ver Segment.ts) e é essa
+     orientação que está na tela quando a emenda começa. Por isso a caixa da
+     <img> nasce com as medidas trocadas — depois do giro ela ocupa exatamente
+     o retângulo da emenda. */
+  .work-seam img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--seam-h);
+    height: var(--seam-w);
     display: block;
     max-width: none;
-    object-fit: cover;
+    max-height: none;
+    object-fit: fill;
+    transform: translate(-50%, -50%) rotate(var(--seam-rotation));
   }
 
   .work-portal-title {
@@ -499,14 +542,14 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     letter-spacing: -0.065em;
   }
 
+  /* A home que NASCE de volta da /work: sem BFCache não há cena viva atrás, e
+     o primeiro quadro tem que ser o último da página anterior. Daí o estado
+     armado ser CSS, e não JS — ele precisa valer antes de o bundle existir. */
   :global(html[data-work-return='armed']) .work-portal {
     visibility: visible;
   }
 
-  :global(html[data-work-return='armed']) .work-portal-frame {
-    width: max(100vw, calc(100vh * 0.563));
-    height: max(100vh, calc(100vw / 0.563));
-    border-radius: 0;
+  :global(html[data-work-return='armed']) .work-seam {
     opacity: 1;
   }
 

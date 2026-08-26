@@ -1,7 +1,8 @@
 // src/data/work.ts — o CONTEÚDO da página /work mora aqui, e só aqui.
 //
-// O work.astro não conhece nenhuma frase desta página: ele percorre o que
-// `timeline()` devolve e desenha. Pra mexer no texto é sempre este arquivo.
+// O work.astro não conhece nenhuma frase desta página — nem os rótulos dos
+// dois grupos: ele percorre o que `groups()` devolve e desenha. Pra mexer no
+// texto é sempre este arquivo.
 //
 // Por que um módulo TS e NÃO uma content collection: é o mesmo motivo de
 // data/about.ts e data/songs.ts. São nove registros fixos, sem corpo em
@@ -12,12 +13,22 @@
 //
 //   • trocar texto      → editar a string
 //   • nova entrada      → mais um objeto em ENTRIES (a ORDEM da lista não
-//                         importa: quem ordena é `timeline()`, pelas datas)
+//                         importa: quem separa e ordena é `groups()`, pelo
+//                         `track` e pelas datas)
 //   • tirar uma entrada → apagar o objeto
 //
 // O que esta página NÃO recebe: projeto pessoal/criativo. Isso é /craft.
 
 export type Kind = 'role' | 'build' | 'recognition';
+
+/** Em qual das duas listas da página a entrada cai.
+ *
+ *  Não dá pra deduzir isto de `kind`: a monitoria e a presidência do Builders
+ *  Club são as duas 'role' e caem em lados OPOSTOS — uma é emprego, a outra é
+ *  o que eu faço além de um. Só quem escreve a entrada sabe de que lado ela
+ *  está, então o campo é obrigatório de propósito: entrada nova sem lado
+ *  escolhido não compila, em vez de sumir calada num dos dois grupos. */
+export type Track = 'career' | 'project';
 
 /** Uma data com a precisão que ela realmente tem.
  *
@@ -30,6 +41,7 @@ export type Stamp = string; // 'YYYY-MM' | 'YYYY'
 export interface Entry {
   id: string;
   kind: Kind;
+  track: Track;
   weight: 1 | 2 | 3;
   title: string;
   org?: string;
@@ -46,6 +58,7 @@ export interface Entry {
 export const ENTRIES: Entry[] = [
   {
     id: 'nock',
+    track: 'career',
     kind: 'role',
     weight: 1,
     title: 'Founder & CDO',
@@ -69,6 +82,7 @@ export const ENTRIES: Entry[] = [
 
   {
     id: 'bradesco',
+    track: 'career',
     kind: 'role',
     weight: 1,
     title: 'Data Analyst Intern',
@@ -90,6 +104,7 @@ export const ENTRIES: Entry[] = [
 
   {
     id: 'trade-stars',
+    track: 'career',
     kind: 'role',
     weight: 1,
     title: 'Web Development Intern',
@@ -113,6 +128,7 @@ export const ENTRIES: Entry[] = [
 
   {
     id: 'fuelcheck',
+    track: 'project',
     kind: 'recognition',
     weight: 2,
     title: 'Founder & CEO',
@@ -130,6 +146,7 @@ export const ENTRIES: Entry[] = [
 
   {
     id: 'builders-club',
+    track: 'project',
     kind: 'role',
     weight: 2,
     title: 'President',
@@ -145,6 +162,7 @@ export const ENTRIES: Entry[] = [
 
   {
     id: 'study-sync',
+    track: 'project',
     kind: 'build',
     weight: 2,
     title: 'Study Sync',
@@ -167,6 +185,7 @@ export const ENTRIES: Entry[] = [
   // por peso em `timeline()`.
   {
     id: 'monitor',
+    track: 'career',
     kind: 'role',
     weight: 3,
     title: 'Academic Monitor, Business Process Modeling',
@@ -177,6 +196,7 @@ export const ENTRIES: Entry[] = [
   },
   {
     id: 'coach',
+    track: 'project',
     kind: 'role',
     weight: 3,
     title: 'Coach, League of Legends team',
@@ -186,6 +206,7 @@ export const ENTRIES: Entry[] = [
   },
   {
     id: 'cbsoft',
+    track: 'project',
     kind: 'role',
     weight: 3,
     title: 'Volunteer organizer',
@@ -241,6 +262,48 @@ const from = (e: Entry) => months(e.start, 'start');
 const to = (e: Entry) => (e.end === 'present' ? Infinity : months(e.end, 'end'));
 
 const overlaps = (a: Entry, b: Entry) => from(a) <= to(b) && from(b) <= to(a);
+
+// ——— os dois grupos da página ———
+
+export type Group = { id: Track; label: string; entries: Entry[] };
+
+/** A ordem dentro de um grupo.
+ *
+ *  Em curso vence terminado, mesmo quando o terminado é mais recente: o que
+ *  ainda está acontecendo é o que responde "e hoje?", e mandá-lo pro meio da
+ *  lista porque um fim de semana de hackathon terminou depois seria ordenar
+ *  pelo relógio contra o leitor.
+ *
+ *  Depois disso, cada um pela data que o POSICIONA: quem segue aberto pelo
+ *  início (é o "desde quando" que se procura), quem terminou pelo fim. Usar a
+ *  mesma ponta para os dois faria uma das duas metades mentir. */
+const byRelevance = (a: Entry, b: Entry) => {
+  const open = (e: Entry) => (e.end === 'present' ? 1 : 0);
+  const anchor = (e: Entry) => (e.end === 'present' ? from(e) : to(e));
+  return open(b) - open(a) || anchor(b) - anchor(a) || from(b) - from(a);
+};
+
+/**
+ * As duas listas que a página desenha, na ordem em que ela as desenha.
+ *
+ * O rótulo mora aqui e não no template pelo mesmo motivo de todo o resto do
+ * arquivo: é frase da página. "Projects & communities" é mais largo que
+ * "Projects" de propósito — o grupo abriga a presidência do Builders Club e o
+ * CBSoft, que não são projetos de ninguém, e um rótulo curto demais os
+ * classificaria errado só para caber.
+ */
+export function groups(): Group[] {
+  const specs: { id: Track; label: string }[] = [
+    { id: 'career', label: 'Career' },
+    { id: 'project', label: 'Projects & communities' },
+  ];
+
+  return specs.map(({ id, label }) => ({
+    id,
+    label,
+    entries: ENTRIES.filter((e) => e.track === id).sort(byRelevance),
+  }));
+}
 
 // ——— ordem (ver §3 do briefing) ———
 

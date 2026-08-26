@@ -1,19 +1,16 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { ENTRIES, range, type Entry } from '../data/work';
+import { ENTRIES, groups, range, type Entry } from '../data/work';
 import { WORK_SEAM } from '../scripts/workNavigation';
 
-const entries = [...ENTRIES].sort((a, b) => {
-  const aCurrent = a.end === 'present';
-  const bCurrent = b.end === 'present';
-
-  if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
-
-  const aAnchor = aCurrent ? a.start : a.end;
-  const bAnchor = bCurrent ? b.start : b.end;
-
-  return bAnchor.localeCompare(aAnchor) || b.start.localeCompare(a.start);
-});
+/** A cor do selo é presa ao id, e não à posição na lista.
+ *
+ *  A lista e os diálogos percorrem coleções DIFERENTES — os diálogos pulam
+ *  quem não tem detalhe —, e a página agora quebra a lista em dois grupos.
+ *  Ler a posição em cada percurso dava à mesma entrada uma cor no card e
+ *  outra no diálogo assim que os dois deixassem de andar juntos. A ordem de
+ *  ENTRIES é a única que nenhum recorte da página mexe. */
+const HUE = new Map(ENTRIES.map((e, i) => [e.id, (i * 47 + 258) % 360]));
 
 const entryType: Record<Entry['kind'], string> = {
   role: 'Experience',
@@ -32,18 +29,41 @@ function preview(entry: Entry) {
   return entry.summary.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() ?? entry.summary;
 }
 
-/** Quantas linhas da lista entram animadas junto com a cortina.
+/** Quantas linhas do painel de abertura entram escalonadas com a cortina.
  *
- *  Só as que cabem na tela: mesmo no monitor mais alto a sétima já está
- *  abaixo da dobra, e animar as dezesseis significava pôr o navegador para
- *  compor treze camadas que ninguém vê — com os últimos atrasos caindo já no
- *  fim da abertura, que é onde apareciam os quadros longos no celular. As
- *  demais nascem prontas. */
-const REVEAL_ITEMS = 6;
+ *  Agora que cada painel cabe na tela, "as que cabem" é praticamente o painel
+ *  inteiro. O teto continua existindo pelo motivo de sempre — animar o que
+ *  está fora da dobra é pôr o navegador pra compor camada que ninguém vê, e os
+ *  últimos atrasos caem já no fim da abertura, que é onde apareciam os quadros
+ *  longos no celular. Ele volta a morder no dia em que um grupo crescer além
+ *  da tela e o painel passar a rolar por dentro. */
+const REVEAL_ROWS = 6;
+
+/** A página em passos de animação.
+ *
+ *  Só o painel que a página abre mostrando entra escalonado: o outro nasce
+ *  fora da tela, e animar quem ninguém vê é composição pura. O passo 1 é a
+ *  fileira de abas — ela ocupa altura entre o cabeçalho e a lista, então
+ *  precisa ocupar tempo, senão a primeira linha entra antes do controle que a
+ *  comanda. */
+const TABS_STEP = 1;
+
+const sections = groups().map((group, panel) => ({
+  ...group,
+  panel,
+  rows: group.entries.map((entry, row) => ({
+    entry,
+    row,
+    step: panel === 0 && row < REVEAL_ROWS ? TABS_STEP + 1 + row : null,
+  })),
+}));
 
 function hasDetails(entry: Entry) {
   return Boolean(entry.summary || entry.impact?.length || entry.stack?.length || entry.badge || entry.href);
 }
+
+/** As entradas que têm um <dialog>, na mesma ordem em que a página as lista. */
+const detailed = sections.flatMap((section) => section.entries).filter(hasDetails);
 ---
 
 <Layout lang="en">
@@ -74,6 +94,17 @@ function hasDetails(entry: Entry) {
       document.documentElement.style.setProperty('--seam-aspect', seamAspect);
       document.documentElement.style.setProperty('--seam-overscan', seamOverscan);
       document.documentElement.style.setProperty('--seam-rotation', seamRotation + 'deg');
+      /* A marca que liga o modo painel: a página vira duas telas que deslizam,
+         em vez de uma lista que rola. Ela nasce AQUI, antes do primeiro paint,
+         e não no bundle — pôr a página em tela cheia depois do primeiro quadro
+         é um salto de layout visível pra quem entra por link direto (quem vem
+         pela home não veria, porque a cortina cobre).
+
+         E ela nasce do JS de propósito, e não do HTML: sem script as abas não
+         trocam nada, e uma página presa em 100dvh mostrando só metade das
+         entradas seria conteúdo perdido. Sem a marca o CSS devolve as duas
+         listas empilhadas e a rolagem normal. */
+      document.documentElement.dataset.workPanels = '';
       try {
         if (sessionStorage.getItem('portfolio:work-entry')) {
           sessionStorage.removeItem('portfolio:work-entry');
@@ -124,61 +155,113 @@ function hasDetails(entry: Entry) {
         <p class="lead">A concise view of the roles, projects and communities I’ve helped build.</p>
       </header>
 
-      <ol class="experience-list">
-        {entries.map((entry, index) => {
-          const dates = range(entry);
-          const dialogId = `work-details-${entry.id}`;
+      <div
+        class:list={['work-tabs', 'is-arriving']}
+        style={`--i:${TABS_STEP}`}
+        role="tablist"
+        aria-label="Sections of this page"
+        data-work-tabs
+      >
+        {sections.map((section) => (
+          <button
+            class="tab"
+            type="button"
+            role="tab"
+            id={`work-tab-${section.id}`}
+            aria-controls={`work-panel-${section.id}`}
+            aria-selected={section.panel === 0 ? 'true' : 'false'}
+            tabindex={section.panel === 0 ? 0 : -1}
+            data-panel={section.panel}
+          >
+            {section.label}
+          </button>
+        ))}
+        {/* A régua acompanha a aba ativa. A medida vem do JS (offsetLeft e
+            offsetWidth da aba) porque as duas têm larguras diferentes e o
+            rótulo é conteúdo — deduzir a posição no CSS exigiria congelar a
+            largura, que é a única coisa que não posso prometer sobre texto. */}
+        <span class="tab-rule" aria-hidden="true"></span>
+      </div>
 
-          return (
-            <li
-              class:list={['experience-item', index < REVEAL_ITEMS && 'is-arriving']}
-              style={index < REVEAL_ITEMS ? `--i:${index + 1}` : undefined}
+      <div class="work-track" data-work-track>
+        <div class="work-rail" data-work-rail>
+          {sections.map((section) => (
+            <section
+              class="work-panel"
+              role="tabpanel"
+              id={`work-panel-${section.id}`}
+              aria-labelledby={`work-tab-${section.id}`}
+              data-panel={section.panel}
+              tabindex="0"
             >
-              <div
-                class:list={['experience-mark', entry.logo && 'has-image']}
-                style={`--mark-hue:${(index * 47 + 258) % 360}`}
-                aria-hidden="true"
-              >
-                {entry.logo ? (
-                  <img
-                    src={entry.logo}
-                    alt=""
-                    loading={index < 3 ? 'eager' : 'lazy'}
-                    decoding="async"
-                  />
-                ) : monogram(entry)}
-              </div>
+              <ol class="experience-list">
+                {section.rows.map(({ entry, row, step }) => {
+                  const dates = range(entry);
+                  const dialogId = `work-details-${entry.id}`;
+                  const details = hasDetails(entry);
 
-              <article class="experience-main">
-                <h2>{entry.title}</h2>
-                <p class="company">{entry.org ?? entryType[entry.kind]}</p>
-                <p class="preview">{preview(entry)}</p>
+                  return (
+                    <li
+                      class:list={['experience-item', step !== null && 'is-arriving']}
+                      style={`--row:${row}${step !== null ? `;--i:${step}` : ''}`}
+                    >
+                      <div
+                        class:list={['experience-mark', entry.logo && 'has-image']}
+                        style={`--mark-hue:${HUE.get(entry.id)}`}
+                        aria-hidden="true"
+                      >
+                        {entry.logo ? (
+                          <img
+                            src={entry.logo}
+                            alt=""
+                            loading={section.panel === 0 ? 'eager' : 'lazy'}
+                            decoding="async"
+                          />
+                        ) : monogram(entry)}
+                      </div>
 
-                {hasDetails(entry) && (
-                  <button
-                    class="read-more"
-                    type="button"
-                    data-dialog-open={dialogId}
-                    aria-haspopup="dialog"
-                    aria-controls={dialogId}
-                  >
-                    Read more
-                    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M3 8h10M9 4l4 4-4 4"></path>
-                    </svg>
-                  </button>
-                )}
-              </article>
+                      <article class="experience-main">
+                        <h2>{entry.title}</h2>
+                        <p class="meta">
+                          <span class="company">{entry.org ?? entryType[entry.kind]}</span>
+                          {/* o ponto vive DENTRO do período, que é nowrap: solto
+                              entre os dois, ele ficava órfão no fim da linha
+                              quando a data quebrava pra baixo */}
+                          <span class="period">
+                            <span class="dot" aria-hidden="true">·</span>
+                            <time datetime={dates.from.dt}>{dates.from.label}</time>
+                            {dates.to && <><span aria-hidden="true"> — </span><time datetime={dates.to.dt}>{dates.to.label}</time></>}
+                            {dates.present && <><span aria-hidden="true"> — </span>Present</>}
+                          </span>
+                        </p>
+                      </article>
 
-              <p class="period">
-                <time datetime={dates.from.dt}>{dates.from.label}</time>
-                {dates.to && <><span aria-hidden="true"> — </span><time datetime={dates.to.dt}>{dates.to.label}</time></>}
-                {dates.present && <><span aria-hidden="true"> — </span>Present</>}
-              </p>
-            </li>
-          );
-        })}
-      </ol>
+                      {details && (
+                        <button
+                          class="row-open"
+                          type="button"
+                          data-dialog-open={dialogId}
+                          aria-haspopup="dialog"
+                          aria-controls={dialogId}
+                        >
+                          {/* O rótulo visível é a seta; o nome acessível diz de
+                              QUEM são os detalhes. Numa lista de nove linhas,
+                              nove botões chamados "Read more" mandam o leitor
+                              de tela adivinhar em qual delas ele está. */}
+                          <span class="sr-only">Read more about {entry.title}</span>
+                          <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M6 3l5 5-5 5"></path>
+                          </svg>
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ))}
+        </div>
+      </div>
 
       <p class="craft-note">
         Personal experiments and things made for the joy of making live on <a href="/craft">/craft</a>.
@@ -186,7 +269,7 @@ function hasDetails(entry: Entry) {
     </div>
   </main>
 
-  {entries.filter(hasDetails).map((entry, index) => {
+  {detailed.map((entry) => {
     const dates = range(entry);
     const dialogId = `work-details-${entry.id}`;
 
@@ -209,7 +292,7 @@ function hasDetails(entry: Entry) {
 
           <div class="dialog-body">
             <div class="dialog-meta">
-              <span class:list={['dialog-mark', entry.logo && 'has-image']} style={`--mark-hue:${(index * 47 + 258) % 360}`} aria-hidden="true">
+              <span class:list={['dialog-mark', entry.logo && 'has-image']} style={`--mark-hue:${HUE.get(entry.id)}`} aria-hidden="true">
                 {entry.logo ? <img src={entry.logo} alt="" decoding="async" /> : monogram(entry)}
               </span>
               <p>
@@ -264,8 +347,10 @@ function hasDetails(entry: Entry) {
 <script>
   import { initTheme } from '../scripts/theme';
   import { initWork } from '../scripts/work';
+  import { initWorkPanels } from '../scripts/workPanels';
 
   initTheme();
+  initWorkPanels();
   initWork();
 </script>
 
@@ -278,8 +363,12 @@ function hasDetails(entry: Entry) {
     transition: background-color var(--theme-fade);
   }
 
-  :global(html:has(.work-page)),
-  :global(body:has(.work-page)) {
+  /* Sem o modo painel (script desligado) a página é a lista de sempre: as duas
+     seções empilhadas e rolagem normal. Com ele, html e body ficam com o
+     height:100% / overflow:hidden que o global.css já dá — quem rola, se
+     precisar, é o painel. */
+  :global(html:not([data-work-panels]):has(.work-page)),
+  :global(html:not([data-work-panels]):has(.work-page) body) {
     height: auto;
     overflow: visible;
   }
@@ -289,7 +378,7 @@ function hasDetails(entry: Entry) {
      a lista inteira dava um pulo lateral no meio da abertura — bem no momento
      em que ela está entrando. Como esta página rola de qualquer jeito, o
      espaço reservado não custa nada fora da transição. */
-  :global(html:has(.work-page)) {
+  :global(html:not([data-work-panels]):has(.work-page)) {
     scrollbar-gutter: stable;
   }
 
@@ -577,13 +666,13 @@ function hasDetails(entry: Entry) {
      fechada, e o escalonamento faz a leitura descer com ela. Sem marca de
      entrada (link direto, reload, baixa animação) nada disso existe. */
   :global(html[data-work-entry]) .work-head,
-  :global(html[data-work-entry]) .experience-item.is-arriving {
+  :global(html[data-work-entry]) .is-arriving {
     opacity: 0;
     transform: translateY(18px);
   }
 
   :global(html[data-work-entry='opening']) .work-head,
-  :global(html[data-work-entry='opening']) .experience-item.is-arriving {
+  :global(html[data-work-entry='opening']) .is-arriving {
     opacity: 1;
     transform: none;
     transition:
@@ -671,15 +760,44 @@ function hasDetails(entry: Entry) {
     min-height: 100vh;
   }
 
+  /* A medida vertical desta página passou a ser vh, e não vw.
+     Enquanto ela rolava, o respiro podia crescer com a largura — o que
+     transbordasse ia pra baixo da dobra e ninguém se machucava. Agora o
+     conteúdo TEM que caber, e num notebook de 720px de altura um cabeçalho
+     dimensionado pela largura come a lista inteira. Cada clamp abaixo é lido
+     pela altura porque é a altura que é escassa. */
+  /* A COLUNA de leitura, num lugar só. O trilho passou a ocupar a tela inteira
+     (ver mais abaixo) e a lista dentro dele voltou a se estreitar por conta
+     própria — as duas medidas precisam ser a mesma, e duas cópias do mesmo
+     min() é como elas deixam de ser. */
+  .work-page {
+    --column: min(100% - 3rem, 920px);
+  }
+
   .work-inner {
-    width: min(100% - 3rem, 920px);
+    width: var(--column);
     margin: 0 auto;
-    padding: clamp(7rem, 12vw, 10rem) 0 6rem;
+    padding: clamp(2.75rem, 8.5vh, 7.5rem) 0 clamp(1rem, 2.6vh, 2.5rem);
+  }
+
+  :global(html[data-work-panels]) .work-page {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* auto auto 1fr auto: cabeçalho, abas e o rodapé do /craft pedem o tamanho
+     que têm, e o trilho fica com o que sobrar. O minmax(0, 1fr) é o que
+     autoriza esse resto a ser MENOR que o conteúdo — sem ele a faixa cresce
+     até caber a lista e volta a empurrar a página pra fora da tela, que é
+     exatamente o que este layout existe pra impedir. */
+  :global(html[data-work-panels]) .work-inner {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    height: 100dvh;
   }
 
   .work-head {
-    padding-bottom: clamp(2rem, 5vw, 3.25rem);
-    border-bottom: 1px solid rgba(var(--ink-rgb), 0.13);
+    padding-bottom: clamp(1.1rem, 3vh, 2rem);
   }
 
   .eyebrow,
@@ -695,7 +813,7 @@ function hasDetails(entry: Entry) {
 
   .work-head h1 {
     font-family: "Playfair Display", Georgia, serif;
-    font-size: clamp(3.2rem, 9vw, 6.5rem);
+    font-size: clamp(2.4rem, min(7vw, 7.4vh), 4.6rem);
     font-weight: 600;
     line-height: 0.95;
     letter-spacing: -0.055em;
@@ -703,24 +821,192 @@ function hasDetails(entry: Entry) {
 
   .lead {
     max-width: 36rem;
-    margin-top: 1.4rem;
+    margin-top: clamp(0.6rem, 1.6vh, 1.1rem);
     color: rgba(var(--ink-rgb), 0.62);
     font-size: clamp(0.95rem, 2vw, 1.05rem);
     line-height: 1.65;
     transition: color var(--theme-fade);
   }
 
+  /* ——— as abas ———
+     Elas falam na voz do .eyebrow lá do topo — versalete, entrelinha larga,
+     meio-tom — e não na do <h1>: são um CONTROLE, e um controle que grita
+     compete com o título da página pela hierarquia. O que separa a ativa da
+     outra é opacidade e a régua embaixo, não tamanho: trocar de aba não pode
+     fazer a linha inteira mudar de altura. */
+  .work-tabs {
+    position: relative;
+    display: flex;
+    gap: clamp(1.1rem, 3vw, 2rem);
+    align-items: center;
+    padding: clamp(0.65rem, 2.1vh, 1.4rem) 0;
+  }
+
+  .tab {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.2rem 0;
+    border: 0;
+    background: transparent;
+    color: rgba(var(--ink-rgb), 0.42);
+    font: inherit;
+    font-size: clamp(0.62rem, 1.5vw, 0.68rem);
+    font-weight: 650;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 200ms ease;
+  }
+
+  .tab:hover {
+    color: rgba(var(--ink-rgb), 0.7);
+  }
+
+  .tab[aria-selected='true'] {
+    color: var(--ink);
+    cursor: default;
+  }
+
+  /* O único fio que sobrou na página. Ele não decora: é a resposta à pergunta
+     "qual das duas estou vendo". Todos os outros — as bordas da fileira, os
+     separadores entre as linhas, o traço acima do rodapé — eram divisões que
+     o espaço em branco já fazia, e cada um deles competia com este. */
+  .tab-rule {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: var(--rule-width, 0);
+    transform: translateX(var(--rule-x, 0));
+    background: var(--ink);
+    transition:
+      transform 480ms cubic-bezier(0.2, 0.86, 0.24, 1),
+      width 480ms cubic-bezier(0.2, 0.86, 0.24, 1),
+      background-color var(--theme-fade);
+  }
+
+  /* Antes da primeira medida a régua não tem onde estar, e nascer com largura
+     zero no canto esquerdo faria ela DESLIZAR do nada até a primeira aba no
+     carregamento. Fica escondida até o JS medir. */
+  .work-tabs:not([data-ready]) .tab-rule {
+    opacity: 0;
+  }
+
+  /* ——— o trilho ———
+     A janela recorta; quem anda é o rail. O rail tem a largura da janela e os
+     painéis TRANSBORDAM dele (flex: 0 0 100% de 100%), e é isso que faz
+     translateX(-100%) valer exatamente um painel — se o rail medisse a soma
+     dos painéis, cada -100% pularia os dois de uma vez. */
+  .work-track {
+    min-height: 0;
+  }
+
+  /* O trilho SANGRA pra fora da coluna e ocupa a tela inteira.
+     Recortado na coluna de 920px, o painel que saía evaporava a 260px da borda
+     do monitor, com página em branco depois dele — a troca lia como um cartão
+     desaparecendo no meio da tela, não como uma tela dando lugar à outra. É a
+     borda do MONITOR que precisa ser a linha onde um some e o outro nasce.
+
+     A conta: 50% da coluna menos 50% da janela, dos dois lados, devolve
+     exatamente a largura que a coluna tirou. Só no modo painel — no retorno
+     sem script a página rola, tem barra, e 100vw ali criaria rolagem lateral. */
+  :global(html[data-work-panels]) .work-track {
+    overflow: hidden;
+    margin-inline: calc(50% - 50vw);
+  }
+
+  .work-rail {
+    display: flex;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* A curva do deslize é a ÚNICA da página que não é de desaceleração pura.
+     A cubic-bezier(0.2, 0.86, 0.24, 1) que o resto usa serve pra coisa que
+     CHEGA — ela larga a 64% do caminho em 100ms e passa o resto assentando. Um
+     painel do tamanho da tela com essa curva já saiu antes de a vista
+     acompanhar: o cruzamento nas duas bordas, que é o movimento inteiro,
+     acontece num quadro. Esta sai devagar, cruza no meio do tempo e assenta —
+     é o percurso que se lê, não só o destino. */
+  :global(html[data-work-panels]) .work-rail {
+    transform: translate3d(calc(var(--panel, 0) * -100% + var(--drag, 0px)), 0, 0);
+    transition: transform var(--slide-dur, 620ms) cubic-bezier(0.5, 0, 0.15, 1);
+  }
+
+  /* Enquanto o dedo está na tela o rail SEGUE o dedo: uma transição aqui
+     colocaria um atraso entre o toque e o desenho, que é a diferença entre
+     arrastar uma coisa e pedir pra ela ir. */
+  :global(html[data-work-panels]) .work-rail.is-dragging {
+    transition: none;
+  }
+
+  /* O portão de movimento do site (motion.ts), que é uma escolha do usuário e
+     não a preferência do sistema — o @media lá embaixo não a enxerga. Quem
+     carimba é o workPanels.ts, com o mesmo booleano que já decide não animar
+     as linhas do painel que entra. */
+  :global(html[data-work-panels]) .work-rail[data-still] {
+    transition: none;
+  }
+
+  .work-panel {
+    min-width: 0;
+  }
+
+  :global(html[data-work-panels]) .work-panel {
+    flex: 0 0 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    /* o painel é o fim da linha da rolagem: sem isto, chegar ao fim da lista
+       repassa o gesto pra página e o documento inteiro balança */
+    overscroll-behavior: contain;
+    /* o gesto vertical continua rolando o painel; o horizontal é nosso */
+    touch-action: pan-y;
+  }
+
+  :global(html[data-work-panels]) .work-panel:focus-visible {
+    outline: 2px solid rgba(var(--ink-rgb), 0.4);
+    outline-offset: -2px;
+  }
+
+  /* Sem script os dois painéis ficam empilhados, um depois do outro, e a
+     página rola como antes. */
+  :global(html:not([data-work-panels])) .work-rail {
+    display: block;
+  }
+
   .experience-list {
     list-style: none;
   }
 
+  /* A lista fica no MEIO da faixa que sobrou, não colada no topo dela: um
+     grupo tem quatro linhas e o outro cinco, e ancorar as duas em cima deixava
+     um buraco de tamanho diferente embaixo de cada painel — a troca de aba
+     virava a lista subindo e o vazio mudando de altura.
+
+     margin auto, e não justify-content: center. Os dois centram igual enquanto
+     sobra espaço; a diferença aparece quando o painel precisa rolar, e aí o
+     centrado empurra o começo da lista pra ACIMA do topo da rolagem, fora do
+     alcance. A margem automática vira zero quando não há folga. */
+  :global(html[data-work-panels]) .experience-list {
+    /* o trilho é a tela inteira; quem devolve o texto à coluna de leitura é a
+       lista, aqui dentro — margin auto centra nos dois eixos de uma vez */
+    width: var(--column);
+    margin: auto;
+  }
+
+  /* A linha perdeu a frase de preview pra caber na tela — ela continua no
+     diálogo, em "Overview", que é onde alguém que quer ler já vai. O que
+     sobrou é o que identifica a entrada de relance: quem, onde, quando. */
   .experience-item {
+    position: relative;
     display: grid;
-    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
-    gap: 1.75rem;
-    align-items: start;
-    padding: clamp(1.75rem, 4vw, 2.6rem) 0;
-    border-bottom: 1px solid rgba(var(--ink-rgb), 0.1);
+    grid-template-columns: 3rem minmax(0, 1fr) auto;
+    gap: 0 clamp(0.9rem, 2vw, 1.25rem);
+    align-items: center;
+    padding: clamp(0.62rem, 1.9vh, 1.3rem) 0;
   }
 
   .experience-mark,
@@ -736,16 +1022,16 @@ function hasDetails(entry: Entry) {
   }
 
   .experience-mark {
-    width: 4.5rem;
+    width: 3rem;
     aspect-ratio: 1;
-    border-radius: 0.8rem;
-    font-size: 1.05rem;
+    border-radius: 0.65rem;
+    font-size: 0.8rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
   .experience-mark.has-image,
   .dialog-mark.has-image {
-    padding: 0.6rem;
+    padding: 0.42rem;
     overflow: hidden;
     border-color: rgba(10, 10, 10, 0.12);
     background: #fff;
@@ -770,76 +1056,126 @@ function hasDetails(entry: Entry) {
 
   .experience-main h2 {
     font-family: "Playfair Display", Georgia, serif;
-    font-size: clamp(1.35rem, 3vw, 1.65rem);
+    font-size: clamp(1.02rem, 2.2vw, 1.28rem);
     font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: -0.025em;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+  }
+
+  /* Organização e data na MESMA linha, separadas por um ponto. Data em pílula
+     na direita é o que a lista fazia enquanto tinha altura de sobra; aqui ela
+     custava uma coluna inteira no desktop e uma linha inteira no celular, e o
+     que ela dizia cabe ao lado de onde. */
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.45rem;
+    align-items: baseline;
+    margin-top: 0.18rem;
+    color: rgba(var(--ink-rgb), 0.58);
+    font-size: clamp(0.76rem, 1.7vw, 0.82rem);
+    line-height: 1.45;
+    transition: color var(--theme-fade);
   }
 
   .company {
-    margin-top: 0.3rem;
-    color: rgba(var(--ink-rgb), 0.65);
-    font-size: 0.9rem;
     font-weight: 600;
+    color: rgba(var(--ink-rgb), 0.7);
     transition: color var(--theme-fade);
   }
 
-  .preview {
-    max-width: 37rem;
-    margin-top: 0.85rem;
-    color: rgba(var(--ink-rgb), 0.62);
-    font-size: 0.9rem;
-    line-height: 1.6;
-    transition: color var(--theme-fade);
+  .dot {
+    margin-right: 0.32rem;
+    color: rgba(var(--ink-rgb), 0.3);
   }
 
   .period {
-    justify-self: end;
-    padding: 0.48rem 0.85rem;
-    border-radius: 999px;
-    background: rgba(var(--ink-rgb), 0.08);
-    color: rgba(var(--ink-rgb), 0.66);
-    font-size: 0.76rem;
-    line-height: 1;
     white-space: nowrap;
-    transition: color var(--theme-fade), background-color var(--theme-fade);
+    font-variant-numeric: tabular-nums;
   }
 
-  .read-more {
-    display: inline-flex;
-    gap: 0.45rem;
-    align-items: center;
-    margin-top: 1rem;
-    padding: 0.25rem 0;
+  /* A seta é o rótulo visível; o alvo é a linha inteira (o ::after abaixo).
+     Numa lista desta densidade, um botão de 15px é um alvo cruel no toque, e
+     alargar o botão em si empurraria a coluna do texto. */
+  .row-open {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
     border: 0;
-    border-bottom: 1px solid rgba(var(--ink-rgb), 0.3);
+    border-radius: 999px;
     background: transparent;
-    color: var(--ink);
-    font: inherit;
-    font-size: 0.78rem;
-    font-weight: 650;
+    color: rgba(var(--ink-rgb), 0.42);
     cursor: pointer;
-    transition: border-color 160ms ease, color var(--theme-fade);
+    transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
   }
 
-  .read-more:hover {
-    border-bottom-color: currentColor;
+  .row-open::after {
+    content: '';
+    position: absolute;
+    inset: 0;
   }
 
-  .read-more svg {
-    transition: transform 160ms ease;
+  .experience-item:hover .row-open,
+  .row-open:focus-visible {
+    background: rgba(var(--ink-rgb), 0.08);
+    color: var(--ink);
+    transform: translateX(2px);
   }
 
-  .read-more:hover svg {
-    transform: translateX(3px);
+  /* O realce é da LINHA, porque o alvo é a linha. Sangra pros lados pra
+     parecer uma faixa acesa e não um retângulo colado no texto. */
+  .experience-item:has(.row-open:hover),
+  .experience-item:has(.row-open:focus-visible) {
+    background: rgba(var(--ink-rgb), 0.035);
+    box-shadow: 0 0 0 0.75rem rgba(var(--ink-rgb), 0.035);
   }
 
   .craft-note {
-    margin-top: 3.5rem;
+    margin-top: clamp(0.9rem, 2.4vh, 1.6rem);
     color: rgba(var(--ink-rgb), 0.52);
-    font-size: 0.86rem;
-    line-height: 1.6;
+    font-size: clamp(0.76rem, 1.7vw, 0.84rem);
+    line-height: 1.55;
     transition: color var(--theme-fade);
+  }
+
+  /* o rótulo que só o leitor de tela lê (a seta é o rótulo de quem enxerga) */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ——— a troca de painel ———
+     O rail desliza inteiro, mas um retângulo rígido voando pro lado lê como
+     cartão sendo empurrado, não como página trocando — é a mesma queixa que o
+     --seam-parallax da cortina responde. Então as linhas do painel que ENTRA
+     assentam um pouco atrás do rail, escalonadas, e vindo do lado de onde o
+     painel veio: --dir é +1 quando ele entra pela direita e -1 pela esquerda.
+
+     E é ATRASO, não aparição: nada aqui mexe em opacidade. Uma linha que nasce
+     transparente no meio da tela surge do nada, que é justamente o contrário
+     de entrar pela borda — o painel inteiro atravessa opaco, e o escalonamento
+     só faz as linhas arrastarem um pouco atrás dele.
+
+     O escalonamento tem teto (o min) porque ele mede posição na lista, e numa
+     lista longa o atraso da última linha passaria da duração do próprio
+     deslize — a linha assentaria depois de o painel já ter chegado. */
+  @keyframes row-settle {
+    from {
+      transform: translate3d(calc(var(--dir, 1) * 24px), 0, 0);
+    }
+  }
+
+  .work-panel.is-entering .experience-item {
+    animation: row-settle 460ms cubic-bezier(0.2, 0.86, 0.24, 1) backwards;
+    animation-delay: calc(min(var(--row, 0), 7) * 30ms + 40ms);
   }
 
   .craft-note a {
@@ -1052,33 +1388,38 @@ function hasDetails(entry: Entry) {
       height: 40px;
     }
 
-    .work-inner {
-      width: min(100% - 2rem, 920px);
-      padding-top: 6.5rem;
+    .work-page {
+      --column: min(100% - 2rem, 920px);
     }
 
+    .work-inner {
+      padding-top: clamp(3.25rem, 7vh, 5rem);
+    }
+
+    /* A linha NÃO muda de forma aqui — é a mesma de três colunas do desktop.
+       Empilhar data e texto, como a versão que rolava fazia, custava uma linha
+       de altura por entrada: cinco entradas, 140px, e o painel deixava de
+       caber num celular. O que cede é o selo e o espaço entre colunas. */
     .experience-item {
-      grid-template-columns: 3.5rem minmax(0, 1fr);
-      column-gap: 1rem;
-      row-gap: 0.8rem;
+      grid-template-columns: 2.5rem minmax(0, 1fr) auto;
     }
 
     .experience-mark {
-      grid-row: 1 / span 2;
-      width: 3.5rem;
-      border-radius: 0.7rem;
-      font-size: 0.86rem;
+      width: 2.5rem;
+      border-radius: 0.55rem;
+      font-size: 0.72rem;
     }
 
-    .period {
-      grid-column: 2;
-      grid-row: 1;
-      justify-self: start;
+    .experience-mark.has-image {
+      padding: 0.32rem;
     }
 
-    .experience-main {
-      grid-column: 2;
-      grid-row: 2;
+    .work-tabs {
+      gap: 0.9rem;
+    }
+
+    .tab {
+      letter-spacing: 0.1em;
     }
   }
 
@@ -1111,8 +1452,21 @@ function hasDetails(entry: Entry) {
     .work-transition .work-seam,
     .work-transition-title,
     .work-head,
-    .experience-item.is-arriving {
+    .is-arriving,
+    .tab-rule {
       transition: none;
+    }
+
+    /* O [data-work-panels] repetido não é enfeite: a regra que LIGA o deslize
+       é `html[data-work-panels] .work-rail`, e media query não acrescenta
+       especificidade nenhuma — um `.work-rail` pelado aqui perde a disputa e a
+       transição continua rodando. */
+    :global(html[data-work-panels]) .work-rail {
+      transition: none;
+    }
+
+    .work-panel.is-entering .experience-item {
+      animation: none;
     }
   }
 </style>

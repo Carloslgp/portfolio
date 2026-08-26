@@ -2,6 +2,7 @@
 // parede curva. O DOM continua por cima como interação, acessibilidade e fallback.
 import * as THREE from 'three';
 import { TUNNEL } from './config';
+import { canvasPixelRatio } from './resolution';
 
 export interface RenderPlacement {
   key: string;
@@ -79,8 +80,10 @@ export class TunnelRenderer {
       // não lança. Sem isto, um driver incompatível poderia ativar um canvas
       // transparente e esconder o fallback DOM perfeitamente utilizável.
       this.renderer.debug.onShaderError = () => this.fallback();
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.coarse ? 1.5 : 2));
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+      // a razão de pixels é medida junto com o viewport, no resize logo abaixo:
+      // ela depende do TAMANHO da tela (ver GL.PIXEL_BUDGET_COARSE), e fixá-la
+      // aqui deixaria um celular girado desenhando com a conta do retrato
       this.resize();
       this.canvas.addEventListener('webglcontextlost', this.onContextLost, { once: true });
       this.enabled = true;
@@ -141,6 +144,10 @@ export class TunnelRenderer {
     if (!this.renderer) return;
     this.viewW = Math.max(this.canvas.clientWidth, 1);
     this.viewH = Math.max(this.canvas.clientHeight, 1);
+    // a MESMA conta que escolheu a variante da foto (ver resolution.ts): se as
+    // duas discordassem, ou se desenharia detalhe que não veio, ou se baixaria
+    // detalhe que não se desenha
+    this.renderer.setPixelRatio(canvasPixelRatio(this.viewW, this.viewH, this.coarse));
     this.perspective = Math.max(
       Math.hypot(this.viewW, this.viewH) * TUNNEL.PERSPECTIVE_DIAG,
       TUNNEL.PERSPECTIVE_MIN,

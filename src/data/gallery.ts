@@ -30,10 +30,34 @@ import { ARC_WIDTH, HEIGHT } from '../components/carousel/config';
  *  a textura nova. */
 export const SEAM_PHOTO = 'anjo.jpg';
 
-/** A variante que o MURAL desenha. 800px é a medida das linhas justificadas
- *  (TARGET_ROW_HEIGHT de 300px ⇒ um tile passa raspando dos 400px de largura)
- *  em tela densa, e nada além. */
+/** As DUAS variantes que o mural desenha, e por que são duas.
+ *
+ *  Quanta fonte um tile pede sai de uma conta só: a altura da linha, vezes o
+ *  quanto a foto é deitada, vezes quantos pixels reais o canvas desenha por
+ *  pixel de CSS. E a altura da linha depende da TELA (photos/config.ts →
+ *  MURAL.ROW_HEIGHT_VW): 300px do tablet pra cima, ~175px num celular em pé.
+ *
+ *  Daí os dois números, medidos sobre esta pasta:
+ *
+ *    • celular EM PÉ — linha de 175px. Mesmo a foto mais deitada daqui (2.17:1)
+ *      pede 760px. Os 800 cobrem a pasta inteira, e é por isso que o telefone
+ *      não paga nada pela variante grande: ela nunca é pedida ali.
+ *
+ *    • tela grande (desktop, tablet, celular DEITADO) — linha de 300px. Aí uma
+ *      16:9 pede 1067px e a mais larga pede 1300. Os 800 cobriam 40 das 56: as
+ *      em pé, que fazem tile estreito. Toda foto deitada saía esticada, e
+ *      quanto melhor a tela, mais aparecia.
+ *
+ *  Por que não um número só pra todo mundo: 1200 pra todos dobra o que se baixa
+ *  na primeira tela (medido: 6,2 → 12,2 MB no celular) pra entregar detalhe que
+ *  o telefone não tem onde mostrar. Quem escolhe é a tela — ver
+ *  photos/resolution.ts, que refaz esta conta no cliente.
+ *
+ *  A grande sai com 3 pontos a menos de qualidade. Não é economia às cegas: em
+ *  foto, mais pixels com um pouco menos de bit por pixel se lê melhor que o
+ *  contrário — o artefato do WebP fica menor que o borrão da ampliação. */
 export const THUMB = { width: 800, format: 'webp', quality: 75 } as const;
+export const THUMB_WIDE = { width: 1400, format: 'webp', quality: 72 } as const;
 
 /** A variante grande: o lightbox, e a foto da emenda em tela cheia nas duas
  *  pontas da transição. */

@@ -11,7 +11,7 @@ import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
 import { PHOTO_META } from '../data/photos';
 import {
-  SEAM_ASPECT, SEAM_PHOTO, SEAM_ENTRY_KEY, SEAM_OVERSCAN, THUMB, FULL,
+  SEAM_ASPECT, SEAM_PHOTO, SEAM_ENTRY_KEY, SEAM_OVERSCAN, THUMB, THUMB_WIDE, FULL,
 } from '../data/gallery';
 
 const modules = import.meta.glob<{ default: ImageMetadata }>(
@@ -29,7 +29,7 @@ const photos = await Promise.all(
     const file = path.split('/').pop() ?? path;
     const meta = PHOTO_META[file] ?? {};
 
-    // duas variantes por foto. O sharp não amplia: pedir 2400 numa foto menor
+    // Variantes por foto. O sharp não amplia: pedir 2400 numa foto menor
     // devolve a largura original — o teto só vale pra quem passa dele.
     //
     // As medidas (e o porquê de cada uma) moram em src/data/gallery.ts: a home
@@ -40,6 +40,13 @@ const photos = await Promise.all(
       getImage({ src, ...FULL }),
     ]);
 
+    // A variante larga é pedida só quando o ORIGINAL tem o que dar. Sem esta
+    // pergunta, as vinte e uma fotos menores que 800px gerariam um segundo
+    // arquivo pixel a pixel idêntico ao primeiro — o sharp não amplia, mas o
+    // Astro versiona pelas opções pedidas, não pelo resultado. Aqui elas
+    // reaproveitam a mesma URL, e o cliente nunca baixa duas vezes o mesmo.
+    const wide = src.width > THUMB.width ? await getImage({ src, ...THUMB_WIDE }) : thumb;
+
     // alt: metadado > título > nome do arquivo limpo. Nunca vazio.
     const alt =
       meta.alt ?? meta.title ?? file.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
@@ -47,6 +54,12 @@ const photos = await Promise.all(
     return {
       id: file,
       thumb: thumb.src,
+      // a largura REAL de cada variante, não a pedida: é ela que o cliente
+      // compara com o que o tile precisa (ver photos/resolution.ts), e pra foto
+      // que já nasceu pequena as duas são a mesma
+      thumbW: Math.min(THUMB.width, src.width),
+      wide: wide.src,
+      wideW: Math.min(THUMB_WIDE.width, src.width),
       full: full.src,
       w: src.width,
       h: src.height,

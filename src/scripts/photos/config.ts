@@ -103,6 +103,47 @@ export const MURAL = {
   RESIZE_DEBOUNCE: 180,
 };
 
+// ——— resolução do canvas (a conta que usa estes números: resolution.ts) ———
+//
+// Quantos pixels REAIS o mural desenha por pixel de CSS. É o número que decide
+// a nitidez das fotos, e ele estava vindo emprestado do lugar errado: o teto de
+// 1.5 no touch é o do carrossel da home (components/carousel/config.ts → GPU),
+// uma cena com refração de vidro — que faz o three desenhar tudo uma SEGUNDA
+// vez por quadro —, reflexo n'água e estilhaço. O mural é quad texturizado com
+// uma curva no vertex shader, e o blur já se desliga sozinho no touch
+// (BLUR.DISABLE_ON_COARSE). Ele pagava um orçamento que não gasta.
+//
+// O que 1.5 custava: num celular de dpr 3, o canvas saía com METADE dos pixels
+// da tela em cada eixo — um quarto no total — e o compositor esticava o que
+// sobrou de volta. A densidade que deveria deixar a foto nítida era exatamente
+// a que fazia a conta piorar.
+export const GL = {
+  /** Teto do devicePixelRatio. Cada ponto acima de 1 custa o QUADRADO em
+   *  pixels, então dois é onde quase todo mundo para: o que se ganharia de 2
+   *  pra 3 já está abaixo do que o olho separa a um braço de distância, e
+   *  custaria mais 125% de pixels pra chegar lá. */
+  PIXEL_RATIO: 2,
+
+  /** ——— e por que o mesmo teto no touch ———
+   *
+   *  Não é generosidade: no celular ele desenha MENOS que no desktop. Um
+   *  aparelho de 390×844 em dpr 2 dá 1.3 megapixels; a mesma página num
+   *  notebook de 1440×900 em dpr 2 dá 5.2. O aparelho pequeno estava sendo
+   *  punido pelo tamanho da tela dele, que é justamente o que o torna barato
+   *  de desenhar.
+   *
+   *  Quem cuida do caso caro é o orçamento abaixo, e não o teto — porque o
+   *  caso caro não é o celular, é o tablet grande e denso. */
+  PIXEL_RATIO_COARSE: 2,
+
+  /** Teto de pixels do canvas em ponteiro grosso, para o teto acima não virar
+   *  um cheque em branco numa tela grande: um tablet de 1024×1366 em dpr 2
+   *  desenharia 5.6 megapixels, mais que o notebook. Aqui a razão cede até
+   *  caber no orçamento — o celular nunca chega perto dele e fica com os 2
+   *  inteiros. Só no touch: no desktop o dpr 2 já se provou. */
+  PIXEL_BUDGET_COARSE: 2_600_000,
+};
+
 // ——— a parede curva / tubo (ver tunnel.ts) ———
 //
 // O centro do viewport é o fundo do tubo; as bordas avançam em Z e viram suas

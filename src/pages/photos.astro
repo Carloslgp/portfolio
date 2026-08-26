@@ -79,7 +79,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
 
 <Layout>
   <Fragment slot="head">
-    <title>Photos — Carlos Leonardo</title>
+    <title>Photos · Carlos Leonardo</title>
 
     {/* O caminho de volta. Quem veio da home volta pela HISTÓRIA (e o BFCache
         costuma servi-la viva, sem custo nenhum), mas quem entrou direto aqui
@@ -96,7 +96,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
        plano de propósito — o plano tem um transform reescrito TODO FRAME pelo
        infiniteCanvas, e dividir essa string com uma segunda animação seria pedir
        que as duas se atropelassem. Aqui cada uma tem o seu elemento. -->
-  <main class="mural" data-mural aria-label="Mural de fotos — arraste para navegar">
+  <main class="mural" data-mural aria-label="Mural de fotos, arraste para navegar">
     <div class="mural-fx" data-mural-fx>
       <div class="mural-stage" data-mural-stage>
         <div class="mural-zoom" data-mural-zoom>
@@ -164,7 +164,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   )}
 
   {photos.length === 0 && (
-    <p class="mural-empty">Sem fotos por enquanto — jogue arquivos em <code>src/assets/photos/</code>.</p>
+    <p class="mural-empty">Sem fotos por enquanto. Jogue arquivos em <code>src/assets/photos/</code>.</p>
   )}
 
   <!-- ——— HUD mínima por cima do mural ———

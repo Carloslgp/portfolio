@@ -70,7 +70,7 @@ export const ENTRIES: Entry[] = [
     logo: '/images/work/nock.svg',
     summary:
       'B2B lead enrichment for the Brazilian market. I work across the product as a ' +
-      'generalist and increasingly on the data side — right now I’m structuring the ' +
+      'generalist and increasingly on the data side. Right now I’m structuring the ' +
       'database with our CTO ahead of our first paying customers.',
     impact: [
       'Built Nock’s blog to an accessibility standard most marketing sites skip: 99 Lighthouse, dyslexia-friendly typefaces, fully navigable by screen reader',
@@ -115,13 +115,13 @@ export const ENTRIES: Entry[] = [
     summary:
       'I built two internal systems end to end. The first was a performance review ' +
       'platform where managers and their reports rate each other. The hard part wasn’t ' +
-      'the reviews — it was that no two teams had the same shape. Some ran director → ' +
+      'the reviews; it was that no two teams had the same shape. Some ran director → ' +
       'manager → team lead → deputy → sales rep. Others were one lead and one person. ' +
       'The data model had to handle both without special-casing either.',
     impact: [
       'Modeled reporting structures of arbitrary depth so the review flow worked for any org shape',
       'Rolled individual ratings up into team sentiment metrics for leads, with full visibility for HR and the C-suite',
-      'Shipped a second app moving HR requests into self-service — time off, medical leave, resignations',
+      'Shipped a second app moving HR requests into self-service: time off, medical leave, resignations',
     ],
     stack: ['Next.js', 'React', 'Node.js'],
   },
@@ -136,9 +136,9 @@ export const ENTRIES: Entry[] = [
     logo: '/images/work/startup-weekend.webp',
     start: '2026-08',
     end: '2026-08',
-    badge: '2nd of 15 — Techstars Startup Weekend Curitiba',
+    badge: '2nd of 15, Techstars Startup Weekend Curitiba',
     summary:
-      'Fuel quality monitoring for truck fleets — a hardware sensor that catches ' +
+      'Fuel quality monitoring for truck fleets: a hardware sensor that catches ' +
       'adulterated diesel before it reaches an engine. The idea was mine; the company ' +
       'was the team’s. We took it from problem statement through validation to a final ' +
       'pitch in 54 hours, and placed second out of 15. I built the pitch with the team ' +
@@ -158,7 +158,7 @@ export const ENTRIES: Entry[] = [
     summary:
       'PUCPR’s developer community, meeting weekly. I speak on APIs and databases, my ' +
       'co-president runs his own sessions, and about 15 people show up each week. Most ' +
-      'of the work isn’t the talks — it’s keeping a room of students building on a schedule.',
+      'of the work isn’t the talks; it’s keeping a room of students building on a schedule.',
   },
 
   {
@@ -173,7 +173,7 @@ export const ENTRIES: Entry[] = [
     summary:
       'A campus-scoped social platform, built for the Creative Experience course and ' +
       'voted first by the class. Students signed up with an institutional email, which ' +
-      'unlocked every group at their university — course subjects, reading circles, ' +
+      'unlocked every group at their university: course subjects, reading circles, ' +
       'tabletop RPG. The pitch was pulling campus life off WhatsApp, where groups are ' +
       'invisible unless someone adds you and nobody is accountable for what happens in ' +
       'them. Chat, an announcements feed, and a reporting flow that handed real ' +

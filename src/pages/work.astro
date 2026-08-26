@@ -73,7 +73,7 @@ function hasDetails(entry: Entry) {
 
 <Layout lang="en">
   <Fragment slot="head">
-    <title>Experience — Carlos Leonardo</title>
+    <title>Experience · Carlos Leonardo</title>
     <meta
       name="description"
       content="Carlos Leonardo's professional experience, projects and recognition."
@@ -234,8 +234,8 @@ function hasDetails(entry: Entry) {
                           <span class="period">
                             <span class="dot" aria-hidden="true">·</span>
                             <time datetime={dates.from.dt}>{dates.from.label}</time>
-                            {dates.to && <><span aria-hidden="true"> — </span><time datetime={dates.to.dt}>{dates.to.label}</time></>}
-                            {dates.present && <><span aria-hidden="true"> — </span>Present</>}
+                            {dates.to && <><span aria-hidden="true"> – </span><time datetime={dates.to.dt}>{dates.to.label}</time></>}
+                            {dates.present && <><span aria-hidden="true"> – </span>Present</>}
                           </span>
                         </p>
 
@@ -1204,16 +1204,28 @@ function hasDetails(entry: Entry) {
     max-width: 44rem;
   }
 
+  /* A distinção não é uma etiqueta: é uma frase sobre a entrada. Era pílula
+     cinza com versalete, e pílula é justamente o que a régua das abas lá em
+     cima existe pra não haver — divisão desenhada onde o espaço em branco já
+     divide.
+
+     Quem marca agora é a VOZ: Playfair itálico, o mesmo aparte serifado do
+     verso no Songs ("sem aspas desenhadas nem caixa em volta") e da citação do
+     carrossel. Trocar de tipo já diz "isto não é o corpo do texto", e diz sem
+     acrescentar nenhuma linha nova à página.
+
+     Sem text-transform: o dado é escrito em data/work.ts com a caixa que ele
+     tem ("2nd of 15 — Techstars Startup Weekend Curitiba"), e o maiúsculo
+     forçado apagava essa escolha — em itálico serifado, pior ainda: versalete
+     larga em Playfair itálico lê como erro, não como ênfase. */
   .badge {
-    display: inline-block;
-    padding: 0.38rem 0.7rem;
-    border: 1px solid rgba(var(--ink-rgb), 0.16);
-    border-radius: 999px;
-    color: rgba(var(--ink-rgb), 0.66);
-    font-size: 0.66rem;
-    font-weight: 650;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    display: block;
+    font-family: "Playfair Display", Georgia, serif;
+    font-style: italic;
+    font-size: clamp(0.94rem, 2vw, 1.02rem);
+    line-height: 1.45;
+    color: rgba(var(--ink-rgb), 0.72);
+    transition: color var(--theme-fade);
   }
 
   .detail-section {
@@ -1268,21 +1280,34 @@ function hasDetails(entry: Entry) {
     background: rgba(var(--ink-rgb), 0.35);
   }
 
+  /* A pilha voltou a ser TEXTO. Quatro pílulas cinzas em fila eram quatro
+     caixas pra dizer quatro palavras, e ainda competiam com os selos das
+     entradas — o único elemento da página que tem direito a ser uma caixa,
+     porque ele é uma imagem.
+
+     O rótulo em cima ("Tools & technologies") já diz o que a fila é, então as
+     bordas não estavam separando nada que o leitor pudesse confundir.
+
+     O separador é o mesmo ponto que o .meta desta linha já usa entre a empresa
+     e a data: a página tem um vocabulário de separação e ele cabe aqui. Ele
+     vive no item SEGUINTE (li + li), pelo mesmo motivo do ponto de lá — solto
+     entre os dois, fica órfão no fim da linha quando a fila quebra. */
   .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
     list-style: none;
+    color: rgba(var(--ink-rgb), 0.62);
+    font-size: clamp(0.8rem, 1.8vw, 0.86rem);
+    line-height: 1.7;
+    transition: color var(--theme-fade);
   }
 
   .chips li {
-    padding: 0.38rem 0.7rem;
-    border: 1px solid rgba(var(--ink-rgb), 0.14);
-    border-radius: 999px;
-    background: rgba(var(--ink-rgb), 0.035);
-    color: rgba(var(--ink-rgb), 0.63);
-    font-size: 0.68rem;
-    font-weight: 600;
+    display: inline;
+  }
+
+  .chips li + li::before {
+    content: '·';
+    margin: 0 0.5rem;
+    color: rgba(var(--ink-rgb), 0.3);
   }
 
   .project-link {

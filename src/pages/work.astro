@@ -31,13 +31,17 @@ function preview(entry: Entry) {
 
 /** Quantas linhas do painel de abertura entram escalonadas com a cortina.
  *
- *  Agora que cada painel cabe na tela, "as que cabem" é praticamente o painel
- *  inteiro. O teto continua existindo pelo motivo de sempre — animar o que
- *  está fora da dobra é pôr o navegador pra compor camada que ninguém vê, e os
- *  últimos atrasos caem já no fim da abertura, que é onde apareciam os quadros
- *  longos no celular. Ele volta a morder no dia em que um grupo crescer além
- *  da tela e o painel passar a rolar por dentro. */
-const REVEAL_ROWS = 6;
+ *  O dia que o comentário antigo previa chegou: os detalhes voltaram pro fluxo
+ *  e a linha deixou de ter uma altura só. Com summary, contribuições e chips
+ *  dentro dela, duas ou três já ocupam a faixa visível do painel — o resto
+ *  nasce abaixo da dobra, e animar o que ninguém vê é pôr o navegador pra
+ *  compor camada à toa, que é de onde vinham os quadros longos no celular.
+ *
+ *  Três e não duas porque a conta muda com a tela: num notebook baixo a
+ *  terceira linha realmente fica fora, mas num monitor alto ela está lá, e uma
+ *  linha visível que NÃO entra escalonada aparece mais do que uma invisível
+ *  que entra. Errar pro lado de animar demais é o lado barato. */
+const REVEAL_ROWS = 3;
 
 /** A página em passos de animação.
  *
@@ -58,12 +62,13 @@ const sections = groups().map((group, panel) => ({
   })),
 }));
 
+/** Tem algo além do cabeçalho da linha pra mostrar? Enquanto os detalhes eram
+ *  modal isto decidia se a linha ganhava botão; agora decide se ela ganha
+ *  corpo. As três entradas de peso 3 não têm — e continuam sendo uma linha só,
+ *  que é o que elas sempre foram. */
 function hasDetails(entry: Entry) {
   return Boolean(entry.summary || entry.impact?.length || entry.stack?.length || entry.badge || entry.href);
 }
-
-/** As entradas que têm um <dialog>, na mesma ordem em que a página as lista. */
-const detailed = sections.flatMap((section) => section.entries).filter(hasDetails);
 ---
 
 <Layout lang="en">
@@ -197,7 +202,6 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
               <ol class="experience-list">
                 {section.rows.map(({ entry, row, step }) => {
                   const dates = range(entry);
-                  const dialogId = `work-details-${entry.id}`;
                   const details = hasDetails(entry);
 
                   return (
@@ -234,26 +238,49 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
                             {dates.present && <><span aria-hidden="true"> — </span>Present</>}
                           </span>
                         </p>
-                      </article>
 
-                      {details && (
-                        <button
-                          class="row-open"
-                          type="button"
-                          data-dialog-open={dialogId}
-                          aria-haspopup="dialog"
-                          aria-controls={dialogId}
-                        >
-                          {/* O rótulo visível é a seta; o nome acessível diz de
-                              QUEM são os detalhes. Numa lista de nove linhas,
-                              nove botões chamados "Read more" mandam o leitor
-                              de tela adivinhar em qual delas ele está. */}
-                          <span class="sr-only">Read more about {entry.title}</span>
-                          <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M6 3l5 5-5 5"></path>
-                          </svg>
-                        </button>
-                      )}
+                        {details && (
+                          <div class="detail">
+                            {entry.badge && <p class="badge">{entry.badge}</p>}
+                            {entry.summary && <p class="summary">{entry.summary}</p>}
+
+                            {/* Os dois rótulos continuam sendo <h3> de verdade,
+                                e não um <p> em maiúsculas: eles enquadravam as
+                                seções do diálogo e enquadram as mesmas coisas
+                                aqui. Sem eles, uma lista de frases soltas e
+                                uma fila de palavras soltas ficariam penduradas
+                                embaixo do summary sem dizer o que são — pra
+                                quem lê com os olhos e pra quem lê com leitor
+                                de tela, que é onde some primeiro. */}
+                            {entry.impact?.length && (
+                              <section class="detail-section">
+                                <h3>What I did</h3>
+                                <ul class="impact-list">
+                                  {entry.impact.map((line) => <li>{line}</li>)}
+                                </ul>
+                              </section>
+                            )}
+
+                            {entry.stack?.length && (
+                              <section class="detail-section">
+                                <h3>Tools & technologies</h3>
+                                <ul class="chips">
+                                  {entry.stack.map((tech) => <li>{tech}</li>)}
+                                </ul>
+                              </section>
+                            )}
+
+                            {entry.href && (
+                              <a class="project-link" href={entry.href} target="_blank" rel="noopener noreferrer">
+                                Visit {entry.org ?? entry.title}
+                                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                  <path d="M6 3h7v7M13 3 5 11M11 9v4H3V5h4"></path>
+                                </svg>
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </article>
                     </li>
                   );
                 })}
@@ -267,81 +294,23 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
         Personal experiments and things made for the joy of making live on <a href="/craft">/craft</a>.
       </p>
     </div>
+
+    <!-- A mesma seta da dobra do About, pelo mesmo motivo: agora que a lista
+         passa da altura da tela, a primeira dobra termina no meio de uma
+         entrada e nada diz que há mais. Ela responde ao ESTADO da página (o
+         quanto falta pro fim), não a um gesto já feito — ver scripts/work.ts.
+
+         aria-hidden + pointer-events: none de propósito: é um sinal pra quem
+         VÊ a dobra. Quem lê por leitor de tela ou por Tab já recebe a lista
+         inteira em sequência, e um "role para baixo" ali seria só ruído. -->
+    <div class="work-hint" data-work-hint aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14" />
+        <path d="m19 12-7 7-7-7" />
+      </svg>
+    </div>
   </main>
 
-  {detailed.map((entry) => {
-    const dates = range(entry);
-    const dialogId = `work-details-${entry.id}`;
-
-    return (
-      <dialog class="work-dialog" id={dialogId} data-work-dialog aria-labelledby={`${dialogId}-title`}>
-        <div class="dialog-shell">
-          <header class="dialog-head">
-            <div>
-              <p class="dialog-kicker">{entryType[entry.kind]}</p>
-              <h2 id={`${dialogId}-title`}>{entry.title}</h2>
-              <p class="dialog-company">{entry.org}</p>
-            </div>
-
-            <button class="dialog-close" type="button" data-dialog-close aria-label={`Close ${entry.title} details`}>
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-                <path d="M5 5l14 14M19 5 5 19"></path>
-              </svg>
-            </button>
-          </header>
-
-          <div class="dialog-body">
-            <div class="dialog-meta">
-              <span class:list={['dialog-mark', entry.logo && 'has-image']} style={`--mark-hue:${HUE.get(entry.id)}`} aria-hidden="true">
-                {entry.logo ? <img src={entry.logo} alt="" decoding="async" /> : monogram(entry)}
-              </span>
-              <p>
-                <time datetime={dates.from.dt}>{dates.from.label}</time>
-                {dates.to && <><span aria-hidden="true"> — </span><time datetime={dates.to.dt}>{dates.to.label}</time></>}
-                {dates.present && <><span aria-hidden="true"> — </span>Present</>}
-              </p>
-            </div>
-
-            {entry.badge && <p class="badge">{entry.badge}</p>}
-
-            {entry.summary && (
-              <section class="dialog-section" aria-labelledby={`${dialogId}-overview`}>
-                <h3 id={`${dialogId}-overview`}>Overview</h3>
-                <p class="dialog-summary">{entry.summary}</p>
-              </section>
-            )}
-
-            {entry.impact?.length && (
-              <section class="dialog-section" aria-labelledby={`${dialogId}-contributions`}>
-                <h3 id={`${dialogId}-contributions`}>What I did</h3>
-                <ul class="impact-list">
-                  {entry.impact.map((line) => <li>{line}</li>)}
-                </ul>
-              </section>
-            )}
-
-            {entry.stack?.length && (
-              <section class="dialog-section" aria-labelledby={`${dialogId}-tools`}>
-                <h3 id={`${dialogId}-tools`}>Tools & technologies</h3>
-                <ul class="chips">
-                  {entry.stack.map((tech) => <li>{tech}</li>)}
-                </ul>
-              </section>
-            )}
-
-            {entry.href && (
-              <a class="project-link" href={entry.href} target="_blank" rel="noopener noreferrer">
-                Visit {entry.org ?? entry.title}
-                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M6 3h7v7M13 3 5 11M11 9v4H3V5h4"></path>
-                </svg>
-              </a>
-            )}
-          </div>
-        </div>
-      </dialog>
-    );
-  })}
 </Layout>
 
 <script>
@@ -363,12 +332,18 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     transition: background-color var(--theme-fade);
   }
 
-  /* Sem o modo painel (script desligado) a página é a lista de sempre: as duas
-     seções empilhadas e rolagem normal. Com ele, html e body ficam com o
-     height:100% / overflow:hidden que o global.css já dá — quem rola, se
-     precisar, é o painel. */
-  :global(html:not([data-work-panels]):has(.work-page)),
-  :global(html:not([data-work-panels]):has(.work-page) body) {
+  /* A /work rola de cima a baixo, com script ou sem ele — e o global.css dá a
+     html e body o `height: 100%` + `overflow: hidden` de que a HOME precisa
+     (canvas fixo, quem rola lá é o Lenis). Aqui os dois voltam ao normal.
+
+     Sem o `:not([data-work-panels])` que esta regra tinha: enquanto o painel
+     rolava por dentro, o documento travado ERA o desenho. Agora quem rola é a
+     página, e manter a trava tem um sintoma que engana — o conteúdo aparece
+     inteiro, porque o overflow do body propaga pro viewport e o body então não
+     recorta nada, mas nenhum gesto chega nele. Fica tudo visível e nada
+     alcançável, que é pior do que um corte: um corte pelo menos se vê. */
+  :global(html:has(.work-page)),
+  :global(html:has(.work-page) body) {
     height: auto;
     overflow: visible;
   }
@@ -378,12 +353,8 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
      a lista inteira dava um pulo lateral no meio da abertura — bem no momento
      em que ela está entrando. Como esta página rola de qualquer jeito, o
      espaço reservado não custa nada fora da transição. */
-  :global(html:not([data-work-panels]):has(.work-page)) {
+  :global(html:has(.work-page)) {
     scrollbar-gutter: stable;
-  }
-
-  :global(body.has-work-dialog) {
-    overflow: hidden !important;
   }
 
   /* Vale enquanto a cortina existe — armada E abrindo. Só em 'armed' a
@@ -780,28 +751,11 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     padding: clamp(2.75rem, 8.5vh, 7.5rem) 0 clamp(1rem, 2.6vh, 2.5rem);
   }
 
-  :global(html[data-work-panels]) .work-page {
-    height: 100dvh;
-    overflow: hidden;
-  }
-
-  /* auto auto 1fr auto: cabeçalho, abas e o rodapé do /craft pedem o tamanho
-     que têm, e o trilho fica com o que sobrar. O minmax(0, 1fr) é o que
-     autoriza esse resto a ser MENOR que o conteúdo — sem ele a faixa cresce
-     até caber a lista e volta a empurrar a página pra fora da tela, que é
-     exatamente o que este layout existe pra impedir. */
-  :global(html[data-work-panels]) .work-inner {
-    display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
-    height: 100dvh;
-  }
-
   .work-head {
     padding-bottom: clamp(1.1rem, 3vh, 2rem);
   }
 
-  .eyebrow,
-  .dialog-kicker {
+  .eyebrow {
     margin-bottom: 0.75rem;
     color: rgba(var(--ink-rgb), 0.5);
     font-size: 0.68rem;
@@ -869,10 +823,12 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     cursor: default;
   }
 
-  /* O único fio que sobrou na página. Ele não decora: é a resposta à pergunta
-     "qual das duas estou vendo". Todos os outros — as bordas da fileira, os
-     separadores entre as linhas, o traço acima do rodapé — eram divisões que
-     o espaço em branco já fazia, e cada um deles competia com este. */
+  /* Um dos dois fios da página, e o único horizontal. Ele não decora: é a
+     resposta à pergunta "qual das duas estou vendo". O outro é a espinha da
+     lista, que responde outra coisa ("isto é uma sequência") e corre no outro
+     eixo — os dois não competem porque não dizem a mesma coisa.
+     O que continua fora: bordas de fileira, separadores entre as linhas e o
+     traço acima do rodapé, que eram divisões que o espaço em branco já fazia. */
   .tab-rule {
     position: absolute;
     bottom: 0;
@@ -920,7 +876,21 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
   .work-rail {
     display: flex;
     width: 100%;
-    height: 100%;
+  }
+
+  /* A altura do rail é a do painel ATIVO, medida pelo workPanels.ts.
+     Sem isto, os dois painéis ficam lado a lado numa fileira flex e a fileira
+     fica com a altura do MAIOR: o grupo "Career" tem três entradas com lista de
+     contribuições e é quase o dobro do outro, então a aba dos projetos herdava
+     uns 800px de branco no fim da página — rolagem que não leva a lugar nenhum.
+     `align-items: start` é o que impede o painel curto de ser esticado até lá.
+
+     A altura entra na mesma transição do deslize, e com a mesma curva: os dois
+     acontecem no mesmo gesto, e uma página que muda de tamanho num degrau
+     enquanto o conteúdo desliza lê como dois eventos em vez de um. */
+  :global(html[data-work-panels]) .work-rail {
+    align-items: start;
+    height: var(--rail-height, auto);
   }
 
   /* A curva do deslize é a ÚNICA da página que não é de desaceleração pura.
@@ -932,7 +902,9 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
      é o percurso que se lê, não só o destino. */
   :global(html[data-work-panels]) .work-rail {
     transform: translate3d(calc(var(--panel, 0) * -100% + var(--drag, 0px)), 0, 0);
-    transition: transform var(--slide-dur, 620ms) cubic-bezier(0.5, 0, 0.15, 1);
+    transition:
+      transform var(--slide-dur, 620ms) cubic-bezier(0.5, 0, 0.15, 1),
+      height var(--slide-dur, 620ms) cubic-bezier(0.5, 0, 0.15, 1);
   }
 
   /* Enquanto o dedo está na tela o rail SEGUE o dedo: uma transição aqui
@@ -954,15 +926,11 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     min-width: 0;
   }
 
+  /* Quem rola é a PÁGINA. O painel voltou a ter a altura do próprio conteúdo:
+     a lista não é mais uma janela pra espiar um documento, é o documento. */
   :global(html[data-work-panels]) .work-panel {
     flex: 0 0 100%;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    /* o painel é o fim da linha da rolagem: sem isto, chegar ao fim da lista
-       repassa o gesto pra página e o documento inteiro balança */
-    overscroll-behavior: contain;
-    /* o gesto vertical continua rolando o painel; o horizontal é nosso */
+    /* o gesto vertical rola a página; o horizontal continua sendo nosso */
     touch-action: pan-y;
   }
 
@@ -981,36 +949,85 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     list-style: none;
   }
 
-  /* A lista fica no MEIO da faixa que sobrou, não colada no topo dela: um
-     grupo tem quatro linhas e o outro cinco, e ancorar as duas em cima deixava
-     um buraco de tamanho diferente embaixo de cada painel — a troca de aba
-     virava a lista subindo e o vazio mudando de altura.
-
-     margin auto, e não justify-content: center. Os dois centram igual enquanto
-     sobra espaço; a diferença aparece quando o painel precisa rolar, e aí o
-     centrado empurra o começo da lista pra ACIMA do topo da rolagem, fora do
-     alcance. A margem automática vira zero quando não há folga. */
+  /* O trilho sangra pra tela inteira (ver acima); quem devolve o texto à coluna
+     de leitura é a lista, aqui dentro. A centragem vertical que esta regra
+     fazia saiu junto com a altura fixa: sem folga sobrando, não há o que
+     centrar — a lista começa no topo do painel e vai até onde for. */
   :global(html[data-work-panels]) .experience-list {
-    /* o trilho é a tela inteira; quem devolve o texto à coluna de leitura é a
-       lista, aqui dentro — margin auto centra nos dois eixos de uma vez */
     width: var(--column);
-    margin: auto;
+    margin-inline: auto;
   }
 
-  /* A linha perdeu a frase de preview pra caber na tela — ela continua no
-     diálogo, em "Overview", que é onde alguém que quer ler já vai. O que
-     sobrou é o que identifica a entrada de relance: quem, onde, quando. */
+  /* A linha voltou a ter corpo: o que era diálogo agora mora aqui embaixo do
+     cabeçalho dela. Duas colunas — o selo e o texto —, e a terceira (a do
+     botão que abria o modal) deixou de existir.
+
+     align-items: start, e não center: com o corpo dentro, centrar punha o selo
+     no meio de um bloco de dez linhas, longe do título que ele identifica. Ele
+     é a marca da entrada, então mora na altura do nome dela.
+
+     As duas medidas viram variável porque a ESPINHA depende das duas: ela
+     precisa saber onde é o meio da coluna do selo e onde o selo acaba. Duas
+     cópias de 3rem em lugares diferentes é como o fio sai do lugar no dia em
+     que o selo mudar de tamanho — e ele muda, no celular, logo ali embaixo. */
   .experience-item {
+    --mark: 3rem;
+    --row-pad: clamp(0.62rem, 1.9vh, 1.3rem);
     position: relative;
     display: grid;
-    grid-template-columns: 3rem minmax(0, 1fr) auto;
+    grid-template-columns: var(--mark) minmax(0, 1fr);
     gap: 0 clamp(0.9rem, 2vw, 1.25rem);
-    align-items: center;
-    padding: clamp(0.62rem, 1.9vh, 1.3rem) 0;
+    align-items: start;
+    padding: var(--row-pad) 0;
   }
 
-  .experience-mark,
-  .dialog-mark {
+  /* ——— a espinha ———
+     Um fio na coluna do selo ligando uma entrada à seguinte. Ele responde
+     "isto é uma sequência, não cinco cartões soltos" — que é a pergunta que
+     aparece assim que cada linha ganha altura própria e o espaço em branco
+     entre elas deixa de ser regular.
+
+     Ele NÃO passa por trás do selo: são dois segmentos por linha, um acima e
+     outro abaixo, e o vão entre eles tem exatamente a altura do selo. Passar
+     por trás exigiria que o selo fosse opaco, e o selo do monograma é um tom
+     translúcido de propósito (a matiz vem do id da entrada) — o fio apareceria
+     por dentro dele. O vão também é mais honesto: o fio LIGA os selos, então
+     começar e terminar na borda de cada um é o que ele de fato faz.
+
+     Primeira e última linha ficam sem a ponta solta: um fio que sobe acima do
+     primeiro selo ou desce abaixo do último aponta pra uma entrada que não
+     existe. */
+  .experience-item::before,
+  .experience-item::after {
+    content: '';
+    position: absolute;
+    left: calc(var(--mark) / 2);
+    width: 1px;
+    /* o fio tem 1px e a coluna tem largura par: sem isto ele encosta meio
+       pixel pra direita do centro do selo, e a 3rem isso se vê */
+    transform: translateX(-50%);
+    background: rgba(var(--ink-rgb), 0.14);
+    transition: background-color var(--theme-fade);
+  }
+
+  /* do topo da linha até o topo do selo */
+  .experience-item::before {
+    top: 0;
+    height: var(--row-pad);
+  }
+
+  /* do pé do selo até o fim da linha, onde o ::before da próxima o encontra */
+  .experience-item::after {
+    top: calc(var(--row-pad) + var(--mark));
+    bottom: 0;
+  }
+
+  .experience-item:first-child::before,
+  .experience-item:last-child::after {
+    content: none;
+  }
+
+  .experience-mark {
     display: grid;
     place-items: center;
     border: 1px solid hsla(var(--mark-hue), 45%, 45%, 0.18);
@@ -1022,31 +1039,28 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
   }
 
   .experience-mark {
-    width: 3rem;
+    width: var(--mark);
     aspect-ratio: 1;
     border-radius: 0.65rem;
     font-size: 0.8rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
-  .experience-mark.has-image,
-  .dialog-mark.has-image {
+  .experience-mark.has-image {
     padding: 0.42rem;
     overflow: hidden;
     border-color: rgba(10, 10, 10, 0.12);
     background: #fff;
   }
 
-  .experience-mark.has-image img,
-  .dialog-mark.has-image img {
+  .experience-mark.has-image img {
     width: 100%;
     height: 100%;
     display: block;
     object-fit: contain;
   }
 
-  :global(html[data-theme='dark']) .experience-mark,
-  :global(html[data-theme='dark']) .dialog-mark {
+  :global(html[data-theme='dark']) .experience-mark {
     color: hsl(var(--mark-hue), 55%, 72%);
   }
 
@@ -1094,41 +1108,50 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     font-variant-numeric: tabular-nums;
   }
 
-  /* A seta é o rótulo visível; o alvo é a linha inteira (o ::after abaixo).
-     Numa lista desta densidade, um botão de 15px é um alvo cruel no toque, e
-     alargar o botão em si empurraria a coluna do texto. */
-  .row-open {
-    display: grid;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    border: 0;
-    border-radius: 999px;
-    background: transparent;
-    color: rgba(var(--ink-rgb), 0.42);
-    cursor: pointer;
-    transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+  /* ——— a seta da dobra ———
+     Cópia fiel da .about-hint do index.astro, e de propósito: é o mesmo sinal,
+     na mesma quina, no mesmo peso. Duas setas de "role para baixo" desenhadas
+     diferente no mesmo site seriam dois vocabulários pra uma ideia só. */
+  .work-hint {
+    position: fixed;
+    left: 50%;
+    /* a MESMA linha de base do .theme na quina direita: os dois são marcas do
+       pé da janela, e em alturas diferentes um faria o outro parecer torto */
+    bottom: 2.2rem;
+    z-index: 6;
+    transform: translateX(-50%);
+    color: rgba(var(--ink-rgb), 0.55);
+    pointer-events: none;
+    transition: opacity 0.5s ease, color var(--theme-fade);
   }
 
-  .row-open::after {
-    content: '';
-    position: absolute;
-    inset: 0;
+  /* chegou ao fim: não há mais o que apontar (ver scripts/work.ts → syncHint) */
+  .work-hint.is-gone {
+    opacity: 0;
   }
 
-  .experience-item:hover .row-open,
-  .row-open:focus-visible {
-    background: rgba(var(--ink-rgb), 0.08);
-    color: var(--ink);
-    transform: translateX(2px);
+  /* Enquanto a cortina está na tela não há página pra rolar, e uma seta
+     balançando por cima da pintura anuncia uma dobra que ainda não existe. */
+  :global(html[data-work-entry]) .work-hint,
+  :global(body.has-work-transition) .work-hint {
+    opacity: 0;
   }
 
-  /* O realce é da LINHA, porque o alvo é a linha. Sangra pros lados pra
-     parecer uma faixa acesa e não um retângulo colado no texto. */
-  .experience-item:has(.row-open:hover),
-  .experience-item:has(.row-open:focus-visible) {
-    background: rgba(var(--ink-rgb), 0.035);
-    box-shadow: 0 0 0 0.75rem rgba(var(--ink-rgb), 0.035);
+  /* O balanço é o que separa "seta" de "seta que quer que você role". Vai no
+     <svg>, e não no .work-hint: lá em cima o transform já é a centralização, e
+     uma animação por cima dele jogaria a seta pra fora do centro. */
+  .work-hint svg {
+    display: block;
+    animation: hint-bob 1.8s ease-in-out infinite;
+  }
+
+  @keyframes hint-bob {
+    0%, 100% { transform: translateY(-4px); }
+    50%      { transform: translateY(4px); }
+  }
+
+  :global(html[data-motion='reduced']) .work-hint svg {
+    animation: none;
   }
 
   .craft-note {
@@ -1137,19 +1160,6 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     font-size: clamp(0.76rem, 1.7vw, 0.84rem);
     line-height: 1.55;
     transition: color var(--theme-fade);
-  }
-
-  /* o rótulo que só o leitor de tela lê (a seta é o rótulo de quem enxerga) */
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
   }
 
   /* ——— a troca de painel ———
@@ -1184,107 +1194,18 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     border-bottom: 1px solid rgba(var(--ink-rgb), 0.3);
   }
 
-  .work-dialog {
-    width: min(calc(100% - 2rem), 700px);
-    max-height: min(86dvh, 780px);
-    margin: auto;
-    padding: 0;
-    overflow: hidden;
-    border: 1px solid rgba(var(--ink-rgb), 0.14);
-    border-radius: 1.15rem;
-    background: var(--paper);
-    color: var(--ink);
-    box-shadow: 0 26px 80px rgba(0, 0, 0, 0.22);
-    opacity: 0;
-    transform: translateY(12px) scale(0.985);
-    transition: opacity 180ms ease, transform 180ms ease, background-color var(--theme-fade), color var(--theme-fade);
-  }
-
-  .work-dialog[open] {
-    opacity: 1;
-    transform: none;
-  }
-
-  .work-dialog::backdrop {
-    background: rgba(0, 0, 0, 0.52);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-  }
-
-  .dialog-shell {
-    display: flex;
-    max-height: min(86dvh, 780px);
-    flex-direction: column;
-  }
-
-  .dialog-head {
-    display: flex;
-    gap: 1.5rem;
-    align-items: flex-start;
-    justify-content: space-between;
-    padding: clamp(1.5rem, 4vw, 2.25rem);
-    border-bottom: 1px solid rgba(var(--ink-rgb), 0.1);
-  }
-
-  .dialog-head h2 {
-    max-width: 30rem;
-    font-family: "Playfair Display", Georgia, serif;
-    font-size: clamp(1.8rem, 5vw, 2.75rem);
-    font-weight: 600;
-    line-height: 1.08;
-    letter-spacing: -0.035em;
-  }
-
-  .dialog-company {
-    margin-top: 0.55rem;
-    color: rgba(var(--ink-rgb), 0.58);
-    font-size: 0.9rem;
-    font-weight: 600;
-  }
-
-  .dialog-close {
-    width: 2.5rem;
-    height: 2.5rem;
-    flex: 0 0 auto;
-    display: grid;
-    place-items: center;
-    border: 1px solid rgba(var(--ink-rgb), 0.14);
-    border-radius: 999px;
-    background: transparent;
-    color: var(--ink);
-    cursor: pointer;
-    transition: background-color 160ms ease, color var(--theme-fade), border-color var(--theme-fade);
-  }
-
-  .dialog-close:hover {
-    background: rgba(var(--ink-rgb), 0.07);
-  }
-
-  .dialog-body {
-    padding: clamp(1.5rem, 4vw, 2.25rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  .dialog-meta {
-    display: flex;
-    gap: 0.9rem;
-    align-items: center;
-    color: rgba(var(--ink-rgb), 0.6);
-    font-size: 0.8rem;
-  }
-
-  .dialog-mark {
-    width: 2.5rem;
-    height: 2.5rem;
-    flex: 0 0 auto;
-    border-radius: 0.55rem;
-    font-size: 0.72rem;
+  /* ——— o corpo da linha ———
+     O que estava no diálogo, agora no fluxo. Os respiros encolheram todos: lá
+     dentro cada bloco tinha uma folha de 700px só pra ele e 2rem entre seções
+     era o certo; aqui nove entradas seguidas com esse respiro empurram a
+     última pra três telas abaixo, e o que era ar vira distância. */
+  .detail {
+    margin-top: 0.85rem;
+    max-width: 44rem;
   }
 
   .badge {
     display: inline-block;
-    margin-top: 1.25rem;
     padding: 0.38rem 0.7rem;
     border: 1px solid rgba(var(--ink-rgb), 0.16);
     border-radius: 999px;
@@ -1295,11 +1216,11 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     text-transform: uppercase;
   }
 
-  .dialog-section {
-    margin-top: 2rem;
+  .detail-section {
+    margin-top: 1.35rem;
   }
 
-  .dialog-section h3 {
+  .detail-section h3 {
     margin-bottom: 0.75rem;
     color: rgba(var(--ink-rgb), 0.48);
     font-size: 0.67rem;
@@ -1308,10 +1229,16 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     text-transform: uppercase;
   }
 
-  .dialog-summary {
+  .summary {
     color: rgba(var(--ink-rgb), 0.76);
-    font-size: 0.96rem;
-    line-height: 1.75;
+    font-size: clamp(0.88rem, 1.9vw, 0.94rem);
+    line-height: 1.7;
+  }
+
+  /* o badge é a primeira coisa do corpo quando existe; quando o summary vem
+     logo depois dele, os dois não podem ficar colados */
+  .badge + .summary {
+    margin-top: 0.9rem;
   }
 
   .impact-list {
@@ -1362,7 +1289,7 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     display: inline-flex;
     gap: 0.5rem;
     align-items: center;
-    margin-top: 2.25rem;
+    margin-top: 1.35rem;
     color: var(--ink);
     font-size: 0.8rem;
     font-weight: 650;
@@ -1396,16 +1323,17 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
       padding-top: clamp(3.25rem, 7vh, 5rem);
     }
 
-    /* A linha NÃO muda de forma aqui — é a mesma de três colunas do desktop.
-       Empilhar data e texto, como a versão que rolava fazia, custava uma linha
-       de altura por entrada: cinco entradas, 140px, e o painel deixava de
-       caber num celular. O que cede é o selo e o espaço entre colunas. */
+    /* A linha NÃO muda de forma aqui — é a mesma do desktop, com o selo menor.
+       Empilhar data e texto, como uma versão antiga fazia, custava uma linha de
+       altura por entrada. O que cede é o selo e o espaço entre colunas.
+
+       Uma variável só: a grade e a espinha leem as duas daqui, então o selo
+       encolher não pede que mais ninguém saiba disso. */
     .experience-item {
-      grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+      --mark: 2.5rem;
     }
 
     .experience-mark {
-      width: 2.5rem;
       border-radius: 0.55rem;
       font-size: 0.72rem;
     }
@@ -1427,27 +1355,10 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
     .work-head h1 {
       font-size: clamp(3rem, 17vw, 4.7rem);
     }
-
-    .work-dialog {
-      width: calc(100% - 1rem);
-      max-height: 92dvh;
-      border-radius: 0.9rem;
-    }
-
-    .dialog-shell {
-      max-height: 92dvh;
-    }
-
-    .dialog-head,
-    .dialog-body {
-      padding: 1.35rem;
-    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .back::after,
-    .read-more svg,
-    .work-dialog,
     .work-transition-panel,
     .work-transition .work-seam,
     .work-transition-title,
@@ -1465,7 +1376,8 @@ const detailed = sections.flatMap((section) => section.entries).filter(hasDetail
       transition: none;
     }
 
-    .work-panel.is-entering .experience-item {
+    .work-panel.is-entering .experience-item,
+    .work-hint svg {
       animation: none;
     }
   }

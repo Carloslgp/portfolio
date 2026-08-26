@@ -20,7 +20,7 @@
 // fica onde está e o .webp é descartado.
 //
 //   npm run images
-import { readdir, stat, unlink, mkdir, rename } from 'node:fs/promises';
+import { readdir, stat, unlink, mkdir, rename, writeFile } from 'node:fs/promises';
 import { join, extname, basename } from 'node:path';
 import sharp from 'sharp';
 
@@ -67,6 +67,27 @@ const POLICY = [
     maxSide: 480,
     quality: 80,
   },
+  {
+    // Os selos das entradas da /work. O selo tem 3rem e uns 34px de conteúdo
+    // depois do padding, então 192 já é dpr 3 com folga.
+    //
+    // pickSmaller é por causa da MISTURA que esta pasta tem. Metade são logos
+    // chapados de origem vetorial (Bradesco, PUCPR, Trade Stars, CBSoft), e
+    // nesses o lossless ganha do lossy com folga — o q90 gasta bytes inventando
+    // ruído em áreas de cor sólida. A outra metade nasceu de JPEG (Octa-Core,
+    // Startup Weekend) e já traz ruído de compressão gravado nos pixels: ali o
+    // lossless tem que codificar o ruído fielmente e dobra de tamanho, enquanto
+    // o lossy o joga fora, que é o que se quer. Medido, nesta pasta: 55,4 KB de
+    // PNG viram 40,7 escolhendo sempre lossless, 31,1 sempre lossy e 26,1
+    // escolhendo o menor caso a caso.
+    //
+    // O .svg do Nock não entra (não está em SOURCES) e é assim que tem que ser:
+    // vetor virando bitmap é downgrade, não otimização.
+    dir: 'public/images/work',
+    maxSide: 192,
+    quality: 90,
+    pickSmaller: true,
+  },
 ];
 
 // .gif fica de fora: GIF animado não vira webp, vira VÍDEO (ver o comentário do
@@ -75,12 +96,16 @@ const SOURCES = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
 
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
 
-async function convert(srcPath, outPath, maxSide, quality) {
+/** O webp de uma foto, já no tamanho, como buffer.
+ *
+ *  `lossless` é decisão de PASTA, não de arquivo — exceto onde a regra pede
+ *  pickSmaller, e aí quem decide é a balança. */
+async function encode(srcPath, maxSide, quality, lossless = false) {
   // failOn: 'none' — alguns JPEGs de câmera/celular trazem marcadores fora do
   // padrão ("Invalid SOS parameters") que o libvips recusa por padrão. O
   // navegador decodifica esses arquivos numa boa, então recusá-los aqui só
   // deixaria a foto pesada no ar.
-  await sharp(srcPath, { failOn: 'none' })
+  return sharp(srcPath, { failOn: 'none' })
     // .rotate() sem argumento GRAVA NOS PIXELS a rotação que o EXIF só
     // descrevia. Isto não é detalhe: a saída não leva metadado, então uma foto
     // com Orientation=6 que saísse daqui sem o giro chegaria ao navegador
@@ -91,8 +116,21 @@ async function convert(srcPath, outPath, maxSide, quality) {
     // withoutEnlargement: pedir 2048 numa foto menor devolve a original. O teto
     // é teto, não alvo — nada aqui é ampliado.
     .resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality, effort: 6 })
-    .toFile(outPath);
+    .webp(lossless ? { lossless: true, effort: 6 } : { quality, effort: 6 })
+    .toBuffer();
+}
+
+/** Escreve o webp e devolve o tamanho. Com `pickSmaller`, encoda dos dois jeitos
+ *  e grava o menor — os dois caminhos custam alguns ms numa imagem de 192px, e
+ *  é a única forma de acertar numa pasta com origens diferentes. */
+async function convert(srcPath, outPath, maxSide, quality, pickSmaller = false) {
+  const lossy = await encode(srcPath, maxSide, quality);
+  const best = pickSmaller
+    ? [lossy, await encode(srcPath, maxSide, quality, true)].sort((a, b) => a.length - b.length)[0]
+    : lossy;
+
+  await writeFile(outPath, best);
+  return best.length;
 }
 
 async function run() {
@@ -148,7 +186,7 @@ async function run() {
         }
 
         const tmp = `${outPath}.tmp`;
-        await convert(srcPath, tmp, rule.maxSide, rule.quality);
+        await convert(srcPath, tmp, rule.maxSide, rule.quality, rule.pickSmaller);
         const out = await stat(tmp);
 
         // o webp saiu maior que a fonte (avif costuma ganhar): fica a fonte

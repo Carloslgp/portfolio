@@ -1,11 +1,14 @@
 // src/scripts/workPanels.ts — as duas telas da /work e a troca entre elas.
 //
-// A página deixou de ser uma lista que rola: cada grupo ocupa a tela e a troca
-// é horizontal, uma saindo pra esquerda enquanto a outra entra pela direita. O
-// desenho inteiro (o recorte, o deslize, a régua embaixo da aba) vive no CSS da
-// work.astro; o que este arquivo faz é o que CSS não faz sozinho:
+// A página rola de cima a baixo como qualquer outra; o que é horizontal aqui é
+// só a TROCA de grupo — um painel sai pra esquerda enquanto o outro entra pela
+// direita. O desenho inteiro (o recorte, o deslize, a régua embaixo da aba)
+// vive no CSS da work.astro; o que este arquivo faz é o que CSS não faz
+// sozinho:
 //
 //   • dizer QUAL painel está na tela (--panel no rail)
+//   • dar ao rail a altura do painel ativo, senão a fileira flex fica com a
+//     altura do maior e o grupo curto ganha um rodapé de branco
 //   • manter o estado ARIA das abas e o foco no lugar certo
 //   • tirar o painel escondido do caminho de quem navega por teclado ou leitor
 //     de tela (inert) — ele continua no DOM, só que fora da tela
@@ -69,6 +72,30 @@ export function initWorkPanels() {
   for (const button of buttons) observer.observe(button);
   if (document.fonts?.ready) void document.fonts.ready.then(measureRule);
 
+  // ——— a altura ———
+
+  /** Dá ao rail a altura do painel ATIVO.
+   *
+   *  Os dois painéis são uma fileira flex, e uma fileira flex tem a altura do
+   *  maior: sem esta medida, a aba dos projetos herdaria a altura do "Career",
+   *  que é quase o dobro, e a página terminaria em centenas de pixels de branco
+   *  que rolam pra lugar nenhum. O CSS não consegue perguntar "qual dos meus
+   *  filhos está selecionado e quanto ele mede" — daqui é uma linha.
+   *
+   *  offsetHeight e não scrollHeight: o painel não rola por dentro (é a página
+   *  que rola), então a caixa dele JÁ é o conteúdo inteiro — e scrollHeight
+   *  arredonda pra inteiro, o que num zoom fracionário devolve meio pixel a
+   *  menos e deixa a última linha raspando na borda do trilho, que recorta. */
+  const measureRail = () => {
+    rail.style.setProperty('--rail-height', `${panels[current].offsetHeight}px`);
+  };
+
+  for (const panel of panels) {
+    // a altura do painel muda com a largura da janela (o texto reflui) e com a
+    // fonte que chega depois do primeiro layout
+    new ResizeObserver(measureRail).observe(panel);
+  }
+
   // ——— a troca ———
 
   /** Move o rail e reescreve o estado de todo mundo.
@@ -108,6 +135,7 @@ export function initWorkPanels() {
 
     rail.style.setProperty('--panel', String(current));
     measureRule();
+    measureRail();
 
     if (focus) buttons[current].focus();
   };

@@ -11,11 +11,16 @@ const CURTAIN_CALM_CAP = 800;
  *  pergunta, resta esperar o tempo típico. */
 const CURTAIN_CALM_FALLBACK = 420;
 
+/** A que distância do fim, em px, a seta da dobra já não aponta pra nada. Um
+ *  punhado de pixels e não zero: a rolagem é fracionária (zoom, dpr não
+ *  inteiro) e o fim costuma parar a meio pixel do alvo — com zero, a seta fica
+ *  acesa pra sempre numa página que já acabou. */
+const HINT_END = 24;
+
 export function initWork() {
-  const dialogs = document.querySelectorAll<HTMLDialogElement>('[data-work-dialog]');
   const transition = document.querySelector<HTMLElement>('[data-work-transition]');
   const back = document.querySelector<HTMLAnchorElement>('[data-work-back]');
-  let opener: HTMLElement | null = null;
+  const hint = document.querySelector<HTMLElement>('[data-work-hint]');
   let leaving = false;
 
   const mode = storedMotionMode();
@@ -108,6 +113,28 @@ export function initWork() {
     await waitForPanel();
   };
 
+  // ——— a seta da dobra ———
+  //
+  // Ela responde ao ESTADO ("ainda falta página"), não a um gesto já feito: some
+  // ao chegar no fim e volta se a página crescer de novo — o que acontece de
+  // verdade aqui, porque trocar de aba troca a altura do rail.
+  //
+  // Sem Lenis nesta página (ela não carrega o main.ts), então a medida é a
+  // nativa mesmo.
+  const syncHint = () => {
+    const doc = document.documentElement;
+    const left = doc.scrollHeight - window.innerHeight - window.scrollY;
+    hint?.classList.toggle('is-gone', left <= HINT_END);
+  };
+
+  if (hint) {
+    syncHint();
+    window.addEventListener('scroll', syncHint, { passive: true });
+    // a altura do documento muda sem ninguém rolar: a troca de aba, a fonte que
+    // chega depois do primeiro layout, o giro do celular
+    new ResizeObserver(syncHint).observe(document.body);
+  }
+
   back?.addEventListener('click', async (event) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || leaving) return;
     event.preventDefault();
@@ -128,52 +155,4 @@ export function initWork() {
     if (home && history.length > 1) history.back();
     else location.href = home ?? '/';
   });
-
-  const unlockPage = () => {
-    document.body.classList.remove('has-work-dialog');
-    opener?.focus();
-    opener = null;
-  };
-
-  document.querySelectorAll<HTMLElement>('[data-dialog-open]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const dialogId = button.dataset.dialogOpen;
-      if (!dialogId) return;
-
-      const dialog = document.getElementById(dialogId);
-      if (!(dialog instanceof HTMLDialogElement)) return;
-
-      opener = button;
-      document.body.classList.add('has-work-dialog');
-      dialog.showModal();
-    });
-  });
-
-  dialogs.forEach((dialog) => {
-    dialog.querySelector<HTMLElement>('[data-dialog-close]')?.addEventListener('click', () => {
-      dialog.close();
-    });
-
-    dialog.addEventListener('click', (event) => {
-      const bounds = dialog.getBoundingClientRect();
-      const clickedOutside =
-        event.clientX < bounds.left ||
-        event.clientX > bounds.right ||
-        event.clientY < bounds.top ||
-        event.clientY > bounds.bottom;
-
-      if (clickedOutside) dialog.close();
-    });
-
-    dialog.addEventListener('close', unlockPage);
-    dialog.addEventListener('cancel', () => {
-      document.body.classList.remove('has-work-dialog');
-    });
-  });
-
-  window.addEventListener('pagehide', () => {
-    dialogs.forEach((dialog) => {
-      if (dialog.open) dialog.close();
-    });
-  }, { once: true });
 }

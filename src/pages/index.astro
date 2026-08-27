@@ -364,11 +364,17 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
          scripts/loading.ts → awaitGate). role="dialog" porque é exatamente
          isto: uma pergunta que bloqueia o resto da página até ser respondida. -->
     <div class="gate" data-gate role="dialog" aria-modal="true" aria-labelledby="gate-q" tabindex="-1">
-      <p class="gate-q" id="gate-q">Como você prefere ver este site?</p>
+      <p class="gate-q" id="gate-q">
+        Como você prefere ver este site?
+        <span>Recomendamos a experiência completa com animações.</span>
+      </p>
 
       <div class="gate-opts">
-        <button type="button" class="gate-btn" data-gate-motion="full">
-          Com animação
+        <button type="button" class="gate-btn is-recommended" data-gate-motion="full">
+          <span class="gate-btn-head">
+            <span>Com animação</span>
+            <span class="gate-recommended">Recomendado</span>
+          </span>
           <small>a experiência completa: câmera, vidro e transições</small>
         </button>
         <button type="button" class="gate-btn" data-gate-motion="reduced">
@@ -616,6 +622,13 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     font-size: 0.95rem;
     letter-spacing: 0.02em;
   }
+  .gate-q > span {
+    display: block;
+    margin-top: 0.35rem;
+    color: rgba(var(--ink-rgb), 0.58);
+    font-size: 0.72rem;
+    letter-spacing: 0;
+  }
   .gate-opts {
     display: flex;
     flex-wrap: wrap;
@@ -638,10 +651,38 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     cursor: pointer;
     transition: border-color 0.2s ease, background 0.2s ease, color var(--theme-fade);
   }
+  .gate-btn.is-recommended {
+    border-color: rgba(var(--ink-rgb), 0.72);
+    background: rgba(var(--ink-rgb), 0.07);
+    box-shadow: inset 0 0 0 1px rgba(var(--ink-rgb), 0.08);
+  }
   .gate-btn:hover,
   .gate-btn:focus-visible {
     border-color: var(--ink);
     background: rgba(var(--ink-rgb), 0.04);
+  }
+  .gate-btn.is-recommended:hover,
+  .gate-btn.is-recommended:focus-visible {
+    background: rgba(var(--ink-rgb), 0.12);
+  }
+  .gate-btn-head {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .gate-recommended {
+    padding: 0.18rem 0.42rem;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    transition: background-color var(--theme-fade), color var(--theme-fade);
   }
   .gate-btn small {
     font-size: 0.7rem;

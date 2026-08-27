@@ -68,7 +68,7 @@ function mount(root: HTMLElement) {
           .catch((err) => {
             // sem WebGL, ou uma foto que não veio: a lista volta a ser o
             // carrossel. Ela nunca saiu do documento, só estava escondida.
-            console.warn('[reel] 3D indisponível — ficando com a lista', err);
+            console.warn('[reel] 3D unavailable — keeping the fallback list', err);
             root.classList.remove('is-js');
           });
       }

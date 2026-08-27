@@ -247,7 +247,7 @@ export class Lightbox {
     const sub = [photo.place, photo.year].filter(Boolean).join(' · ');
     this.subEl.textContent = sub;
     this.subEl.hidden = !sub;
-    this.dialog.setAttribute('aria-label', `Foto ampliada: ${photo.alt}`);
+    this.dialog.setAttribute('aria-label', `Enlarged photo: ${photo.alt}`);
   }
 
   /** Escreve a caixa da FIGURA e a da IMAGEM para o giro atual.

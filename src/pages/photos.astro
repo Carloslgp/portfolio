@@ -96,7 +96,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
        plano de propósito — o plano tem um transform reescrito TODO FRAME pelo
        infiniteCanvas, e dividir essa string com uma segunda animação seria pedir
        que as duas se atropelassem. Aqui cada uma tem o seu elemento. -->
-  <main class="mural" data-mural aria-label="Mural de fotos, arraste para navegar">
+  <main class="mural" data-mural aria-label="Photo wall, drag to navigate">
     <div class="mural-fx" data-mural-fx>
       <div class="mural-stage" data-mural-stage>
         <div class="mural-zoom" data-mural-zoom>
@@ -164,14 +164,14 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   )}
 
   {photos.length === 0 && (
-    <p class="mural-empty">Sem fotos por enquanto. Jogue arquivos em <code>src/assets/photos/</code>.</p>
+    <p class="mural-empty">No photos yet. Add files to <code>src/assets/photos/</code>.</p>
   )}
 
   <!-- ——— HUD mínima por cima do mural ———
        Vocabulário do site: texto em blend difference (legível sobre qualquer
        foto, como o .intro da home), sem cápsulas de vidro — aqui não há
        carrossel, só papel de fotos. -->
-  <a class="mural-back" href="/" data-back>‹ Voltar</a>
+  <a class="mural-back" href="/" data-back>‹ Back</a>
   <h1 class="mural-title">Photos</h1>
   <aside class="mural-credit" data-mural-credit aria-label="About the photos">
     <button type="button" data-mural-credit-close aria-label="Hide photo notice">
@@ -182,7 +182,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
     <strong>About the photos</strong>
     <span>Every photo on this site either features me or was taken by me.</span>
   </aside>
-  <p class="mural-hint" aria-hidden="true">arraste · role · setas</p>
+  <p class="mural-hint" aria-hidden="true">drag · scroll · arrows</p>
 
   <!-- O filtro do motion blur (ver motionBlur.ts). O stdDeviation de dois
        eixos é o que torna o borrão direcional; o JS o reescreve por frame e
@@ -199,10 +199,10 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   <!-- ——— lightbox: <dialog> nativo, mesmo padrão do modal das músicas ———
        O conteúdo mora na .lightbox-inner; clique que não acerta figura nem
        botão é backdrop e fecha (ver lightbox.ts). A figura recebe o FLIP. -->
-  <dialog class="lightbox" data-lightbox aria-label="Foto ampliada">
+  <dialog class="lightbox" data-lightbox aria-label="Enlarged photo">
     <div class="lightbox-inner">
-      <button type="button" class="lightbox-close" data-lightbox-close aria-label="Fechar">×</button>
-      <button type="button" class="lightbox-rotate" data-lightbox-rotate aria-label="Girar 90°">⟳</button>
+      <button type="button" class="lightbox-close" data-lightbox-close aria-label="Close">×</button>
+      <button type="button" class="lightbox-rotate" data-lightbox-rotate aria-label="Rotate 90°">⟳</button>
 
       <figure class="lightbox-figure" data-lightbox-figure>
         <img data-lightbox-img alt="" />
@@ -212,8 +212,8 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
         </figcaption>
       </figure>
 
-      <button type="button" class="lightbox-nav is-prev" data-lightbox-prev aria-label="Foto anterior">‹</button>
-      <button type="button" class="lightbox-nav is-next" data-lightbox-next aria-label="Próxima foto">›</button>
+      <button type="button" class="lightbox-nav is-prev" data-lightbox-prev aria-label="Previous photo">‹</button>
+      <button type="button" class="lightbox-nav is-next" data-lightbox-next aria-label="Next photo">›</button>
     </div>
   </dialog>
 

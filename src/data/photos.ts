@@ -21,7 +21,7 @@ export interface PhotoMeta {
 export const PHOTO_META: Record<string, PhotoMeta> = {
   // A foto da emenda com a home (ver data/gallery.ts): é a mesma do segmento
   // "Photos" do anel. Só o alt — título, lugar e ano são seus pra preencher.
-  'anjo.jpg': { alt: 'Pintura de um anjo de cabelos ruivos tocando alaúde' },
+  'anjo.jpg': { alt: 'Painting of a red-haired angel playing a lute' },
   // 'IMG_0053.jpeg': { title: 'Fim de tarde', place: 'Curitiba', year: 2025 },
 
   // ——— capturas de tela ———
@@ -36,21 +36,21 @@ export const PHOTO_META: Record<string, PhotoMeta> = {
   //   IMG_0433       → 'Aquarela'    — Pokémon Legends: Z-A
   //   IMG_0434       → 'Hall of Fame' — Pokémon FireRed
   'IMG_0429-limpa.webp': {
-    alt: 'Princesa Zelda de olhos fechados e mãos unidas junto ao peito, banhada por uma luz verde numa clareira de pedras cobertas de musgo',
+    alt: 'Princess Zelda with her eyes closed and hands clasped to her chest, bathed in green light in a clearing of moss-covered stones',
   },
   'IMG_0430-limpa.webp': {
-    alt: 'Mão enluvada de Link segurando a Master Sword pelo punho, a lâmina verde-azulada atravessando o quadro na diagonal',
+    alt: 'Link’s gloved hand holding the Master Sword by its hilt, its blue-green blade crossing the frame diagonally',
   },
   'IMG_0431-limpa.webp': {
-    alt: 'A Master Sword cravada no pedestal de pedra no meio da floresta, sob um facho de luz que desce entre as árvores',
+    alt: 'The Master Sword embedded in a stone pedestal in the forest beneath a beam of light filtering through the trees',
   },
   'IMG_0432-limpa.webp': {
-    alt: 'Retrato da princesa Zelda sorrindo, segurando um pano branco, com árvores desfocadas ao fundo',
+    alt: 'Portrait of Princess Zelda smiling and holding a white cloth, with blurred trees in the background',
   },
   'IMG_0433-limpa.webp': {
-    alt: 'Ilustração em aquarela de cores pastel: uma criatura enorme de olhos amarelos com uma figura pequena de cabelo verde em pé sobre o focinho, cercada por outras criaturas coloridas e por uma escrita inventada',
+    alt: 'Pastel watercolor illustration of a huge yellow-eyed creature with a small green-haired figure standing on its snout, surrounded by colorful creatures and invented writing',
   },
   'IMG_0434-limpa.webp': {
-    alt: 'Tela do Hall da Fama de Pokémon em pixel art: Venusaur, Ninetales, Snorlax, Lapras, Alakazam e Dragonite sob a frase "Welcome to the HALL OF FAME!"',
+    alt: 'Pixel-art Pokémon Hall of Fame screen showing Venusaur, Ninetales, Snorlax, Lapras, Alakazam, and Dragonite beneath the words "Welcome to the HALL OF FAME!"',
   },
 };

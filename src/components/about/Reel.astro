@@ -19,7 +19,7 @@ const { title, items } = Astro.props;
 const pad = (n: number) => String(n).padStart(2, '0');
 ---
 
-<figure class="reel" data-reel aria-roledescription="carrossel" aria-label={title}>
+<figure class="reel" data-reel aria-roledescription="carousel" aria-label={title}>
   <div class="reel-stage">
     <!-- tabindex vem do script, quando o 3D existe de fato: sem ele isto é um
          canvas vazio e invisível, e uma parada de Tab em cima de nada -->
@@ -43,7 +43,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
   <figcaption class="reel-bar">
     <button
       type="button" class="reel-nav" data-reel-prev
-      aria-label="Jogo anterior" disabled>‹</button>
+      aria-label="Previous game" disabled>‹</button>
 
     <!-- aria-live: quem navega pelas setas ouve o título trocar -->
     <span class="reel-title" data-reel-title aria-live="polite">{items[0]?.title}</span>
@@ -52,7 +52,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
     <button
       type="button" class="reel-nav" data-reel-next
-      aria-label="Próximo jogo">›</button>
+      aria-label="Next game">›</button>
   </figcaption>
 </figure>
 

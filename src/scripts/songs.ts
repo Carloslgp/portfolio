@@ -80,7 +80,7 @@ function loadApi(): Promise<YTApi> {
 
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
-    tag.onerror = () => reject(new Error('o script do YouTube não carregou'));
+    tag.onerror = () => reject(new Error('The YouTube script failed to load'));
     document.head.appendChild(tag);
   });
 
@@ -158,7 +158,7 @@ function saidaDeEmergencia(frame: HTMLElement, id: string) {
   a.href = `https://www.youtube.com/watch?v=${id}`;
   a.target = '_blank';
   a.rel = 'noopener';
-  a.textContent = 'Ouvir no YouTube ↗';
+  a.textContent = 'Listen on YouTube ↗';
 
   // no slot, e não na moldura inteira: o cartaz é irmão dele e sai pelo hidden,
   // senão o link nasceria escondido atrás da capa
@@ -263,7 +263,7 @@ function mount(root: HTMLElement) {
     const dialog = id ? document.getElementById(id) : null;
 
     if (!btn || !(dialog instanceof HTMLDialogElement)) {
-      console.warn('[songs] modal não encontrado:', id);
+      console.warn('[songs] modal not found:', id);
       return;
     }
     openModal(dialog, btn);

@@ -131,7 +131,7 @@ export class InfiniteCanvas {
     this.drive = TUNNEL.REST;            // o mural nasce parado, logo quase reto
     this.tunnelStrength = this.opts.reduced ? 0 : this.choreo * this.drive;
     const stage = this.viewport.querySelector<HTMLElement>('[data-mural-stage]');
-    if (!stage) throw new Error('InfiniteCanvas: [data-mural-stage] ausente');
+    if (!stage) throw new Error('InfiniteCanvas: [data-mural-stage] is missing');
     this.tunnel = new TunnelProjection(
       this.viewport,
       stage,
@@ -625,7 +625,7 @@ export class InfiniteCanvas {
     img.width = item.photo.w;
     img.height = item.photo.h;
     node.dataset.photo = item.photo.id;
-    node.setAttribute('aria-label', `Ampliar foto: ${item.photo.alt}`);
+    node.setAttribute('aria-label', `Enlarge photo: ${item.photo.alt}`);
   }
 
   private makeNode(): HTMLButtonElement {

@@ -75,8 +75,8 @@ export const SONGS: Song[] = [
     // TODO(Carlos): texto seu. Isto é só marcação de lugar — está em PT-BR pra
     // não passar batido num deploy: o resto da página é tudo em inglês.
     note: [
-      'RASCUNHO: o primeiro parágrafo desta música.',
-      'RASCUNHO: e o segundo, se ela pedir dois — o modal aceita quantos forem.',
+      'DRAFT: the first paragraph about this song.',
+      'DRAFT: and the second, if it needs two — the modal accepts as many as necessary.',
     ],
   },
   {
@@ -92,8 +92,8 @@ export const SONGS: Song[] = [
     alt: 'Cover of EDEN’s End Credits: an empty small-town street under a pale sky, shot through a faded film border, with EDEN and END CREDITS printed over it',
     // TODO(Carlos): idem — texto seu.
     note: [
-      'RASCUNHO: o primeiro parágrafo desta música.',
-      'RASCUNHO: e o segundo, se ela pedir dois — o modal aceita quantos forem.',
+      'DRAFT: the first paragraph about this song.',
+      'DRAFT: and the second, if it needs two — the modal accepts as many as necessary.',
     ],
   },
   {

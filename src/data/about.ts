@@ -89,32 +89,32 @@ export const GAMES: ReelPhoto[] = [
   {
     src: '/images/about/zelda_totk.webp',
     title: 'The Legend of Zelda: Tears of the Kingdom',
-    alt: 'Link olhando sobre as ilhas celestes de Hyrule',
+    alt: 'Link overlooking the sky islands of Hyrule',
   },
   {
     src: '/images/about/rdr2.webp',
     title: 'Red Dead Redemption 2',
-    alt: 'Arthur Morgan e gangue em Red Dead Redemption 2 em preto, vermelho e laranja',
+    alt: 'Arthur Morgan and his gang in Red Dead Redemption 2 in black, red, and orange',
   },
   {
     src: '/images/about/ark.webp',
     title: 'ARK: Survival Evolved',
-    alt: 'Dinossauros na ilha de ARK: Survival Evolved',
+    alt: 'Dinosaurs on the island of ARK: Survival Evolved',
   },
   {
     src: '/images/about/fh3.jpg',
     title: 'Forza Horizon 3',
-    alt: 'Carro em alta velocidade nas estradas de Forza Horizon 3',
+    alt: 'A car speeding along the roads of Forza Horizon 3',
   },
   {
     src: '/images/about/lis.webp',
     title: 'Life is Strange',
-    alt: 'Max e Chloe em Arcadia Bay, de Life is Strange',
+    alt: 'Max and Chloe in Arcadia Bay from Life is Strange',
   },
   {
     src: '/images/about/pkm_alpha_saphire.webp',
     title: 'Pokémon Alpha Sapphire',
-    alt: 'Arte de Pokémon Alpha Sapphire',
+    alt: 'Pokémon Alpha Sapphire artwork',
   },
 ];
 

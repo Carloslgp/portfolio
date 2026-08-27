@@ -31,7 +31,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`;
 ---
 
-<figure class="songs" data-songs aria-roledescription="carrossel" aria-labelledby={headingId}>
+<figure class="songs" data-songs aria-roledescription="carousel" aria-labelledby={headingId}>
   <h4 class="songs-heading" id={headingId}>{title}</h4>
 
   <div class="songs-stage" data-songs-stage>
@@ -59,7 +59,7 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
             </span>
 
             {/* a única pista de que a capa abre alguma coisa; só na da frente */}
-            <span class="songs-open" aria-hidden="true">Ler</span>
+            <span class="songs-open" aria-hidden="true">Read</span>
           </button>
         </li>
       ))}
@@ -69,7 +69,7 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
   <figcaption class="songs-bar">
     <button
       type="button" class="songs-nav" data-songs-prev
-      aria-label="Música anterior" disabled>‹</button>
+      aria-label="Previous song" disabled>‹</button>
 
     <!-- aria-live: quem navega pelas setas ouve o título trocar -->
     <span class="songs-title" data-songs-title aria-live="polite">
@@ -80,7 +80,7 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
 
     <button
       type="button" class="songs-nav" data-songs-next
-      aria-label="Próxima música">›</button>
+      aria-label="Next song">›</button>
   </figcaption>
 </figure>
 
@@ -108,7 +108,7 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
     {/* Todo o conteúdo mora neste filho, e é isso que faz o clique no fundo
         funcionar: só o backdrop chega ao <dialog> como alvo (ver songs.ts). */}
     <div class="song-modal-inner">
-      <button type="button" class="song-close" data-songs-close aria-label="Fechar">×</button>
+      <button type="button" class="song-close" data-songs-close aria-label="Close">×</button>
 
       <div class="song-head">
         <img class="song-cover" src={song.cover} alt={song.alt} width="640" height="640" />
@@ -143,7 +143,7 @@ const headingId = `songs-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
 
           <button
             type="button" class="song-video-start" data-song-play
-            aria-label={`Tocar ${song.title} no YouTube`}
+            aria-label={`Play ${song.title} on YouTube`}
           >
             <img src={song.cover} alt="" width="640" height="640" loading="lazy" />
             <span class="song-video-glyph" aria-hidden="true">

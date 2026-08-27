@@ -1356,6 +1356,23 @@ function hasDetails(entry: Entry) {
     grid-row: 1 / -1;
   }
 
+  /* Duas fotos não fecham a caixa das outras galerias: a segunda ocuparia só a
+     linha de cima da coluna estreita e sobraria um buraco de meia altura. Mas
+     esticá-la pelas duas linhas resolveria o buraco criando um pior — as duas
+     entradas que caem aqui abrem com foto de grupo (doze pessoas no Builders
+     Club, sete no Study Sync), e coluna estreita corta justamente quem está na
+     ponta.
+
+     Então o que muda é a CAIXA: uma linha só, mais larga e mais baixa. O grupo
+     passa quase inteiro no slot de 2fr, e o slot quase quadrado ao lado fica
+     com a foto que aguenta corte lateral: a palestra do Builders Club, que é
+     vertical (pessoa em pé apontando pra tela), e o screenshot do Study Sync,
+     que centrado cai em cima do "Sync." sem partir nenhuma palavra. */
+  .experience-gallery[data-photo-count='2'] {
+    grid-template-rows: minmax(0, 1fr);
+    aspect-ratio: 2.6 / 1;
+  }
+
   /* Com quatro fotos, a principal continua contando a história e as outras
      três ocupam uma faixa editorial: uma larga em cima, duas menores abaixo. */
   .experience-gallery[data-photo-count='4'] {
@@ -1632,6 +1649,26 @@ function hasDetails(entry: Entry) {
     .gallery-item:first-child {
       grid-column: 1 / -1;
       grid-row: auto;
+    }
+
+    /* Duas fotos empilham: lado a lado no telefone, a turma de doze viraria
+       uma fileira de rostos de ~4mm.
+
+       O aspect-ratio: auto aqui em cima NÃO alcança esta galeria — media query
+       não acrescenta especificidade, e `.experience-gallery` pelado perde para
+       o `[data-photo-count='2']` do desktop. Sem esta linha a caixa continuaria
+       travada em 2.6/1 no celular. */
+    .experience-gallery[data-photo-count='2'] {
+      grid-template-columns: 1fr;
+      aspect-ratio: auto;
+    }
+
+    /* E cada uma na SUA proporção, em vez do 3/2 das outras: numa coluna só não
+       há vizinha com quem alinhar altura, então o corte não compraria nada — e
+       ele é exatamente o que estas fotos não suportam (a turma perde quem está
+       na ponta, o screenshot do Study Sync parte o texto no meio da palavra). */
+    .experience-gallery[data-photo-count='2'] .gallery-photo {
+      aspect-ratio: auto;
     }
 
     /* Quatro fotos viram uma principal e uma tira de três miniaturas. Como o

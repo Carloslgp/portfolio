@@ -19,9 +19,16 @@
 //
 // O que esta página NÃO recebe: projeto pessoal/criativo. Isso é /craft.
 
+import bradescoKit from '../assets/work_photos/professional/bradesco_1.webp';
+import bradescoLounge from '../assets/work_photos/professional/bradesco_2.webp';
+import bradescoBadge from '../assets/work_photos/professional/bradesco_3.webp';
+import buildersClubTalk from '../assets/work_photos/professional/builders_club_1.webp';
+import buildersClubTeam from '../assets/work_photos/professional/builders_club_2.webp';
 import nockHotmilk from '../assets/work_photos/professional/nock_1.webp';
 import nockTeam from '../assets/work_photos/professional/nock_2.webp';
 import nockWorking from '../assets/work_photos/professional/nock_3.webp';
+import studySyncLanding from '../assets/work_photos/professional/study_sync_1.webp';
+import studySyncTeam from '../assets/work_photos/professional/study_sync_2.webp';
 import startupWeekendAward from '../assets/work_photos/professional/tech_star_2.webp';
 import startupWeekendAudience from '../assets/work_photos/professional/tech_stars_1.webp';
 import startupWeekendTeam from '../assets/work_photos/professional/tech_stars_3.webp';
@@ -126,6 +133,23 @@ export const ENTRIES: Entry[] = [
       'Life insurance and private pension data at one of Brazil’s largest insurers. I ' +
       'build the analytical bases other teams make decisions from, and maintain the ' +
       'system that reaches customers at the moment they’re about to pull their money out.',
+    photos: [
+      {
+        src: bradescoLounge,
+        alt: 'A lounge inside the Bradesco Seguros office, with the company sign on the wall.',
+        position: 'center 55%',
+      },
+      {
+        src: bradescoBadge,
+        alt: 'A hand holding a Bradesco Vida e Previdência badge issued to Carlos Leonardo.',
+        position: 'center 38%',
+      },
+      {
+        src: bradescoKit,
+        alt: 'The Bradesco Seguros welcome kit on a desk: notebook, bottle and welcome letter.',
+        position: 'center',
+      },
+    ],
     impact: [
       'Built a one-off analysis tracking high-net-worth clients’ pension balances month over month. It was picked up as a standing monthly report for the board and the relationship team.',
       'Own the retention routine that routes withdrawal requests to agents, on one of the country’s largest private pension portfolios',
@@ -213,6 +237,18 @@ export const ENTRIES: Entry[] = [
       'PUCPR’s developer community, meeting weekly. I speak on APIs and databases, my ' +
       'co-president runs his own sessions, and about 15 people show up each week. Most ' +
       'of the work isn’t the talks; it’s keeping a room of students building on a schedule.',
+    photos: [
+      {
+        src: buildersClubTeam,
+        alt: 'The Builders Club gathered for a group photo in a PUCPR classroom after a weekly session.',
+        position: 'center',
+      },
+      {
+        src: buildersClubTalk,
+        alt: 'Carlos walking the Builders Club through FastAPI code projected on a classroom screen.',
+        position: '35% 45%',
+      },
+    ],
   },
 
   {
@@ -232,6 +268,18 @@ export const ENTRIES: Entry[] = [
       'invisible unless someone adds you and nobody is accountable for what happens in ' +
       'them. Chat, an announcements feed, and a reporting flow that handed real ' +
       'moderation control to the university.',
+    photos: [
+      {
+        src: studySyncTeam,
+        alt: 'The Study Sync team with their professor after presenting the project in class.',
+        position: 'center bottom',
+      },
+      {
+        src: studySyncLanding,
+        alt: 'The Study Sync landing page: the word “Sync.” over a university library reading room.',
+        position: 'center',
+      },
+    ],
     stack: ['PHP', 'MySQL', 'HTML', 'CSS'],
   },
 

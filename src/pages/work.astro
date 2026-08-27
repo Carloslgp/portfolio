@@ -67,7 +67,10 @@ const sections = groups().map((group, panel) => ({
  *  corpo. As três entradas de peso 3 não têm — e continuam sendo uma linha só,
  *  que é o que elas sempre foram. */
 function hasDetails(entry: Entry) {
-  return Boolean(entry.summary || entry.impact?.length || entry.stack?.length || entry.badge || entry.href);
+  return Boolean(
+    entry.summary || entry.impact?.length || entry.stack?.length ||
+    entry.badge || entry.href || entry.photos?.length
+  );
 }
 ---
 
@@ -244,6 +247,36 @@ function hasDetails(entry: Entry) {
                             {entry.badge && <p class="badge">{entry.badge}</p>}
                             {entry.summary && <p class="summary">{entry.summary}</p>}
 
+                            {entry.photos?.length && (
+                              <div
+                                class="experience-gallery"
+                                role="group"
+                                aria-label={`Photos from ${entry.org ?? entry.title}`}
+                                data-work-gallery
+                                data-photo-count={entry.photos.length}
+                              >
+                                {entry.photos.map((photo) => (
+                                  <button
+                                    class="gallery-item"
+                                    type="button"
+                                    data-work-photo
+                                    aria-label={`Enlarge photo: ${photo.alt}`}
+                                  >
+                                    <img
+                                      class="gallery-photo"
+                                      src={photo.src.src}
+                                      alt={photo.alt}
+                                      width={photo.src.width}
+                                      height={photo.src.height}
+                                      style={`--photo-position:${photo.position ?? 'center'}`}
+                                      loading="lazy"
+                                      decoding="async"
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
                             {/* Os dois rótulos continuam sendo <h3> de verdade,
                                 e não um <p> em maiúsculas: eles enquadravam as
                                 seções do diálogo e enquadram as mesmas coisas
@@ -311,14 +344,55 @@ function hasDetails(entry: Entry) {
     </div>
   </main>
 
+  <dialog class="work-lightbox" data-work-lightbox aria-label="Expanded work photo">
+    <figure class="lightbox-stage">
+      <img class="lightbox-image" data-work-lightbox-image alt="" />
+    </figure>
+
+    <button
+      class="lightbox-close"
+      type="button"
+      data-work-lightbox-close
+      aria-label="Close enlarged photo"
+    >
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M5 5 19 19M19 5 5 19" />
+      </svg>
+    </button>
+
+    <button
+      class="lightbox-nav is-prev"
+      type="button"
+      data-work-lightbox-prev
+      aria-label="Previous photo"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m15 18-6-6 6-6" />
+      </svg>
+    </button>
+    <button
+      class="lightbox-nav is-next"
+      type="button"
+      data-work-lightbox-next
+      aria-label="Next photo"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </button>
+    <span class="lightbox-counter" data-work-lightbox-counter aria-live="polite"></span>
+  </dialog>
+
 </Layout>
 
 <script>
   import { initTheme } from '../scripts/theme';
+  import { initWorkGallery } from '../scripts/workGallery';
   import { initWork } from '../scripts/work';
   import { initWorkPanels } from '../scripts/workPanels';
 
   initTheme();
+  initWorkGallery();
   initWorkPanels();
   initWork();
 </script>
@@ -1253,6 +1327,167 @@ function hasDetails(entry: Entry) {
     margin-top: 0.9rem;
   }
 
+  /* Cada conjunto vira uma única peça editorial: a primeira foto conduz e as
+     demais completam a narrativa sem transformar a página numa sequência de
+     imagens de largura inteira. */
+  .experience-gallery {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    aspect-ratio: 2.1 / 1;
+    margin-top: 1.35rem;
+    overflow: hidden;
+    border-radius: 0.8rem;
+    background: rgba(var(--ink-rgb), 0.06);
+  }
+
+  .gallery-item {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    cursor: zoom-in;
+  }
+
+  .gallery-item:first-child {
+    grid-row: 1 / -1;
+  }
+
+  /* Com quatro fotos, a principal continua contando a história e as outras
+     três ocupam uma faixa editorial: uma larga em cima, duas menores abaixo. */
+  .experience-gallery[data-photo-count='4'] {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+
+  .experience-gallery[data-photo-count='4'] .gallery-item:nth-child(2) {
+    grid-column: 2 / -1;
+  }
+
+  .gallery-photo {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: var(--photo-position);
+    transition: transform 420ms cubic-bezier(0.2, 0.86, 0.24, 1);
+  }
+
+  .gallery-item:hover .gallery-photo,
+  .gallery-item:focus-visible .gallery-photo {
+    transform: scale(1.025);
+  }
+
+  .gallery-item:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 2px solid var(--ink);
+    outline-offset: -4px;
+    border-radius: 0;
+  }
+
+  /* ——— foto ampliada ——— */
+  :global(body.has-work-lightbox) {
+    overflow: hidden !important;
+  }
+
+  .work-lightbox {
+    position: fixed;
+    inset: 50% auto auto 50%;
+    width: min(94vw, 80rem);
+    max-width: none;
+    max-height: 94dvh;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0.9rem;
+    background: #0b0b0c;
+    color: #fff;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  }
+
+  .work-lightbox::backdrop {
+    background: rgba(5, 5, 7, 0.9);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .lightbox-stage {
+    display: grid;
+    place-items: center;
+    min-height: 0;
+    margin: 0;
+  }
+
+  .lightbox-image {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 94dvh;
+    object-fit: contain;
+    border-radius: 0.9rem;
+  }
+
+  .lightbox-close,
+  .lightbox-nav {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    background: rgba(10, 10, 12, 0.68);
+    color: #fff;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .lightbox-close {
+    top: 0.8rem;
+    right: 0.8rem;
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+
+  .lightbox-nav {
+    top: 50%;
+    width: 2.8rem;
+    height: 2.8rem;
+    transform: translateY(-50%);
+  }
+
+  .lightbox-nav svg {
+    display: block;
+  }
+
+  .lightbox-nav.is-prev {
+    left: 0.8rem;
+  }
+
+  .lightbox-nav.is-next {
+    right: 0.8rem;
+  }
+
+  .lightbox-counter {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .work-lightbox button:focus-visible {
+    outline-color: #fff;
+    outline-offset: 2px;
+  }
+
   .impact-list {
     list-style: none;
   }
@@ -1380,6 +1615,66 @@ function hasDetails(entry: Entry) {
     .work-head h1 {
       font-size: clamp(3rem, 17vw, 4.7rem);
     }
+
+    /* No telefone, as miniaturas da coluna lateral ficariam pequenas demais
+       para rostos. A foto principal abre a largura e as outras duas dividem a
+       fileira de baixo, mantendo as três legíveis sem rolagem horizontal. */
+    .experience-gallery {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: auto auto;
+      aspect-ratio: auto;
+    }
+
+    .gallery-photo {
+      aspect-ratio: 3 / 2;
+    }
+
+    .gallery-item:first-child {
+      grid-column: 1 / -1;
+      grid-row: auto;
+    }
+
+    /* Quatro fotos viram uma principal e uma tira de três miniaturas. Como o
+       clique abre a imagem inteira, a página continua curta sem esconder
+       nenhuma delas. */
+    .experience-gallery[data-photo-count='4'] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .experience-gallery[data-photo-count='4'] .gallery-item:nth-child(2) {
+      grid-column: auto;
+    }
+
+    .work-lightbox {
+      width: calc(100vw - 1rem);
+      max-height: calc(100dvh - 1rem);
+    }
+
+    .lightbox-image {
+      max-height: calc(100dvh - 1rem);
+    }
+
+    .lightbox-nav {
+      top: auto;
+      bottom: 0.45rem;
+      width: 2.3rem;
+      height: 2.3rem;
+      transform: none;
+    }
+
+    .lightbox-nav.is-prev {
+      left: 0.45rem;
+    }
+
+    .lightbox-nav.is-next {
+      right: 0.45rem;
+    }
+
+    .lightbox-counter {
+      right: 50%;
+      bottom: 1.15rem;
+      transform: translateX(50%);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1402,8 +1697,10 @@ function hasDetails(entry: Entry) {
     }
 
     .work-panel.is-entering .experience-item,
-    .work-hint svg {
+    .work-hint svg,
+    .gallery-photo {
       animation: none;
+      transition: none;
     }
   }
 </style>

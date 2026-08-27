@@ -19,6 +19,14 @@
 //
 // O que esta página NÃO recebe: projeto pessoal/criativo. Isso é /craft.
 
+import nockHotmilk from '../assets/work_photos/professional/nock_1.webp';
+import nockTeam from '../assets/work_photos/professional/nock_2.webp';
+import nockWorking from '../assets/work_photos/professional/nock_3.webp';
+import startupWeekendAward from '../assets/work_photos/professional/tech_star_2.webp';
+import startupWeekendAudience from '../assets/work_photos/professional/tech_stars_1.webp';
+import startupWeekendTeam from '../assets/work_photos/professional/tech_stars_3.webp';
+import startupWeekendTrophy from '../assets/work_photos/professional/tech_stars_4.webp';
+
 export type Kind = 'role' | 'build' | 'recognition';
 
 /** Em qual das duas listas da página a entrada cai.
@@ -38,6 +46,12 @@ export type Track = 'career' | 'project';
  *  datetime na mesma medida: <time datetime="2024">, não <time datetime="2024-01">. */
 export type Stamp = string; // 'YYYY-MM' | 'YYYY'
 
+export interface WorkPhoto {
+  src: ImageMetadata;
+  alt: string;
+  position?: string;
+}
+
 export interface Entry {
   id: string;
   kind: Kind;
@@ -53,6 +67,7 @@ export interface Entry {
   href?: string;
   badge?: string;
   logo?: string;
+  photos?: WorkPhoto[];
 }
 
 export const ENTRIES: Entry[] = [
@@ -78,6 +93,23 @@ export const ENTRIES: Entry[] = [
       'Audited the product for UI failures and pulled the data behind our investor pitch, which was selected for PIBEP 2026, PUCPR’s incubation program',
     ],
     stack: ['Next.js', 'Node.js'],
+    photos: [
+      {
+        src: nockHotmilk,
+        alt: 'Four Nock team members posing at Hotmilk, PUCPR’s innovation ecosystem.',
+        position: 'center 48%',
+      },
+      {
+        src: nockTeam,
+        alt: 'Four Nock team members seated together inside the Hotmilk innovation hub.',
+        position: 'center 55%',
+      },
+      {
+        src: nockWorking,
+        alt: 'Two Nock team members working together on a laptop during an event.',
+        position: 'center 55%',
+      },
+    ],
   },
 
   {
@@ -143,6 +175,28 @@ export const ENTRIES: Entry[] = [
       'was the team’s. We took it from problem statement through validation to a final ' +
       'pitch in 54 hours, and placed second out of 15. I built the pitch with the team ' +
       'and delivered it on stage.',
+    photos: [
+      {
+        src: startupWeekendAward,
+        alt: 'The FuelCheck team and event organizers onstage after the second-place award.',
+        position: 'center 43%',
+      },
+      {
+        src: startupWeekendTeam,
+        alt: 'Five FuelCheck teammates posing in Startup Weekend shirts in front of a moss wall.',
+        position: 'center 42%',
+      },
+      {
+        src: startupWeekendAudience,
+        alt: 'Startup Weekend participants seated and watching a presentation.',
+        position: 'center 58%',
+      },
+      {
+        src: startupWeekendTrophy,
+        alt: 'A FuelCheck team member holding the second-place trophy under purple stage lighting.',
+        position: 'center 42%',
+      },
+    ],
   },
 
   {

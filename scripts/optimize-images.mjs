@@ -1,5 +1,5 @@
-// scripts/optimize-images.mjs — encolhe as imagens de public/ pro tamanho em
-// que elas de fato aparecem na tela.
+// scripts/optimize-images.mjs — encolhe as imagens do site pro tamanho em que
+// elas de fato aparecem na tela.
 //
 // Por que isto existe: public/ é copiado VERBATIM pro dist (é a única pasta que
 // não passa pelo pipeline do Astro), então uma foto de 4000px jogada aqui é uma
@@ -26,6 +26,14 @@ import sharp from 'sharp';
 
 // As medidas vêm da tela, não do gosto:
 const POLICY = [
+  {
+    // Fotografias editoriais da página Work. A coluna de detalhe tem 44rem
+    // (704px) e o mosaico nunca mostra uma foto além dela; 1600px cobre DPR 2
+    // com folga sem carregar os JPEGs de câmera com mais de 5000px no build.
+    dir: 'src/assets/work_photos/professional',
+    maxSide: 1600,
+    quality: 82,
+  },
   {
     // As fotos do anel 3D.
     //

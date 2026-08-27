@@ -173,10 +173,15 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
        carrossel, só papel de fotos. -->
   <a class="mural-back" href="/" data-back>‹ Voltar</a>
   <h1 class="mural-title">Photos</h1>
-  <p class="mural-credit">
+  <aside class="mural-credit" data-mural-credit aria-label="About the photos">
+    <button type="button" data-mural-credit-close aria-label="Hide photo notice">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M5 5 19 19M19 5 5 19" />
+      </svg>
+    </button>
     <strong>About the photos</strong>
     <span>Every photo on this site either features me or was taken by me.</span>
-  </p>
+  </aside>
   <p class="mural-hint" aria-hidden="true">arraste · role · setas</p>
 
   <!-- O filtro do motion blur (ver motionBlur.ts). O stdDeviation de dois
@@ -219,6 +224,10 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
 <script>
   import { initMural } from '../scripts/photos/main';
   initMural();
+
+  const credit = document.querySelector<HTMLElement>('[data-mural-credit]');
+  credit?.querySelector<HTMLButtonElement>('[data-mural-credit-close]')
+    ?.addEventListener('click', () => credit.remove());
 </script>
 
 <style>
@@ -469,10 +478,11 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   }
 
   .mural-credit {
+    position: fixed;
     right: 2rem;
     bottom: 1.45rem;
     max-width: 18rem;
-    padding: 0.65rem 0.75rem;
+    padding: 0.65rem 2.1rem 0.65rem 0.75rem;
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 0.35rem;
     background: rgba(8, 8, 10, 0.78);
@@ -482,6 +492,34 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
     text-align: right;
     mix-blend-mode: normal;
     pointer-events: none;
+  }
+
+  .mural-credit button {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    display: grid;
+    place-items: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.72);
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .mural-credit button:hover,
+  .mural-credit button:focus-visible {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+  }
+
+  .mural-credit button:focus-visible {
+    outline: 1px solid #fff;
+    outline-offset: 1px;
   }
 
   .mural-credit strong {

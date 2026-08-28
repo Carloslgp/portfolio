@@ -68,7 +68,7 @@ export interface Entry {
   org?: string;
   start: Stamp;
   end: Stamp | 'present';
-  summary?: string;           // peso 1 e 2
+  summary?: string;           // peso 1 e 2, e a monitoria
   impact?: string[];          // só peso 1, no máximo 3
   stack?: string[];
   href?: string;
@@ -99,7 +99,7 @@ export const ENTRIES: Entry[] = [
       'Got usenock.com surfaced in Google’s AI results through SEO and GEO work',
       'Audited the product for UI failures and pulled the data behind our investor pitch, which was selected for PIBEP 2026, PUCPR’s incubation program',
     ],
-    stack: ['Next.js', 'Node.js'],
+    stack: ['Next.js', 'Node.js', 'SQL', 'GEO', 'Business strategy'],
     photos: [
       {
         src: nockHotmilk,
@@ -283,9 +283,10 @@ export const ENTRIES: Entry[] = [
     stack: ['PHP', 'MySQL', 'HTML', 'CSS'],
   },
 
-  // Os três de peso 3. Saem juntos num bloco condensado (ver work.astro), e a
-  // ordenação abaixo garante que eles fiquem CONSECUTIVOS — ver o desempate
-  // por peso em `timeline()`.
+  // Os três de peso 3. Saem juntos no fim da lista, e a ordenação abaixo
+  // garante que eles fiquem CONSECUTIVOS — ver o desempate por peso em
+  // `timeline()`. A monitoria é a única das três com summary: peso 3 diz onde
+  // ela entra na ordem, não que ela não tenha o que contar.
   {
     id: 'monitor',
     track: 'career',
@@ -296,6 +297,13 @@ export const ENTRIES: Entry[] = [
     logo: '/images/work/pucpr.webp',
     start: '2025-03',
     end: '2025-06',
+    summary:
+      'Monitor for Business Process Modeling, the course where students learn to read ' +
+      'a company as a set of processes and draw them in BPMN. I held support hours, ' +
+      'reviewed diagrams before they were handed in, and took the questions the ' +
+      'professor could not get to in class. The hard part was rarely the notation. It ' +
+      'was getting people to describe what actually happens in a process before they ' +
+      'started drawing it.',
   },
   {
     id: 'coach',
@@ -303,8 +311,8 @@ export const ENTRIES: Entry[] = [
     kind: 'role',
     weight: 3,
     title: 'Coach, League of Legends team',
-    org: 'Octa-Core',
-    logo: '/images/work/octa-core.webp',
+    org: 'Octacore',
+    logo: '/images/work/octacore.webp',
     start: '2025-03',
     end: '2025-06',
   },

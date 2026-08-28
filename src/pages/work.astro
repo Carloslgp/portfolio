@@ -64,8 +64,8 @@ const sections = groups().map((group, panel) => ({
 
 /** Tem algo além do cabeçalho da linha pra mostrar? Enquanto os detalhes eram
  *  modal isto decidia se a linha ganhava botão; agora decide se ela ganha
- *  corpo. As três entradas de peso 3 não têm — e continuam sendo uma linha só,
- *  que é o que elas sempre foram. */
+ *  corpo. Duas das três entradas de peso 3 não têm — e continuam sendo uma
+ *  linha só, que é o que elas sempre foram. */
 function hasDetails(entry: Entry) {
   return Boolean(
     entry.summary || entry.impact?.length || entry.stack?.length ||

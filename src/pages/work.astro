@@ -346,7 +346,7 @@ function hasDetails(entry: Entry) {
 
   <dialog class="work-lightbox" data-work-lightbox aria-label="Expanded work photo">
     <figure class="lightbox-stage">
-      <img class="lightbox-image" data-work-lightbox-image alt="" />
+      <img class="lightbox-image" data-work-lightbox-image alt="" draggable="false" />
     </figure>
 
     <button
@@ -1426,6 +1426,15 @@ function hasDetails(entry: Entry) {
     color: #fff;
     transform: translate(-50%, -50%);
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+
+    /* Trocar de foto no clique rápido é o gesto normal aqui — e dois cliques
+       seguidos no mesmo ponto são, pro navegador, um duplo clique: ele estende
+       a seleção pro que estiver embaixo. Como o único "texto" da caixa é o
+       contador, quem acaba realçado é a imagem inteira, com o ::selection do
+       tema por cima (clara no claro, escura no escuro). Não há nada aqui que
+       alguém queira copiar, então a caixa toda sai da seleção. */
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .work-lightbox::backdrop {
@@ -1449,6 +1458,9 @@ function hasDetails(entry: Entry) {
     max-height: 94dvh;
     object-fit: contain;
     border-radius: 0.9rem;
+    /* o outro caminho pro mesmo realce: arrastar a foto vira drag de imagem,
+       com fantasma e tudo, quando o clique na seta escapa alguns pixels */
+    -webkit-user-drag: none;
   }
 
   .lightbox-close,

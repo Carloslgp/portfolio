@@ -1368,6 +1368,22 @@ function hasDetails(entry: Entry) {
      com a foto que aguenta corte lateral: a palestra do Builders Club, que é
      vertical (pessoa em pé apontando pra tela), e o screenshot do Study Sync,
      que centrado cai em cima do "Sync." sem partir nenhuma palavra. */
+  /* Uma foto só não tem mosaico a montar: na grade padrão ela pegaria a coluna
+     de 2fr e a de 1fr ficaria vazia — meia caixa de fundo cinza ao lado da
+     imagem. Então a caixa vira a própria foto, em 16/9 porque quem cai aqui é
+     captura de tela, e é a proporção em que ela entra sem o cover comer nada.
+
+     Vale no celular também, e de propósito: a especificidade do atributo passa
+     por cima do `.experience-gallery` pelado da media query (mesmo motivo
+     explicado lá embaixo, no caso de duas fotos). Uma coluna e a proporção da
+     tela é o que o telefone já queria — o que ele muda pras outras galerias é
+     justamente desfazer o mosaico, e aqui não há mosaico pra desfazer. */
+  .experience-gallery[data-photo-count='1'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    aspect-ratio: 16 / 9;
+  }
+
   .experience-gallery[data-photo-count='2'] {
     grid-template-rows: minmax(0, 1fr);
     aspect-ratio: 2.6 / 1;

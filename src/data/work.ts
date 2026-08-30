@@ -5,7 +5,7 @@
 // texto é sempre este arquivo.
 //
 // Por que um módulo TS e NÃO uma content collection: é o mesmo motivo de
-// data/about.ts e data/songs.ts. São nove registros fixos, sem corpo em
+// data/about.ts e data/songs.ts. São dez registros fixos, sem corpo em
 // markdown, sem arquivo por entrada e sem glob — uma collection cobraria um
 // schema, uma entrada no config e um carregamento assíncrono pra entregar
 // exatamente a mesma lista. O ganho de uma collection aparece quando o
@@ -33,6 +33,7 @@ import startupWeekendAward from '../assets/work_photos/professional/tech_star_2.
 import startupWeekendAudience from '../assets/work_photos/professional/tech_stars_1.webp';
 import startupWeekendTeam from '../assets/work_photos/professional/tech_stars_3.webp';
 import startupWeekendTrophy from '../assets/work_photos/professional/tech_stars_4.webp';
+import sudocarlosChannel from '../assets/work_photos/professional/youtube_1.webp';
 
 export type Kind = 'role' | 'build' | 'recognition';
 
@@ -247,6 +248,30 @@ export const ENTRIES: Entry[] = [
         src: buildersClubTalk,
         alt: 'Carlos walking the Builders Club through FastAPI code projected on a classroom screen.',
         position: '35% 45%',
+      },
+    ],
+  },
+
+  {
+    id: 'sudocarlos',
+    track: 'project',
+    kind: 'build',
+    weight: 2,
+    title: 'YouTube channel',
+    org: '@sudocarlos',
+    logo: '/images/work/youtube.svg',
+    start: '2026-05',
+    end: 'present',
+    href: 'https://www.youtube.com/@sudocarlos/videos',
+    summary:
+      'A small channel, and one I make with care. I teach Python and computer ' +
+      'architecture, talk about what my own path through tech actually looks like, ' +
+      'and post download tutorials.',
+    photos: [
+      {
+        src: sudocarlosChannel,
+        alt: 'The sudo carlos channel page on YouTube, with the Python course and the computer architecture series.',
+        position: 'center',
       },
     ],
   },

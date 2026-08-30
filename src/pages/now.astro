@@ -1,0 +1,796 @@
+---
+// now.astro — a página /now. O TEXTO todo mora em src/data/now.ts; aqui só
+// existe a forma de desenhá-lo.
+//
+// A chegada é a segunda metade de uma transição que começou no anel (ver
+// scripts/main.ts → initNowLink). O último quadro da home é: a pintura do
+// segmento subida e lavada de luz, e a hora de Curitiba gigante no meio da
+// tela. Esta página NASCE nesse quadro — os mesmos dois elementos, no mesmo
+// lugar — e só então ele se desfaz: a pintura desce e sai de quadro, e a hora
+// encolhe até assentar como o carimbo do cabeçalho.
+//
+// A hora não é passada de uma página pra outra. Os dois documentos perguntam
+// `new Date()` pela mesma função (scripts/nowNavigation.ts → nowTime) e chegam
+// na mesma string porque é o mesmo instante. É a emenda mais barata que este
+// site tem: não há nada a sincronizar.
+import Layout from '../layouts/Layout.astro';
+import { NOW_SEAM, NOW_TZ } from '../scripts/nowNavigation';
+import { ASIDES, LEAD, NOW_NOTE, PLACE, STRANDS, UPDATED } from '../data/now';
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/** 'YYYY-MM' → "August 2026". Duas linhas em vez de um import do data/work.ts:
+ *  o `stamp` de lá abrevia o mês ("Aug") porque ali ele divide linha com um
+ *  intervalo inteiro. Aqui cada data aparece sozinha e cabe por extenso. */
+function month(value: string): string {
+  const [year, m] = value.split('-');
+  return m ? `${MONTHS[Number(m) - 1]} ${year}` : year;
+}
+---
+
+<Layout lang="en">
+  <Fragment slot="head">
+    <title>Now · Carlos Leonardo</title>
+    <meta
+      name="description"
+      content="What Carlos Leonardo is working on, building and learning right now."
+    />
+    <link rel="prefetch" href="/" />
+
+    {/* A hora gigante é a primeira coisa que esta página pinta, e ela é
+        Playfair. Sem o preload o navegador só descobre a fonte depois de baixar
+        e analisar o CSS, e o primeiro quadro sairia na fonte do sistema — num
+        tamanho diferente, no lugar errado, e a emenda com a home apareceria
+        justamente no quadro em que ela não pode aparecer. É o único preload
+        desta página além do Inter que o Layout já faz. */}
+    <link
+      rel="preload"
+      href="/fonts/playfair-600-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    {/* As medidas da emenda descem pro CSS aqui, e não como literais na folha
+        de estilo: elas são o contrato com a home (ver scripts/nowNavigation.ts)
+        e o mesmo punhado de números tem que valer nos dois documentos. */}
+    <script
+      is:inline
+      define:vars={{
+        nowAspect: NOW_SEAM.aspect,
+        nowOverscan: NOW_SEAM.overscan,
+        nowRotation: NOW_SEAM.rotation,
+        nowDrift: NOW_SEAM.drift,
+      }}
+    >
+      document.documentElement.style.setProperty('--now-aspect', nowAspect);
+      document.documentElement.style.setProperty('--now-overscan', nowOverscan);
+      document.documentElement.style.setProperty('--now-rotation', nowRotation + 'deg');
+      document.documentElement.style.setProperty('--now-drift', nowDrift + 'vh');
+      try {
+        if (sessionStorage.getItem('portfolio:now-entry')) {
+          sessionStorage.removeItem('portfolio:now-entry');
+          document.documentElement.dataset.nowEntry = 'armed';
+        }
+      } catch (e) {}
+    </script>
+  </Fragment>
+
+  <div class="paper" aria-hidden="true"></div>
+
+  {/* ——— o céu ———
+      Ela NÃO é animada: está aqui desde o primeiro quadro, escondida atrás da
+      cortina, e aparece porque a cortina DESLIZA pra fora. Uma transição a
+      menos, e o resultado é o que se quer — a claridade não "chega" na página,
+      ela já era da página; o que estava por cima é que era foto. Quem entra por
+      link direto vê só isto, que é o cabeçalho da página em qualquer caso. */}
+  <div class="now-sky" aria-hidden="true"></div>
+
+  {/* ——— a cortina: o último quadro da home, parado ———
+      Os mesmos dois elementos do portal de lá (index.astro), nas mesmas
+      medidas. A hora fica FORA da .now-seam porque a pintura sai de quadro e
+      ela não — cada uma tem o seu caminho. */}
+  <div class="now-entry" data-now-entry aria-hidden="true">
+    <div class="now-seam" data-now-entry-seam>
+      <img src="/textures/now.jpg" alt="" />
+    </div>
+  </div>
+  <span class="now-clock" data-now-entry-clock aria-hidden="true"></span>
+
+  <a class="back" href="/" data-now-back>‹ Back</a>
+
+  <button
+    class="theme"
+    data-theme-toggle
+    aria-pressed="false"
+    aria-label="Toggle dark theme"
+    title="Light / dark theme"
+  >
+    <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
+    </svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+    </svg>
+  </button>
+
+  <main class="now-page">
+    <div class="now-inner">
+      <header class="now-head">
+        {/* O carimbo é onde a hora gigante ATERRISSA, e por isso ele é o único
+            bloco do cabeçalho que não entra deslizando: os outros sobem 18px
+            até o lugar, e um alvo que se move enquanto está sendo mirado faria
+            a hora pousar 18px fora. Aqui só a opacidade anda — a caixa está no
+            lugar final desde o primeiro quadro, que é o que o scripts/now.ts
+            precisa medir.
+
+            A hora é Playfair pelo mesmo motivo: ela e a hora gigante têm que
+            ser o MESMO desenho, na mesma família, pra que o pouso seja uma
+            sobreposição e não uma troca. */}
+        <p class="now-stamp" data-now-stamp>
+          <span class="now-stamp-time" data-now-time></span>
+          <span class="now-stamp-rest">
+            in {PLACE}<span class="now-stamp-dot" aria-hidden="true"> · </span
+            ><span data-now-date></span>
+          </span>
+        </p>
+
+        <div class="now-title is-arriving" style="--i:0">
+          <p class="eyebrow">Now</p>
+          <h1>What I’m doing</h1>
+          <p class="lead">{LEAD}</p>
+        </div>
+      </header>
+
+      <ol class="strands">
+        {STRANDS.map((strand, i) => (
+          <li class="strand is-arriving" style={`--i:${i + 1}`}>
+            <p class="strand-label">{strand.label}</p>
+            <div class="strand-body">
+              <h2>
+                {strand.href
+                  ? <a href={strand.href} target="_blank" rel="noopener noreferrer">{strand.title}</a>
+                  : strand.title}
+              </h2>
+              {strand.since && <p class="strand-since">Since {month(strand.since)}</p>}
+              <p>{strand.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <ul class="asides is-arriving" style={`--i:${STRANDS.length + 1}`}>
+        {ASIDES.map((aside) => (
+          <li class="aside">
+            <span class="aside-label">{aside.label}</span>
+            <span class="aside-body">{aside.body}</span>
+          </li>
+        ))}
+      </ul>
+
+      <footer class="now-foot is-arriving" style={`--i:${STRANDS.length + 2}`}>
+        <p>{NOW_NOTE}</p>
+        <p class="now-doors">
+          <a href="/work">the record</a>
+          <span aria-hidden="true"> · </span>
+          <a href="/#about">the person</a>
+        </p>
+        <p class="now-updated">
+          Last updated <time datetime={UPDATED}>{month(UPDATED)}</time>. The
+          clock above it is live.
+        </p>
+      </footer>
+    </div>
+  </main>
+</Layout>
+
+{/* Preenche a hora e a data ANTES do primeiro pixel. Precisa ser aqui, no
+    corpo e depois dos elementos, e não no <head>: um script do head roda
+    enquanto o corpo ainda não existe, e o querySelector devolveria null.
+
+    Sem isto, a chegada costurada nasceria com o carimbo vazio e a hora gigante
+    em branco — o único quadro do site em que uma emenda apareceria. O
+    scripts/now.ts assume daqui e passa a acertar o relógio na virada do
+    minuto. */}
+<script is:inline define:vars={{ tz: NOW_TZ }}>
+  (function () {
+    var at = new Date();
+    var time = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true,
+    }).format(at);
+    var date = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    }).format(at);
+
+    document.querySelectorAll('[data-now-time], [data-now-entry-clock]')
+      .forEach(function (el) { el.textContent = time; });
+    var d = document.querySelector('[data-now-date]');
+    if (d) d.textContent = date;
+  })();
+</script>
+
+<script>
+  import { initTheme } from '../scripts/theme';
+  import { initNow } from '../scripts/now';
+
+  initTheme();
+  initNow();
+</script>
+
+<style>
+  .paper {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--paper);
+    transition: background-color var(--theme-fade);
+  }
+
+  /* A /now rola de cima a baixo, com script ou sem ele — e o global.css dá a
+     html e body o `height: 100%` de que a HOME precisa (canvas fixo, quem rola
+     lá é o Lenis) junto com o `overflow: hidden` do body. Aqui os dois voltam
+     ao normal, pelo mesmo motivo e com a mesma forma da /work. Sem isto a
+     página aparece inteira e nenhuma rolagem chega nela — visível e
+     inalcançável, que é pior que um corte. */
+  :global(html:has(.now-page)),
+  :global(html:has(.now-page) body) {
+    height: auto;
+    overflow: visible;
+  }
+
+  /* A goteira reservada SEMPRE, e não só quando a barra existe. Travar a
+     rolagem durante a cortina devolveria ~15px de largura à página, e a coluna
+     inteira daria um pulo lateral bem no quadro em que a hora está pousando —
+     que é o único quadro desta página que não pode se mexer. */
+  :global(html:has(.now-page)) {
+    scrollbar-gutter: stable;
+  }
+
+  /* ——— a chegada ———
+     Enquanto a cortina está de pé a página não rola: o que está na tela é o
+     quadro que a home entregou, e uma barra de rolagem nele seria a emenda
+     aparecendo. `!important` porque a regra acima acabou de devolver a rolagem
+     ao body e as duas convivem — vale enquanto a cortina existe, armada E
+     abrindo. */
+  :global(html[data-now-entry] body),
+  :global(html[data-now-exit] body) {
+    overflow: hidden !important;
+  }
+
+  .now-entry {
+    position: fixed;
+    inset: 0;
+    z-index: 12;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* A pintura. Tudo aqui tem que bater com o .now-seam do index.astro — é o
+     mesmo retângulo, do outro lado da troca de documento. Os números vêm das
+     mesmas variáveis (--now-aspect, --now-overscan, --now-rotation), postas no
+     <html> pelo script do <head> a partir do NOW_SEAM. */
+  .now-seam {
+    --now-seam-w: calc(max(100vw, 100vh * var(--now-aspect)) * var(--now-overscan));
+    --now-seam-h: calc(var(--now-seam-w) / var(--now-aspect));
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--now-seam-w);
+    height: var(--now-seam-h);
+    overflow: hidden;
+    background: #2f3034;
+    opacity: 0;
+    /* a pose de CHEGADA já é a deriva: este é o último quadro da home, não o
+       repouso de nada */
+    transform: translate(-50%, calc(-50% + var(--now-drift)));
+    transform-origin: center;
+  }
+
+  .now-seam img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--now-seam-h);
+    height: var(--now-seam-w);
+    display: block;
+    max-width: none;
+    max-height: none;
+    object-fit: fill;
+    transform: translate(-50%, -50%) rotate(var(--now-rotation));
+  }
+
+  /* A hora gigante. Mesma declaração do .now-clock do index.astro, e o tamanho
+     vem do --now-clock-size do global.css — o único lugar onde ele existe,
+     justamente pra não haver duas versões do mesmo número. */
+  .now-clock {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 13;
+    color: #23252b;
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 600;
+    font-size: var(--now-clock-size);
+    line-height: 0.82;
+    letter-spacing: -0.045em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, -50%);
+    transform-origin: center;
+    pointer-events: none;
+  }
+
+  /* ARMADA: o quadro que a home entregou, parado. Sem marca de entrada (link
+     direto, reload, baixa animação) nada disto existe e a página é só a
+     página. */
+  :global(html[data-now-entry]) .now-entry {
+    visibility: visible;
+  }
+  :global(html[data-now-entry]) .now-seam {
+    opacity: 1;
+  }
+  :global(html[data-now-entry]) .now-clock {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  /* ——— o céu que fica ———
+     Fixo, atrás de tudo, sem animação nenhuma. A pintura sai e ele aparece.
+     Em px de altura e não em vh: ele emoldura o CABEÇALHO, e num celular
+     deitado 60vh cobriria a página inteira. */
+  .now-sky {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    width: 100%;
+    height: min(72vh, 640px);
+    pointer-events: none;
+    background:
+      radial-gradient(120% 100% at 50% -12%,
+        rgba(255, 246, 236, 0.9) 0%,
+        rgba(232, 233, 238, 0.55) 42%,
+        rgba(232, 233, 238, 0) 82%);
+  }
+
+  /* No escuro a mesma luz, muito mais fraca e um pouco mais fria: o papel aqui
+     é quase preto, e a claridade do meio-dia por cima dele viraria um borrão
+     leitoso em vez de céu. */
+  :global(html[data-theme='dark']) .now-sky {
+    background:
+      radial-gradient(120% 100% at 50% -12%,
+        rgba(150, 176, 196, 0.22) 0%,
+        rgba(120, 138, 158, 0.12) 44%,
+        rgba(120, 138, 158, 0) 82%);
+  }
+
+  /* ——— a página ——— */
+  .now-page {
+    position: relative;
+    z-index: 1;
+    min-height: 100dvh;
+    padding: clamp(5.5rem, 12vh, 9rem) 2rem clamp(4rem, 10vh, 7rem);
+    color: var(--ink);
+    transition: color var(--theme-fade);
+  }
+
+  .now-inner {
+    max-width: 46rem;
+    margin: 0 auto;
+  }
+
+  .now-stamp {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem 0.6rem;
+    margin-bottom: clamp(2rem, 5vh, 3.2rem);
+  }
+
+  /* ——— o alvo do pouso ———
+     Cada linha abaixo é a MESMA do .now-clock, e isso não é coincidência de
+     estilo: é o que torna o pouso possível.
+
+     O clockWarp mapeia uma caixa na outra com uma escala UNIFORME, e ele só
+     pode ser uniforme se os dois textos forem o mesmo desenho em tamanhos
+     diferentes. Mesma família, mesmo peso, mesmo tracking, mesma entrelinha,
+     mesma string. Bastava o letter-spacing divergir (estava -0.03em contra
+     -0.045em) pra hora gigante chegar com a largura certa e as letras no lugar
+     errado — e a entrelinha divergir (1 contra 0.82) pra ela pousar uns pixels
+     acima do carimbo, porque o warp alinha os CENTROS das caixas e uma caixa
+     mais alta tem outro centro.
+
+     Só o font-size muda. É ele que a escala resolve. */
+  .now-stamp-time {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 0.82;
+    letter-spacing: -0.045em;
+    /* dígitos de mesma largura: a virada do minuto não pode empurrar o resto da
+       linha — e, mais importante, não pode mudar a caixa em que a hora gigante
+       acabou de pousar */
+    font-variant-numeric: tabular-nums;
+  }
+
+  .now-stamp-rest {
+    color: rgba(var(--ink-rgb), 0.55);
+    font-size: 0.82rem;
+    letter-spacing: 0.01em;
+    transition: color var(--theme-fade);
+  }
+
+  .eyebrow {
+    margin-bottom: 0.7rem;
+    color: rgba(var(--ink-rgb), 0.5);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .now-head h1 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(2.2rem, min(6.5vw, 7vh), 4rem);
+    font-weight: 600;
+    line-height: 0.98;
+    letter-spacing: -0.055em;
+  }
+
+  .lead {
+    max-width: 34rem;
+    margin-top: 1.1rem;
+    color: rgba(var(--ink-rgb), 0.72);
+    font-size: 1rem;
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  /* ——— os fios ———
+     Duas colunas: o verbo à esquerda, sempre na mesma coluna, e o corpo à
+     direita. A coluna do verbo é o que faz a página se ler como uma lista de
+     coisas ACONTECENDO — os rótulos ficam alinhados um embaixo do outro e dá
+     pra varrer só eles. */
+  .strands {
+    margin-top: clamp(2.8rem, 7vh, 4.5rem);
+    list-style: none;
+  }
+
+  .strand {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 0 1.5rem;
+    padding: 1.7rem 0;
+    border-top: 1px solid rgba(var(--ink-rgb), 0.1);
+    transition: border-color var(--theme-fade);
+  }
+
+  .strand-label {
+    color: rgba(var(--ink-rgb), 0.42);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    /* alinha com a primeira linha do título, e não com o topo da caixa */
+    padding-top: 0.34rem;
+    transition: color var(--theme-fade);
+  }
+
+  .strand-body h2 {
+    font-size: 1.12rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .strand-body h2 a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--ink-rgb), 0.28);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.3s ease, color var(--theme-fade);
+  }
+
+  .strand-body h2 a:hover {
+    text-decoration-color: rgba(var(--ink-rgb), 0.8);
+  }
+
+  .strand-since {
+    margin-top: 0.24rem;
+    color: rgba(var(--ink-rgb), 0.45);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    transition: color var(--theme-fade);
+  }
+
+  .strand-body p:last-child {
+    margin-top: 0.7rem;
+    color: rgba(var(--ink-rgb), 0.74);
+    font-size: 0.92rem;
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  /* ——— as coisas leves ———
+     Uma linha cada, e sem borda: elas não são fios abertos, são o rodapé da
+     pessoa. Empilhar com o mesmo peso dos de cima daria a uma bonsai a mesma
+     importância de um emprego. */
+  .asides {
+    margin-top: 2.4rem;
+    padding-top: 1.6rem;
+    border-top: 1px solid rgba(var(--ink-rgb), 0.1);
+    list-style: none;
+    transition: border-color var(--theme-fade);
+  }
+
+  .aside {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 0 1.5rem;
+    padding: 0.42rem 0;
+    color: rgba(var(--ink-rgb), 0.6);
+    font-size: 0.86rem;
+    line-height: 1.55;
+    transition: color var(--theme-fade);
+  }
+
+  .aside-label {
+    color: rgba(var(--ink-rgb), 0.42);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding-top: 0.2rem;
+    transition: color var(--theme-fade);
+  }
+
+  .now-foot {
+    margin-top: clamp(3rem, 8vh, 5rem);
+    color: rgba(var(--ink-rgb), 0.6);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    transition: color var(--theme-fade);
+  }
+
+  .now-doors {
+    margin-top: 0.4rem;
+    font-size: 0.95rem;
+  }
+
+  .now-doors a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color var(--theme-fade);
+  }
+
+  .now-updated {
+    margin-top: 1.6rem;
+    color: rgba(var(--ink-rgb), 0.42);
+    font-size: 0.76rem;
+    transition: color var(--theme-fade);
+  }
+
+  .back {
+    position: fixed;
+    top: 1.5rem;
+    left: 2rem;
+    z-index: 6;
+    padding: 0.35rem 0;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color var(--theme-fade);
+  }
+
+  .back:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* ——— o botão de tema ———
+     As mesmas regras da /work, porque é o mesmo botão: a marca do tema fica na
+     mesma quina, no mesmo tamanho, em toda página que não é a home. O markup
+     tinha vindo junto e o estilo não — sem ele, o que sobrava era o botão
+     nativo do navegador com dois SVGs empilhados dentro. */
+  .theme {
+    position: fixed;
+    top: 1.3rem;
+    right: 1.5rem;
+    z-index: 6;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(var(--ink-rgb), 0.12);
+    border-radius: 999px;
+    background: rgba(90, 90, 90, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.2s, color var(--theme-fade), border-color var(--theme-fade);
+  }
+
+  .theme:hover {
+    background: rgba(90, 90, 90, 0.42);
+  }
+
+  /* absolutos e sobrepostos: os dois ícones ocupam a MESMA célula, e a troca é
+     um cruzamento de opacidade com giro. Em fluxo eles empilhariam e o botão
+     teria 40px de altura de ícone dentro de 44px de botão. */
+  .theme svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    transition: opacity var(--theme-fade), transform var(--theme-fade);
+  }
+
+  .theme .icon-sun {
+    opacity: 0;
+    transform: rotate(-90deg);
+  }
+
+  :global(html[data-theme='dark']) .theme .icon-moon {
+    opacity: 0;
+    transform: rotate(90deg);
+  }
+
+  :global(html[data-theme='dark']) .theme .icon-sun {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ——— o conteúdo CHEGA, não estava esperando ———
+     Mesma regra da /work, e pelo mesmo motivo: a lista já montada por baixo da
+     cortina faria o movimento morrer na borda dela. O carimbo é a exceção
+     explicada no markup — ele só acende, nunca desliza, porque é o alvo de um
+     pouso medido. */
+  :global(html[data-now-entry]) .is-arriving {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  :global(html[data-now-entry]) .now-stamp {
+    opacity: 0;
+  }
+
+  /* A pintura agora desce, então a página é DESCOBERTA de cima pra baixo — a
+     mesma direção em que o escalonamento já corria. Os dois se somam: cada
+     bloco já está no lugar quando a beirada passa por ele, e o que se vê é uma
+     página pronta sendo revelada, não uma página se montando. */
+  :global(html[data-now-entry='opening']) .is-arriving {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.75s ease calc(0.24s + var(--i, 0) * 0.08s),
+      transform 0.85s cubic-bezier(0.2, 0.86, 0.24, 1) calc(0.24s + var(--i, 0) * 0.08s);
+  }
+
+  /* O carimbo NÃO acende junto com o resto, e por isso não há regra de
+     'opening' pra ele aqui: quem o acende é o scripts/now.ts, no instante exato
+     em que a hora gigante para em cima dele.
+
+     O estado armado (opacity: 0, logo acima) continua sendo CSS porque precisa
+     valer antes do primeiro pixel. O acender virou JS porque precisa saber
+     QUANDO a hora pousa, e esse número mora lá. Enquanto os dois estavam
+     separados, o carimbo aparecia no meio do voo — dava pra ler o horário antes
+     de a animação chegar nele. */
+
+  /* ——— ABERTA ———
+     A pintura FORA DE QUADRO, e fora de quadro de verdade: ela sai inteira pela
+     borda de baixo, sem apagar em lugar nenhum.
+
+     Antes ela derivava 22vh e quem fazia o sumiço era a opacidade — e era isso
+     que se via como a foto esbranquiçando. Não havia véu nenhum sobrando: uma
+     fotografia apagando sobre papel branco É uma fotografia esbranquiçando. A
+     única forma de tirar aquilo era ela parar de apagar, e pra parar de apagar
+     ela precisa ter pra onde ir.
+
+     A conta do destino sai da própria caixa, e não de um número chutado por
+     tela: `50vh` leva o centro dela até a borda de baixo do viewport e
+     `--now-seam-h / 2` leva a beirada de cima junto. Os 3vh são folga contra
+     arredondamento subpixel — sem eles sobra uma tira de um pixel em algumas
+     densidades de tela. Serve pra qualquer proporção de janela, inclusive as
+     bem largas, onde a caixa passa de 120vh de altura.
+
+     O MESMO estado serve pro fim da chegada e pro começo da saída, e escrevê-lo
+     uma vez só é o ponto: duas descrições de "aberta" seriam duas chances de as
+     duas pontas divergirem no próximo ajuste — e a saída tem que partir
+     exatamente de onde a chegada parou. (Mesma disciplina da cortina da /work.) */
+  :global(html[data-now-entry='opening']) .now-seam,
+  :global(html[data-now-exit='armed']) .now-seam {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% + 50vh + var(--now-seam-h) / 2 + 3vh));
+  }
+
+  /* Só quem ABRE ou FECHA transiciona. `[data-now-exit='armed']` sozinho é uma
+     pose, não um movimento: é ela que dá à pintura um ponto de partida real
+     antes de 'closing' entrar.
+
+     A curva ACELERA (ease-in), ao contrário de quase tudo neste site. É o certo
+     pra quem vai embora: o teto começa a ceder devagar, ganha velocidade e sai.
+     Uma curva que frease no fim deixaria a beirada da foto rastejando pela
+     borda de baixo da tela nos últimos quadros, que é onde ela mais aparece. */
+  :global(html[data-now-entry='opening']) .now-seam {
+    transition: transform 1.55s cubic-bezier(0.5, 0, 0.9, 0.45);
+  }
+
+  /* ——— a saída pelo "‹ Back" ———
+     A mesma cortina, ao contrário. A hora é levada pelo scripts/now.ts (que
+     mede o carimbo na hora); aqui vem a pintura descendo de volta ao quadro que
+     a home sabe receber, e o conteúdo apagando.
+
+     A curva é outra, e não por gosto: quem fecha tem que ENCOSTAR, não
+     assentar — o último quadro daqui é o primeiro de lá. */
+  :global(html[data-now-exit]) .now-entry,
+  :global(html[data-now-exit]) .now-clock {
+    visibility: visible;
+  }
+
+  :global(html[data-now-exit='closing']) .now-seam {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% + var(--now-drift)));
+    transition: transform 1.05s cubic-bezier(0.24, 0.6, 0.2, 1);
+  }
+
+  :global(html[data-now-exit='closing']) .is-arriving,
+  :global(html[data-now-exit='closing']) .now-stamp {
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+
+  @media (max-width: 46rem) {
+    .now-page {
+      padding-left: 1.4rem;
+      padding-right: 1.4rem;
+    }
+
+    .back {
+      left: 1.4rem;
+    }
+
+    .theme {
+      right: 1rem;
+      width: 40px;
+      height: 40px;
+    }
+
+    /* Uma coluna: 7.5rem de rótulo mais o texto não cabem num telefone sem
+       espremer o corpo a quatro palavras por linha. O verbo vira uma linha
+       própria acima do título, que é como ele já se lê. */
+    .strand,
+    .aside {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.3rem;
+    }
+
+    .strand-label,
+    .aside-label {
+      padding-top: 0;
+    }
+
+    /* só o tamanho muda no celular — o resto continua tendo que ser o mesmo
+       desenho da hora gigante (ver a regra acima) */
+    .now-stamp-time {
+      font-size: 1.3rem;
+    }
+  }
+
+  /* Baixa animação: nada chega, nada sai. A cortina nunca é armada (o
+     scripts/now.ts checa antes), mas o estado de repouso precisa valer mesmo se
+     a marca tiver ficado no <html> por qualquer motivo. */
+  :global(html[data-motion='reduced']) .is-arriving,
+  :global(html[data-motion='reduced']) .now-stamp {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+</style>

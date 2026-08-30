@@ -1,0 +1,695 @@
+---
+// /craft is deliberately spare for now: the page has a point of view, but it
+// does not pretend that projects have been published before their content
+// exists. Its transition carries most of the expression.
+import Layout from '../layouts/Layout.astro';
+import { CRAFT_SEAM, CRAFT_TIDES } from '../scripts/craftNavigation';
+
+const tideHeight = 100 / CRAFT_TIDES.length;
+---
+
+<Layout lang="en">
+  <Fragment slot="head">
+    <title>Craft · Carlos Leonardo</title>
+    <meta
+      name="description"
+      content="Personal experiments and things made for the joy of making."
+    />
+    <link rel="prefetch" href="/" />
+    <link
+      rel="preload"
+      href="/fonts/playfair-600-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="preload" href="/textures/craft.jpg" as="image" />
+
+    {/* The geometry and the entry marker must exist before first paint. The
+        home hands this document a full-screen water sheet; waiting for the
+        module bundle to size or reveal it would expose the page for a frame. */}
+    <script
+      is:inline
+      define:vars={{
+        craftAspect: CRAFT_SEAM.aspect,
+        craftOverscan: CRAFT_SEAM.overscan,
+        craftRotation: CRAFT_SEAM.rotation,
+      }}
+    >
+      document.documentElement.style.setProperty('--craft-aspect', craftAspect);
+      document.documentElement.style.setProperty('--craft-overscan', craftOverscan);
+      document.documentElement.style.setProperty('--craft-rotation', craftRotation + 'deg');
+
+      try {
+        var entry = sessionStorage.getItem('portfolio:craft-entry');
+        var mode = sessionStorage.getItem('motion-mode');
+        if (mode === 'full' || mode === 'reduced')
+          document.documentElement.dataset.motion = mode;
+        var reduced = mode === 'reduced' ||
+          (!mode && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+        if (entry) {
+          sessionStorage.removeItem('portfolio:craft-entry');
+          if (!reduced) document.documentElement.dataset.craftEntry = 'armed';
+        }
+      } catch (e) {}
+    </script>
+  </Fragment>
+
+  <div class="paper" aria-hidden="true"></div>
+
+  {/* Seven windows all look at the same, fixed-size painting. In the closed
+      pose their crops meet pixel-for-pixel and read as one image; opening moves
+      the windows, not seven independently framed images. */}
+  <div class="craft-transition" data-craft-transition aria-hidden="true">
+    {CRAFT_TIDES.map((tide, index) => (
+      <div
+        class="craft-tide"
+        data-craft-tide
+        style={`--tide-top:${index * tideHeight}vh;--tide-height:${tideHeight}vh;--tide-travel:${tide.travel};--tide-lift:${tide.lift};--tide-tilt:${tide.tilt};--tide-delay:${tide.delay}`}
+      >
+        <div class="craft-seam">
+          <img src="/textures/craft.jpg" alt="" draggable="false" />
+        </div>
+      </div>
+    ))}
+
+    <div class="craft-transition-mark">
+      <small>Made by curiosity</small>
+      <strong>CRAFT</strong>
+      <span class="craft-stitch"></span>
+    </div>
+  </div>
+
+  <a class="back" href="/" data-craft-back>‹ Back</a>
+
+  <button
+    class="theme"
+    data-theme-toggle
+    aria-pressed="false"
+    aria-label="Toggle dark theme"
+    title="Light / dark theme"
+  >
+    <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
+    </svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+    </svg>
+  </button>
+
+  <main class="craft-page">
+    <div class="craft-inner">
+      <header class="craft-head is-arriving" style="--i:0">
+        <p class="eyebrow">Craft</p>
+        <h1>Made by<br /><em>curiosity.</em></h1>
+        <p class="lead">
+          Personal experiments and things made for the joy of making.
+        </p>
+      </header>
+
+      <section class="craft-status is-arriving" style="--i:1" aria-labelledby="craft-status-title">
+        <p class="status-k">Collection</p>
+        <div class="status-copy">
+          <h2 id="craft-status-title">Taking shape.</h2>
+          <p>This space is being assembled with care. Pieces will surface here when they are ready.</p>
+        </div>
+      </section>
+
+      <footer class="craft-foot is-arriving" style="--i:2">
+        <p>Until then, there is more to explore.</p>
+        <nav aria-label="Explore the portfolio">
+          <a href="/work">Work</a>
+          <a href="/photos">Photos</a>
+          <a href="/#about">About</a>
+        </nav>
+      </footer>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { initTheme } from '../scripts/theme';
+  import { initCraft } from '../scripts/craft';
+
+  initTheme();
+  initCraft();
+</script>
+
+<style>
+  .paper {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--paper);
+    transition: background-color var(--theme-fade);
+  }
+
+  :global(html:has(.craft-page)),
+  :global(html:has(.craft-page) body) {
+    height: auto;
+    overflow: visible;
+  }
+
+  :global(html:has(.craft-page)) {
+    scrollbar-gutter: stable;
+  }
+
+  :global(html[data-craft-entry] body),
+  :global(body.has-craft-transition) {
+    overflow: hidden !important;
+  }
+
+  /* --- the tide curtain -------------------------------------------------- */
+  .craft-transition {
+    --open-dur: 1.18s;
+    --open-ease: cubic-bezier(0.3, 0.08, 0.16, 1);
+    --close-dur: 0.92s;
+    --close-ease: cubic-bezier(0.3, 0.68, 0.2, 1);
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 20;
+    width: 100vw;
+    height: 100vh;
+    visibility: hidden;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .craft-tide {
+    position: absolute;
+    top: var(--tide-top);
+    left: 0;
+    width: 100%;
+    /* The overlap absorbs fractional-pixel rounding between seven equal bands.
+       The copies are aligned, so the extra pixels are indistinguishable while
+       the curtain is closed. */
+    height: calc(var(--tide-height) + 2px);
+    overflow: hidden;
+    background: #247b79;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    transform-origin: center;
+  }
+
+  .craft-seam {
+    --craft-seam-w: calc(max(100vw, 100vh * var(--craft-aspect)) * var(--craft-overscan));
+    --craft-seam-h: calc(var(--craft-seam-w) / var(--craft-aspect));
+    position: absolute;
+    /* Every band points to the center of the viewport, expressed in its own
+       coordinate system. This is what makes the seven crops one painting. */
+    top: calc(50vh - var(--tide-top));
+    left: 50%;
+    width: var(--craft-seam-w);
+    height: var(--craft-seam-h);
+    overflow: hidden;
+    background: #247b79;
+    transform: translate(-50%, -50%);
+    transform-origin: center;
+  }
+
+  .craft-seam::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(3, 38, 43, 0.04), rgba(2, 39, 36, 0.3));
+  }
+
+  .craft-seam img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--craft-seam-h);
+    height: var(--craft-seam-w);
+    display: block;
+    max-width: none;
+    max-height: none;
+    object-fit: fill;
+    transform: translate(-50%, -50%) rotate(var(--craft-rotation));
+    user-select: none;
+  }
+
+  /* Kept byte-for-byte in visual values with the mark on the home portal. */
+  .craft-transition-mark {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-content: center;
+    color: #f5fffa;
+    text-align: center;
+    text-shadow: 0 2px 30px rgba(0, 30, 31, 0.38);
+    opacity: 1;
+    transform: scale(1);
+    transform-origin: center;
+  }
+
+  .craft-transition-mark small {
+    margin-bottom: 0.55rem;
+    font-size: clamp(0.6rem, 1vw, 0.76rem);
+    font-weight: 650;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+  }
+
+  .craft-transition-mark strong {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(4.4rem, 16vw, 13rem);
+    font-weight: 600;
+    line-height: 0.74;
+    letter-spacing: -0.07em;
+  }
+
+  .craft-stitch {
+    display: block;
+    width: min(34rem, 58vw);
+    height: 1px;
+    margin: 1.3rem auto 0;
+    background: repeating-linear-gradient(
+      90deg,
+      rgba(245, 255, 250, 0.92) 0 0.35rem,
+      transparent 0.35rem 0.7rem
+    );
+    transform: scaleX(1);
+    transform-origin: center;
+  }
+
+  /* Armed is the still frame shared with the home. Preparing exit is the
+     fully-open pose, applied without transitions before closing begins. */
+  :global(html[data-craft-entry]) .craft-transition,
+  .craft-transition.is-preparing-exit,
+  .craft-transition.is-closing {
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  :global(html[data-craft-entry]) .craft-tide,
+  .craft-transition.is-preparing-exit .craft-tide,
+  .craft-transition.is-closing .craft-tide {
+    will-change: transform;
+  }
+
+  :global(html[data-craft-entry]) .craft-transition-mark,
+  .craft-transition.is-preparing-exit .craft-transition-mark,
+  .craft-transition.is-closing .craft-transition-mark {
+    will-change: opacity, transform;
+  }
+
+  .craft-transition.is-opening .craft-tide,
+  .craft-transition.is-preparing-exit .craft-tide {
+    transform:
+      translate3d(var(--tide-travel), var(--tide-lift), 0)
+      rotate(var(--tide-tilt));
+  }
+
+  .craft-transition.is-opening .craft-transition-mark,
+  .craft-transition.is-preparing-exit .craft-transition-mark {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  .craft-transition.is-opening .craft-stitch,
+  .craft-transition.is-preparing-exit .craft-stitch {
+    transform: scaleX(0);
+  }
+
+  .craft-transition.is-opening .craft-tide {
+    transition: transform var(--open-dur) var(--open-ease) var(--tide-delay);
+  }
+
+  .craft-transition.is-opening .craft-transition-mark {
+    transition: opacity 0.34s ease, transform 0.82s var(--open-ease);
+  }
+
+  .craft-transition.is-opening .craft-stitch {
+    transition: transform 0.42s ease;
+  }
+
+  /* Closing follows preparing in the DOM at the same time. These rules come
+     later so the exact shared frame wins without adding specificity. */
+  .craft-transition.is-closing .craft-tide {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    transition: transform var(--close-dur) var(--close-ease) var(--tide-delay);
+  }
+
+  .craft-transition.is-closing .craft-transition-mark {
+    opacity: 1;
+    transform: scale(1);
+    transition:
+      opacity 0.36s ease 0.38s,
+      transform var(--close-dur) var(--close-ease);
+  }
+
+  .craft-transition.is-closing .craft-stitch {
+    transform: scaleX(1);
+    transition: transform 0.38s ease 0.46s;
+  }
+
+  /* --- the page --------------------------------------------------------- */
+  .craft-page {
+    position: relative;
+    z-index: 1;
+    min-height: 100dvh;
+    padding: clamp(6.5rem, 13vh, 9rem) 2rem clamp(2.5rem, 6vh, 4rem);
+    color: var(--ink);
+    opacity: 1;
+    transition: opacity 0.32s ease, color var(--theme-fade);
+  }
+
+  .craft-inner {
+    width: min(68rem, 100%);
+    min-height: calc(100dvh - clamp(9rem, 19vh, 13rem));
+    margin: 0 auto;
+    display: grid;
+    grid-template-rows: minmax(18rem, 1fr) auto auto;
+    align-items: end;
+  }
+
+  .eyebrow {
+    margin-bottom: 1rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .craft-head h1 {
+    max-width: 10ch;
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(4rem, min(11vw, 15vh), 8.8rem);
+    font-weight: 600;
+    line-height: 0.82;
+    letter-spacing: -0.065em;
+  }
+
+  .craft-head h1 em {
+    font-weight: 400;
+  }
+
+  .lead {
+    max-width: 31rem;
+    margin-top: clamp(1.4rem, 3.5vh, 2.2rem);
+    color: rgba(var(--ink-rgb), 0.68);
+    font-size: clamp(0.95rem, 1.4vw, 1.08rem);
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  .craft-status {
+    display: grid;
+    grid-template-columns: minmax(8rem, 0.34fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    margin-top: clamp(3rem, 8vh, 6rem);
+    padding: 1.45rem 0;
+    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
+    border-bottom: 1px solid rgba(var(--ink-rgb), 0.13);
+    transition: border-color var(--theme-fade);
+  }
+
+  .status-k {
+    padding-top: 0.24rem;
+    color: rgba(var(--ink-rgb), 0.42);
+    font-size: 0.66rem;
+    font-weight: 650;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .status-copy {
+    display: grid;
+    grid-template-columns: minmax(9rem, 0.62fr) minmax(16rem, 1fr);
+    gap: 1.5rem;
+  }
+
+  .status-copy h2 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(1.35rem, 2.5vw, 1.9rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+  }
+
+  .status-copy p {
+    max-width: 30rem;
+    color: rgba(var(--ink-rgb), 0.62);
+    font-size: 0.88rem;
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  .craft-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 2rem;
+    padding-top: 1.55rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.76rem;
+    transition: color var(--theme-fade);
+  }
+
+  .craft-foot nav {
+    display: flex;
+    gap: 1.25rem;
+  }
+
+  .craft-foot a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--ink-rgb), 0.25);
+    text-underline-offset: 3px;
+    transition: color var(--theme-fade), text-decoration-color 0.25s ease;
+  }
+
+  .craft-foot a:hover,
+  .craft-foot a:focus-visible {
+    text-decoration-color: currentColor;
+  }
+
+  .back {
+    position: fixed;
+    top: 1.5rem;
+    left: 2rem;
+    z-index: 6;
+    padding: 0.35rem 0;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    opacity: 1;
+    transition: opacity 0.32s ease, color var(--theme-fade);
+  }
+
+  .back::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0.12rem;
+    left: 1.05rem;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .back:hover::after,
+  .back:focus-visible::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  .theme {
+    position: fixed;
+    top: 1.3rem;
+    right: 1.5rem;
+    z-index: 6;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(var(--ink-rgb), 0.12);
+    border-radius: 999px;
+    background: rgba(90, 90, 90, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--ink);
+    opacity: 1;
+    cursor: pointer;
+    transition:
+      opacity 0.32s ease,
+      background 0.2s,
+      color var(--theme-fade),
+      border-color var(--theme-fade);
+  }
+
+  .theme:hover {
+    background: rgba(90, 90, 90, 0.42);
+  }
+
+  .theme svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    transition: opacity var(--theme-fade), transform var(--theme-fade);
+  }
+
+  .theme .icon-sun {
+    opacity: 0;
+    transform: rotate(-90deg);
+  }
+
+  :global(html[data-theme='dark']) .theme .icon-moon {
+    opacity: 0;
+    transform: rotate(90deg);
+  }
+
+  :global(html[data-theme='dark']) .theme .icon-sun {
+    opacity: 1;
+    transform: none;
+  }
+
+  :global(html[data-craft-entry]) .is-arriving {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  :global(html[data-craft-entry='opening']) .is-arriving {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.72s ease calc(0.25s + var(--i, 0) * 0.09s),
+      transform 0.82s cubic-bezier(0.2, 0.86, 0.24, 1) calc(0.25s + var(--i, 0) * 0.09s);
+  }
+
+  :global(body.has-craft-transition) .craft-page,
+  :global(body.has-craft-transition) .back,
+  :global(body.has-craft-transition) .theme {
+    pointer-events: none;
+  }
+
+  .craft-transition.is-closing ~ .craft-page,
+  .craft-transition.is-closing ~ .back,
+  .craft-transition.is-closing ~ .theme {
+    opacity: 0;
+  }
+
+  @media (max-width: 46rem) {
+    .craft-page {
+      padding: 6.5rem 1.35rem 2rem;
+    }
+
+    .craft-inner {
+      min-height: calc(100dvh - 8.5rem);
+      grid-template-rows: minmax(18rem, 1fr) auto auto;
+    }
+
+    .craft-head h1 {
+      font-size: clamp(3.7rem, 18vw, 6.5rem);
+    }
+
+    .craft-status,
+    .status-copy {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .craft-status,
+    .status-copy {
+      gap: 0.65rem;
+    }
+
+    .status-k {
+      padding-top: 0;
+    }
+
+    .status-copy p {
+      max-width: 28rem;
+    }
+
+    .craft-foot {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .back {
+      left: 1.35rem;
+    }
+
+    .theme {
+      right: 1rem;
+      width: 40px;
+      height: 40px;
+    }
+  }
+
+  @media (max-height: 42rem) and (min-width: 46.01rem) {
+    .craft-page {
+      padding-top: 5.5rem;
+    }
+
+    .craft-inner {
+      grid-template-rows: minmax(15rem, 1fr) auto auto;
+    }
+
+    .craft-head h1 {
+      font-size: clamp(3.6rem, 12vh, 6rem);
+    }
+
+    .craft-status {
+      margin-top: 2rem;
+    }
+  }
+
+  /* The explicit choice made at the site's gate is authoritative. The media
+     query is the direct-link fallback, before that choice exists. */
+  :global(html[data-motion='reduced']) .craft-transition {
+    display: none;
+  }
+
+  :global(html[data-motion='reduced'][data-craft-entry] body),
+  :global(html[data-motion='reduced'] body.has-craft-transition) {
+    overflow: visible !important;
+  }
+
+  :global(html[data-motion='reduced']) .is-arriving {
+    opacity: 1;
+    transform: none;
+  }
+
+  :global(html[data-motion='reduced']) .craft-page,
+  :global(html[data-motion='reduced']) .back,
+  :global(html[data-motion='reduced']) .theme {
+    opacity: 1;
+  }
+
+  :global(html[data-motion='reduced']) .craft-tide,
+  :global(html[data-motion='reduced']) .craft-transition-mark,
+  :global(html[data-motion='reduced']) .craft-stitch,
+  :global(html[data-motion='reduced']) .is-arriving,
+  :global(html[data-motion='reduced']) .craft-page,
+  :global(html[data-motion='reduced']) .back,
+  :global(html[data-motion='reduced']) .back::after,
+  :global(html[data-motion='reduced']) .theme,
+  :global(html[data-motion='reduced']) .theme svg {
+    transition: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .craft-tide,
+    .craft-transition-mark,
+    .craft-stitch,
+    .is-arriving,
+    .craft-page,
+    .back,
+    .back::after,
+    .theme,
+    .theme svg {
+      transition: none;
+    }
+  }
+</style>

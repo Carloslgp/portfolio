@@ -6,6 +6,8 @@ import Layout from '../layouts/Layout.astro';
 import { SECTIONS } from '../components/carousel/config';
 import { SEAM_ASPECT, SEAM_PHOTO, FULL } from '../data/gallery';
 import { WORK_SEAM } from '../scripts/workNavigation';
+import { NOW_SEAM, NOW_TZ } from '../scripts/nowNavigation';
+import { CRAFT_SEAM } from '../scripts/craftNavigation';
 // O texto do About mora em src/data/about.ts. Aqui embaixo só existe a forma
 // de desenhar cada tipo de bloco — nenhuma frase da página passa por este
 // arquivo, então editar o conteúdo é sempre lá.
@@ -59,14 +61,42 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
         seamAspect: WORK_SEAM.aspect,
         seamOverscan: WORK_SEAM.overscan,
         seamRotation: WORK_SEAM.rotation,
+        nowAspect: NOW_SEAM.aspect,
+        nowOverscan: NOW_SEAM.overscan,
+        nowRotation: NOW_SEAM.rotation,
+        nowDrift: NOW_SEAM.drift,
+        craftAspect: CRAFT_SEAM.aspect,
+        craftOverscan: CRAFT_SEAM.overscan,
+        craftRotation: CRAFT_SEAM.rotation,
       }}
     >
       document.documentElement.style.setProperty('--seam-aspect', seamAspect);
       document.documentElement.style.setProperty('--seam-overscan', seamOverscan);
       document.documentElement.style.setProperty('--seam-rotation', seamRotation + 'deg');
+      document.documentElement.style.setProperty('--now-aspect', nowAspect);
+      document.documentElement.style.setProperty('--now-overscan', nowOverscan);
+      document.documentElement.style.setProperty('--now-rotation', nowRotation + 'deg');
+      document.documentElement.style.setProperty('--now-drift', nowDrift + 'vh');
+      document.documentElement.style.setProperty('--craft-aspect', craftAspect);
+      document.documentElement.style.setProperty('--craft-overscan', craftOverscan);
+      document.documentElement.style.setProperty('--craft-rotation', craftRotation + 'deg');
       try {
+        var motionMode = sessionStorage.getItem('motion-mode');
+        var craftReturning = sessionStorage.getItem('portfolio:craft-return');
+        var reducesMotion = motionMode === 'reduced' ||
+          (!motionMode && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        if (craftReturning && (motionMode === 'full' || motionMode === 'reduced'))
+          document.documentElement.dataset.motion = motionMode;
         if (sessionStorage.getItem('portfolio:work-return'))
           document.documentElement.dataset.workReturn = 'armed';
+        /* A volta da /now sem BFCache cai aqui: a home nasce coberta pela
+           pintura E pela hora gigante, que é o último quadro que a outra
+           página entregou. Quem escreve o TEXTO do relógio é o script logo
+           abaixo do portal — daqui o corpo ainda não existe. */
+        if (sessionStorage.getItem('portfolio:now-return'))
+          document.documentElement.dataset.nowReturn = 'armed';
+        if (craftReturning && !reducesMotion)
+          document.documentElement.dataset.craftReturn = 'armed';
       } catch (e) {}
     </script>
 
@@ -94,6 +124,12 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     {/* /work é uma página de texto e sai barata; o clique no segmento "Work"
         do anel vai direto pra ela (ver scripts/main.ts → section:open). */}
     <link rel="prefetch" href="/work" />
+
+    {/* /now é do mesmo tamanho da /work e chega pelo mesmo gesto. */}
+    <link rel="prefetch" href="/now" />
+
+    {/* Craft has its own route and continues the water painting from the ring. */}
+    <link rel="prefetch" href="/craft" />
   </Fragment>
 
   <!-- ——— o papel ———
@@ -215,6 +251,64 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
       <strong>WORK</strong>
     </span>
   </div>
+
+  <!-- ——— the seam with /craft ———
+       The water photograph becomes a single material sheet. It grows from the
+       flattened 3D segment without changing crop, then /craft cuts that exact
+       sheet into seven horizontal tides. The page transition therefore occurs
+       while both documents are drawing the same still frame. -->
+  <div class="craft-portal" data-craft-portal aria-hidden="true">
+    <div class="craft-seam" data-craft-portal-seam>
+      <img src="/textures/craft.jpg" alt="" />
+    </div>
+    <div class="craft-portal-mark" data-craft-portal-mark>
+      <small>Made by curiosity</small>
+      <strong>CRAFT</strong>
+      <span class="craft-stitch" data-craft-portal-stitch></span>
+    </div>
+  </div>
+
+  <!-- ——— a emenda com /now ———
+       A foto do segmento Now é uma CLARABÓIA: céu visto por uma abertura
+       retangular num teto escuro. A transição é lida a partir disso — não se
+       mergulha nesta foto, passa-se POR BAIXO dela. Daí os três elementos:
+
+         • a pintura, que é a emenda de sempre (mesma superfície, mesma
+           proporção de fita, mesmo giro desfeito em CSS que a /work usa), com
+           uma deriva curta pra baixo somada à escala — quem sobe pela abertura
+           vê o teto descer;
+         • a HORA, fora dela: o relógio do canto da tela, que descola, viaja até
+           o meio e cresce. É ELE a emenda de verdade — os dois documentos leem
+           `new Date()` pela mesma função e chegam na mesma string sem ninguém
+           ter copiado nada (ver scripts/nowNavigation.ts).
+
+       A hora fica FORA da .now-seam de propósito: a pintura recebe um scale por
+       quadro, e o relógio não pode herdá-lo — ele tem o próprio caminho. -->
+  <div class="now-portal" data-now-portal aria-hidden="true">
+    <div class="now-seam" data-now-portal-seam>
+      <img src="/textures/now.jpg" alt="" />
+    </div>
+    <span class="now-clock" data-now-portal-clock></span>
+  </div>
+
+  {/* A hora, escrita ANTES do primeiro pixel. Precisa ser aqui, depois do
+      elemento, e não junto das outras marcas no <head>: um script do head roda
+      com o corpo ainda não analisado, e o querySelector voltaria null.
+
+      Duas coisas dependem disto. A volta da /now sem BFCache nasce com a hora
+      gigante na tela — vazia, ela seria o único quadro do site em que uma
+      emenda aparece. E o voo da hora, no clique, precisa MEDIR esta caixa; sem
+      texto ela tem largura zero e não há o que medir. Daqui o
+      scripts/main.ts assume e passa a acertar o relógio na virada do minuto. */}
+  <script is:inline define:vars={{ nowTz: NOW_TZ }}>
+    (function () {
+      var el = document.querySelector('[data-now-portal-clock]');
+      if (!el) return;
+      el.textContent = new Intl.DateTimeFormat('en-US', {
+        timeZone: nowTz, hour: 'numeric', minute: '2-digit', hour12: true,
+      }).format(new Date());
+    })();
+  </script>
 
   <!-- toggle de tema claro/escuro (ver scripts/theme.ts). Fica FORA do .overlay
        de propósito: o overlay some no About (body.is-about) e o tema é da página
@@ -562,6 +656,233 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   :global(html[data-work-return='armed']) .work-portal-title {
     opacity: 1;
     letter-spacing: 0.08em;
+  }
+
+  /* ——— the seam with /craft ———
+     Same geometry as the ribbon, same reason as Work: the painting never gets
+     reframed. Craft differs after the hand-off, where the page slices this
+     still sheet into moving horizontal bands. */
+  .craft-portal {
+    position: fixed;
+    inset: 0;
+    z-index: 14;
+    visibility: hidden;
+    overflow: hidden;
+    pointer-events: auto;
+  }
+
+  .craft-seam {
+    --craft-seam-w: calc(max(100vw, 100vh * var(--craft-aspect)) * var(--craft-overscan));
+    --craft-seam-h: calc(var(--craft-seam-w) / var(--craft-aspect));
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--craft-seam-w);
+    height: var(--craft-seam-h);
+    overflow: hidden;
+    background: #247b79;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    transform-origin: center;
+    will-change: transform, opacity;
+  }
+
+  .craft-seam::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(3, 38, 43, 0.04), rgba(2, 39, 36, 0.3));
+  }
+
+  .craft-seam img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--craft-seam-h);
+    height: var(--craft-seam-w);
+    display: block;
+    max-width: none;
+    max-height: none;
+    object-fit: fill;
+    transform: translate(-50%, -50%) rotate(var(--craft-rotation));
+  }
+
+  .craft-portal-mark {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-content: center;
+    color: #f5fffa;
+    text-align: center;
+    text-shadow: 0 2px 30px rgba(0, 30, 31, 0.38);
+    opacity: 0;
+    transform: scale(1.08);
+    transform-origin: center;
+    will-change: transform, opacity;
+  }
+
+  .craft-portal-mark small {
+    margin-bottom: 0.55rem;
+    font-size: clamp(0.6rem, 1vw, 0.76rem);
+    font-weight: 650;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+  }
+
+  .craft-portal-mark strong {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(4.4rem, 16vw, 13rem);
+    font-weight: 600;
+    line-height: 0.74;
+    letter-spacing: -0.07em;
+  }
+
+  .craft-stitch {
+    display: block;
+    width: min(34rem, 58vw);
+    height: 1px;
+    margin: 1.3rem auto 0;
+    background: repeating-linear-gradient(
+      90deg,
+      rgba(245, 255, 250, 0.92) 0 0.35rem,
+      transparent 0.35rem 0.7rem
+    );
+    transform: scaleX(0);
+    transform-origin: center;
+    will-change: transform;
+  }
+
+  /* A rebuilt home paints Craft's returned frame before Three.js or the loader
+     can appear. The client then shrinks it back into the focused segment. */
+  :global(html[data-craft-return='armed']) .craft-portal {
+    visibility: visible;
+  }
+
+  :global(html[data-craft-return='armed']) .craft-seam,
+  :global(html[data-craft-return='armed']) .craft-portal-mark {
+    opacity: 1;
+  }
+
+  :global(html[data-craft-return='armed']) .craft-portal-mark {
+    transform: scale(1);
+  }
+
+  :global(html[data-craft-return='armed']) .craft-stitch {
+    transform: scaleX(1);
+  }
+
+  /* A theme control uses backdrop-filter, which Chrome composites in its own
+     layer. Hide it explicitly while Craft owns the frame so that glass never
+     ghosts through the otherwise opaque water sheet. The data attribute also
+     covers the first paint of a rebuilt (non-BFCache) return. */
+  :global(body.is-craft-diving) .theme,
+  :global(html[data-craft-return='armed']) .theme {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* ——— a emenda com /now ———
+     A pintura funciona igual à da /work — mesma superfície, mesma proporção de
+     fita, mesmo giro desfeito em CSS —, então o que está comentado lá vale aqui
+     e não se repete. O que é DESTA transição são as duas camadas em cima dela.
+
+     A caixa é mais alta que a das outras emendas (--now-overscan é 1.14 contra
+     1.06) porque esta pintura SOBE enquanto cresce. Com a sangria das outras, a
+     beirada de baixo entraria na tela justamente no quadro em que os dois
+     documentos precisam ser indistinguíveis. */
+  .now-portal {
+    position: fixed;
+    inset: 0;
+    z-index: 14;
+    visibility: hidden;
+    /* auto, e não none: o pointerup do canvas não pergunta se o input está
+       desligado (ver Carousel.init), então um clique noutra foto no meio do
+       avanço dispararia um segundo `section:open` — e uma segunda navegação
+       por cima desta. O portal cobre a tela; é ele que engole. Mesmo motivo do
+       .work-portal logo acima. */
+    pointer-events: auto;
+  }
+
+  .now-seam {
+    --now-seam-w: calc(max(100vw, 100vh * var(--now-aspect)) * var(--now-overscan));
+    --now-seam-h: calc(var(--now-seam-w) / var(--now-aspect));
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--now-seam-w);
+    height: var(--now-seam-h);
+    overflow: hidden;
+    /* o teto da clarabóia, amostrado da própria foto: é a cor que aparece nos
+       cantos enquanto a pintura ainda não cobriu a caixa inteira */
+    background: #2f3034;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    transform-origin: center;
+    will-change: transform, opacity;
+  }
+
+  .now-seam img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--now-seam-h);
+    height: var(--now-seam-w);
+    display: block;
+    max-width: none;
+    max-height: none;
+    object-fit: fill;
+    transform: translate(-50%, -50%) rotate(var(--now-rotation));
+  }
+
+  /* ——— a hora ———
+     Fora da .now-seam: a pintura leva um scale por quadro e o relógio tem o
+     próprio caminho (do canto até o meio da tela).
+
+     A COR é fixa, e não a do tema. Todo o resto desta página troca de cor com
+     o tema, mas o que está atrás desta hora nos dois lados da troca não é o
+     papel — é a foto lavada pelo véu, que é clara no claro e clara no escuro.
+     Uma tinta que respondesse ao tema ficaria branca sobre claridade metade das
+     visitas.
+
+     --now-clock-size mora no global.css, e é o único lugar onde ela existe: o
+     tamanho tem que ser IDÊNTICO nos dois documentos, e duas declarações do
+     mesmo número são duas chances de ele divergir (ver o comentário de lá). */
+  .now-clock {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 1;
+    color: #23252b;
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 600;
+    font-size: var(--now-clock-size);
+    line-height: 0.82;
+    letter-spacing: -0.045em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    transform-origin: center;
+    will-change: transform, opacity;
+  }
+
+  /* A home que NASCE de volta da /now: sem BFCache não há cena viva atrás, e o
+     primeiro quadro tem que ser o último da página anterior — pintura derivada
+     e a hora gigante no meio. Mesmo motivo do estado armado da /work: isto
+     precisa valer antes de o bundle existir. */
+  :global(html[data-now-return='armed']) .now-portal {
+    visibility: visible;
+  }
+
+  :global(html[data-now-return='armed']) .now-seam {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% + var(--now-drift)));
+  }
+
+  :global(html[data-now-return='armed']) .now-clock {
+    opacity: 1;
   }
 
   /* cortina de carregamento — acima de tudo (canvas 1, cursor 2, overlay 3) */

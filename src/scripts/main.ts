@@ -11,6 +11,22 @@ import { setProgress, hideLoader, awaitGate } from './loading';
 import { reducedMotion } from './motion';
 import { registerScroll } from './scroll';
 import { WORK_ENTRY_KEY, WORK_HOME_KEY, WORK_RETURN_KEY, WORK_SEAM, workSeamBox } from './workNavigation';
+import {
+  NOW_ENTRY_KEY, NOW_HOME_KEY, NOW_RETURN_KEY, NOW_SEAM,
+  clockWarp, msToNextMinute, nowSeamBox, nowTime,
+} from './nowNavigation';
+import {
+  CRAFT_ENTRY_KEY, CRAFT_HOME_KEY, CRAFT_RETURN_KEY, CRAFT_SEAM, craftSeamBox,
+} from './craftNavigation';
+
+// Captured when this module is evaluated, before bootstrap waits for textures
+// and the entrance gate. A rebuilt home can otherwise miss `pagereveal` and
+// start shrinking Craft's returned frame underneath the browser snapshot.
+let craftRevealed: Promise<unknown> = Promise.resolve();
+window.addEventListener('pagereveal', (event) => {
+  const transition = (event as any).viewTransition;
+  if (transition) craftRevealed = transition.finished.catch(() => {});
+});
 
 // Esta chegada à home veio de DENTRO do site? (o "‹ Voltar" do /photos, o
 // botão voltar do navegador.) A distinção importa porque uma volta não é uma
@@ -76,6 +92,30 @@ function takeWorkReturn(): boolean {
   }
 }
 
+/** Consome a marca deixada pelo botão de voltar da /now. Mesmo contrato do
+ * takeWorkReturn: ela não depende do referrer, porque a página pode ter sido
+ * descartada do BFCache e ainda assim precisa renascer no anel, em Now. */
+function takeNowReturn(): boolean {
+  try {
+    if (!sessionStorage.getItem(NOW_RETURN_KEY)) return false;
+    sessionStorage.removeItem(NOW_RETURN_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Consumes the marker left by Craft's custom Back transition. */
+function takeCraftReturn(): boolean {
+  try {
+    if (!sessionStorage.getItem(CRAFT_RETURN_KEY)) return false;
+    sessionStorage.removeItem(CRAFT_RETURN_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function bootstrap() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
   if (!canvas) return;
@@ -84,7 +124,10 @@ export async function bootstrap() {
   // de verdade o portão pergunta, como sempre.
   const returningFromPhotos = takePhotosReturn();
   const returningFromWork = takeWorkReturn();
-  const internal = returningFromPhotos || returningFromWork || isInternalArrival();
+  const returningFromNow = takeNowReturn();
+  const returningFromCraft = takeCraftReturn();
+  const internal = returningFromPhotos || returningFromWork || returningFromNow || returningFromCraft
+    || isInternalArrival();
 
   // Este documento nasceu agora, então não há avanço congelado pra rebobinar: a
   // cortina de carregamento é que cobre a troca, e a home reaparece no segmento
@@ -122,6 +165,14 @@ export async function bootstrap() {
     const workIndex = SECTIONS.findIndex((section) => section.id === 'work');
     if (workIndex >= 0) carousel.focusSectionInstant(workIndex);
   }
+  if (returningFromNow) {
+    const nowIndex = SECTIONS.findIndex((section) => section.id === 'now');
+    if (nowIndex >= 0) carousel.focusSectionInstant(nowIndex);
+  }
+  if (returningFromCraft) {
+    const craftIndex = SECTIONS.findIndex((section) => section.id === 'craft');
+    if (craftIndex >= 0) carousel.focusSectionInstant(craftIndex);
+  }
   carousel.run();                       // cena viva na pose de topo
   await gate;                           // a cortina não sai sem a escolha feita
   await hideLoader();                   // cortina sai, mostrando o anel de cima
@@ -140,6 +191,8 @@ export async function bootstrap() {
   initAbout(carousel, lenis);
   initPhotosLink(carousel);
   initWorkLink(carousel, returningFromWork);
+  initNowLink(carousel, returningFromNow);
+  initCraftLink(carousel, returningFromCraft);
 }
 
 // ——— Work: o segmento do anel vira a página inteira ———
@@ -334,6 +387,417 @@ function initWorkLink(carousel: Carousel, returningFromWork = false) {
   });
 }
 
+
+// ——— Craft: the water sheet is cut into tides on the destination page ———
+//
+// This first half deliberately stays simple: the DOM takes the exact painting
+// from the flattened ribbon and carries it to a shared full-screen frame. The
+// surprising gesture belongs to /craft, where the same frame separates into
+// seven horizontal bands. On the way back those bands reassemble first, so the
+// home always receives a still, continuous surface that it can rewind.
+function initCraftLink(carousel: Carousel, returningFromCraft = false) {
+  const portal = document.querySelector<HTMLElement>('[data-craft-portal]');
+  const seamEl = portal?.querySelector<HTMLElement>('[data-craft-portal-seam]');
+  const mark = portal?.querySelector<HTMLElement>('[data-craft-portal-mark]');
+  const stitch = portal?.querySelector<HTMLElement>('[data-craft-portal-stitch]');
+  if (!portal || !seamEl || !mark || !stitch) return;
+
+  let leaving = false;
+  let seam = craftSeamBox();
+
+  // The 2.5 MB source is already a Three.js texture, but the DOM image has its
+  // own decode cost. Pay it only when Craft becomes a plausible next click.
+  let armed = false;
+  const arm = () => {
+    if (armed) return;
+    armed = true;
+    seamEl.querySelector('img')?.decode?.().catch(() => {});
+  };
+  window.addEventListener('carousel:change', (event) => {
+    if (SECTIONS[(event as CustomEvent).detail?.index]?.id === 'craft') arm();
+  });
+
+  const rememberHome = (animate: boolean) => {
+    try {
+      sessionStorage.setItem(CRAFT_HOME_KEY, location.href);
+      if (animate) sessionStorage.setItem(CRAFT_ENTRY_KEY, '1');
+      else sessionStorage.removeItem(CRAFT_ENTRY_KEY);
+    } catch {}
+  };
+
+  // One drawing function owns both directions. `k` is zero while the DOM is
+  // glued to the current 3D segment and one at the shared full-screen frame.
+  const drawSeamAt = (k: number) => {
+    const now = carousel.frontPhotoSize();
+    const w = k * k * k * (k * (k * 6 - 15) + 10); // smootherstep
+
+    seamEl.style.transform =
+      `translate(-50%, -50%) scale(${(now.w + (seam.w - now.w) * w) / seam.w}, ` +
+      `${(now.h + (seam.h - now.h) * w) / seam.h})`;
+
+    const f = Math.min(1, k / DEPART.flatFade);
+    seamEl.style.opacity = `${f * f * (3 - 2 * f)}`;
+
+    const t = Math.min(1, Math.max(0,
+      (k - CRAFT_SEAM.titleFrom) / (1 - CRAFT_SEAM.titleFrom),
+    ));
+    const e = t * t * (3 - 2 * t);
+    mark.style.opacity = `${e}`;
+    mark.style.transform = `scale(${1 + CRAFT_SEAM.titleScale * (1 - e)})`;
+    stitch.style.transform = `scaleX(${e})`;
+  };
+
+  const drawSeam = (p: number) => {
+    if (p < DEPART.flatAt) return;
+    drawSeamAt(Math.min(1, (p - DEPART.flatAt) / (1 - DEPART.flatAt)));
+  };
+
+  const settle = () => {
+    leaving = false;
+    document.body.classList.remove('is-diving', 'is-craft-diving');
+    document.documentElement.removeAttribute('data-craft-return');
+    portal.style.visibility = '';
+    seamEl.removeAttribute('style');
+    mark.removeAttribute('style');
+    stitch.removeAttribute('style');
+  };
+
+  const returnToRing = async (rewindDeparture: boolean) => {
+    seam = craftSeamBox();
+    portal.style.visibility = 'visible';
+    document.body.classList.add('is-diving', 'is-craft-diving');
+
+    if (rewindDeparture) {
+      const rewind = carousel.returnFromDeparture();
+      if (rewind) await rewind;
+      else carousel.cancelDeparture();
+    } else {
+      drawSeamAt(1);
+      document.documentElement.removeAttribute('data-craft-return');
+      const at = { k: 1 };
+      await gsap.to(at, {
+        k: 0,
+        duration: CRAFT_SEAM.returnDur,
+        ease: CRAFT_SEAM.returnEase,
+        onUpdate: () => drawSeamAt(at.k),
+      });
+    }
+
+    settle();
+  };
+
+  if (returningFromCraft) {
+    if (reducedMotion()) settle();
+    else requestAnimationFrame(() => craftRevealed.then(() => returnToRing(false)));
+  }
+
+  window.addEventListener('section:open', async (event) => {
+    const detail = (event as CustomEvent).detail;
+    if (detail?.id !== 'craft' || leaving) return;
+    leaving = true;
+
+    const animate = !reducedMotion();
+    rememberHome(animate);
+
+    if (!animate) {
+      location.href = '/craft';
+      return;
+    }
+
+    document.body.classList.add('is-diving', 'is-craft-diving');
+    portal.style.visibility = 'visible';
+    arm();
+    seam = craftSeamBox();
+    drawSeamAt(0);
+
+    const movement = carousel.departInto(detail.index, drawSeam);
+    movement.to({}, { duration: DEPART.hold });
+    await movement;
+
+    location.href = '/craft';
+  });
+
+  window.addEventListener('pageshow', (event) => {
+    if (!(event as PageTransitionEvent).persisted) return;
+
+    // Browser Back has no closing tide on the Craft side. Only rewind from the
+    // full water frame when the custom Back control explicitly delivered it.
+    let stitched = false;
+    try {
+      stitched = !!sessionStorage.getItem(CRAFT_RETURN_KEY);
+      sessionStorage.removeItem(CRAFT_RETURN_KEY);
+      sessionStorage.removeItem(CRAFT_HOME_KEY);
+    } catch {}
+
+    // A normal history return to an already-settled home needs no repair. A
+    // stitched return can still arrive after Home -> Craft -> Back -> Forward
+    // -> Back, when there is no longer a live departure timeline to rewind.
+    if (!leaving && !stitched) return;
+
+    if (!stitched) {
+      settle();
+      carousel.cancelDeparture();
+      return;
+    }
+
+    if (reducedMotion()) {
+      settle();
+      return;
+    }
+    const rewindDeparture = leaving;
+    requestAnimationFrame(() => craftRevealed.then(() => returnToRing(rewindDeparture)));
+  });
+}
+
+
+// ——— Now: o segmento do anel vira a página inteira, e a HORA atravessa ———
+//
+// As outras duas saídas da home costuram uma IMAGEM: o último quadro daqui e o
+// primeiro de lá são a mesma pintura, no mesmo retângulo. Esta costura um
+// NÚMERO, e a diferença não é enfeite.
+//
+// A foto do segmento Now é uma clarabóia — céu visto por uma abertura num teto
+// escuro —, e a página se chama Now. As duas coisas apontam pro mesmo gesto: em
+// vez de mergulhar NA foto, passa-se por baixo dela, e o que sobe junto é a
+// hora. Ela já está na tela desde sempre, miudinha no canto esquerdo (a HUD do
+// scripts/hud.ts). No clique ela descola do canto, atravessa a tela e assenta
+// gigante no meio, com a pintura clareando por trás até virar luz do dia.
+//
+// E aí o ponto: a /now NÃO recebe essa hora. Ela pergunta a hora sozinha, pela
+// mesma função (nowNavigation.ts → nowTime), e chega na mesma string porque o
+// instante é o mesmo. Não há valor guardado no sessionStorage, não há retrato
+// da tela, não há nada a sincronizar. As duas páginas mostram o mesmo número
+// pelo motivo mais simples que existe: é essa hora que são. Se o minuto virar
+// no meio do caminho, ele vira dos dois lados.
+//
+// Três coisas se movem, e cada uma tem o próprio relógio:
+//
+//   • a PINTURA, na emenda (últimos 20% do avanço) — é o mesmo desenho da
+//     /work, com uma deriva curta pra baixo somada à escala;
+//   • a HORA, no avanço INTEIRO — ela tem a tela toda a atravessar e não cabe
+//     na janela apertada da emenda.
+function initNowLink(carousel: Carousel, returningFromNow = false) {
+  const portal = document.querySelector<HTMLElement>('[data-now-portal]');
+  const seamEl = portal?.querySelector<HTMLElement>('[data-now-portal-seam]');
+  const clock = portal?.querySelector<HTMLElement>('[data-now-portal-clock]');
+  // o relógio da HUD é a ORIGEM do voo, e é medido, não calculado: no celular
+  // ele desce e encolhe, e uma constante por breakpoint erraria o ponto de
+  // partida em toda tela que não fosse a que foi medida
+  const hudClock = document.querySelector<HTMLElement>('[data-clock-time]');
+  if (!portal || !seamEl || !clock) return;
+
+  let leaving = false;
+  let revealed: Promise<unknown> = Promise.resolve();
+
+  window.addEventListener('pagereveal', (event) => {
+    const transition = (event as any).viewTransition;
+    if (transition) revealed = transition.finished.catch(() => {});
+  });
+
+  // O quadro da emenda e a transformação da hora DESTA janela. Vivem aqui fora
+  // pelo mesmo motivo do seam da /work: a volta precisa remedi-los, porque a
+  // janela pode ter mudado de tamanho enquanto a pessoa lia a outra página.
+  let seam = nowSeamBox();
+  let warp = { x: 0, y: 0, s: 1 };
+
+  // A DECODIFICAÇÃO da pintura, adiada até o anel ENCOSTAR na seção.
+  //
+  // A /work decodifica a dela na ociosidade logo depois da abertura, e ali isso
+  // é barato: são 800 KB. Este arquivo tem o dobro, e a home já paga um portal
+  // desses — decodificar os dois de saída faria todo mundo pagar, no
+  // carregamento, por duas transições que a maioria não vai ver.
+  //
+  // Parar na seção é a intenção mais barata que existe, e é o mesmo gesto que a
+  // emenda do /photos usa pra pedir a foto grande (ver `arm`, mais abaixo).
+  // Depois dela sobra tempo ocioso de sobra, e antes do clique não custa nada.
+  let armed = false;
+  const arm = () => {
+    if (armed) return;
+    armed = true;
+    seamEl.querySelector('img')?.decode?.().catch(() => {});
+  };
+  window.addEventListener('carousel:change', (e) => {
+    if (SECTIONS[(e as CustomEvent).detail?.index]?.id === 'now') arm();
+  });
+
+  // O relógio do portal anda desde já, mesmo invisível. Dois motivos: a caixa
+  // do texto precisa existir pra ser medida no clique, e a volta sem BFCache
+  // nasce com ele na tela — um relógio vazio no primeiro quadro seria a emenda
+  // aparecendo. Custa um setTimeout por minuto.
+  const tick = () => {
+    clock.textContent = nowTime();
+    window.setTimeout(tick, msToNextMinute());
+  };
+  tick();
+
+  /** Remede as duas coisas que dependem do tamanho da janela. O transform é
+   *  zerado ANTES de medir a hora gigante: getBoundingClientRect devolve a
+   *  caixa já transformada, e medir por cima de um transform velho daria o
+   *  destino errado pro voo seguinte. */
+  const measure = () => {
+    seam = nowSeamBox();
+    if (!hudClock) return;
+    clock.style.transform = '';
+    const from = hudClock.getBoundingClientRect();
+    const to = clock.getBoundingClientRect();
+    if (from.width && to.width) warp = clockWarp(from, to);
+  };
+
+  // A hora, no progresso do AVANÇO. Sai da caixa do relógio da HUD e chega
+  // centralizada em escala 1 — ver clockWarp.
+  const drawClockAt = (p: number) => {
+    const span = NOW_SEAM.clockTo - NOW_SEAM.clockFrom;
+    const t = Math.min(1, Math.max(0, (p - NOW_SEAM.clockFrom) / span));
+    // smootherstep, mesmo motivo da pintura: o voo é longo e um peso que sai
+    // rápido do zero vira arranco logo no descolar
+    const e = t * t * t * (t * (t * 6 - 15) + 10);
+
+    clock.style.transform =
+      `translate(-50%, -50%) translate(${warp.x * (1 - e)}px, ${warp.y * (1 - e)}px) ` +
+      `scale(${warp.s + (1 - warp.s) * e})`;
+
+    const f = Math.min(1, t / NOW_SEAM.clockFade);
+    clock.style.opacity = `${f * f * (3 - 2 * f)}`;
+  };
+
+  // A pintura e o véu, no progresso da EMENDA. O corpo é o mesmo drawSeamAt da
+  // /work (ver os comentários lá sobre medir a foto 3D a cada quadro e sobre o
+  // smootherstep); o que é daqui são as duas linhas da subida e do véu.
+  const drawSeamAt = (k: number) => {
+    const now = carousel.frontPhotoSize();
+    const w = k * k * k * (k * (k * 6 - 15) + 10);
+
+    // A deriva NÃO é escalada: ela está à esquerda do scale na lista, então
+    // anda em px de tela mesmo quando a pintura ainda é do tamanho da foto 3D.
+    // É o que faz ela ter a mesma velocidade o caminho todo, em vez de acelerar
+    // junto com o zoom. Positiva = pra baixo (ver NOW_SEAM.drift).
+    const drift = (NOW_SEAM.drift / 100) * window.innerHeight * w;
+
+    seamEl.style.transform =
+      `translate(-50%, -50%) translate(0, ${drift}px) ` +
+      `scale(${(now.w + (seam.w - now.w) * w) / seam.w}, ` +
+      `${(now.h + (seam.h - now.h) * w) / seam.h})`;
+
+    const f = Math.min(1, k / DEPART.flatFade);
+    seamEl.style.opacity = `${f * f * (3 - 2 * f)}`;
+  };
+
+  // A ÚNICA função que desenha, e por isso ida e volta não podem divergir: a
+  // volta é esta mesma conta com `p` andando para trás. Ela recebe o progresso
+  // do avanço e reparte entre os dois relógios de dentro.
+  const drawAt = (p: number) => {
+    drawClockAt(p);
+    if (p < DEPART.flatAt) return;
+    drawSeamAt(Math.min(1, (p - DEPART.flatAt) / (1 - DEPART.flatAt)));
+  };
+
+  const rememberHome = (animate: boolean) => {
+    try {
+      sessionStorage.setItem(NOW_HOME_KEY, location.href);
+      if (animate) sessionStorage.setItem(NOW_ENTRY_KEY, '1');
+      else sessionStorage.removeItem(NOW_ENTRY_KEY);
+    } catch {}
+  };
+
+  const settle = () => {
+    leaving = false;
+    document.body.classList.remove('is-diving');
+    document.documentElement.removeAttribute('data-now-return');
+    portal.style.visibility = '';
+    seamEl.removeAttribute('style');
+    clock.removeAttribute('style');
+  };
+
+  const returnToRing = async (rewindDeparture: boolean) => {
+    portal.style.visibility = 'visible';
+    measure();
+    document.body.classList.add('is-diving');
+
+    if (rewindDeparture) {
+      // Home viva pelo BFCache: a timeline que levou até a /now ainda existe, e
+      // o drawAt está pendurado nela pelo onDive — inclusive a hora. Rebobinar
+      // devolve tudo pelas MESMAS curvas, na ordem inversa.
+      const rewind = carousel.returnFromDeparture();
+      if (rewind) await rewind;
+      else carousel.cancelDeparture();
+    } else {
+      // Documento novo: não há timeline pra rebobinar (ver o estado armado em
+      // index.astro). O progresso anda sozinho, do quadro da emenda até a foto
+      // do anel, pela mesma função de desenho.
+      drawAt(1);
+      document.documentElement.removeAttribute('data-now-return');
+      const at = { p: 1 };
+      await gsap.to(at, {
+        p: 0,
+        duration: NOW_SEAM.returnDur,
+        ease: NOW_SEAM.returnEase,
+        onUpdate: () => drawAt(at.p),
+      });
+    }
+
+    settle();
+  };
+
+  // Documento novo vindo da /now: o script inline do <head> já deixou a pintura
+  // e a hora cobrindo a cortina. Com a cena nascida em Now, tudo recolhe até o
+  // segmento e o quadro volta a ser do anel.
+  if (returningFromNow) {
+    if (reducedMotion()) settle();
+    else requestAnimationFrame(() => revealed.then(() => returnToRing(false)));
+  }
+
+  window.addEventListener('section:open', async (event) => {
+    const detail = (event as CustomEvent).detail;
+    if (detail?.id !== 'now' || leaving) return;
+    leaving = true;
+
+    const animate = !reducedMotion();
+    rememberHome(animate);
+
+    if (!animate) {
+      location.href = '/now';
+      return;
+    }
+
+    // a HUD sai antes do impacto, com a MESMA classe dos outros dois mergulhos.
+    // Aqui ela leva junto o relógio do canto — que é exatamente o efeito: ele
+    // apaga enquanto o do portal acende por cima, no mesmo lugar.
+    document.body.classList.add('is-diving');
+    portal.style.visibility = 'visible';
+    arm();   // clique numa foto de lado, sem passar pela seção: última chance
+
+    // a hora do CLIQUE, e não a do carregamento da página: alguém pode ter
+    // ficado meia hora girando o anel. E antes de medir, porque a caixa do
+    // texto é o que vai ser medido.
+    clock.textContent = nowTime();
+    measure();
+    drawAt(0);   // nasce em cima da foto 3D e da HUD, ainda invisível
+
+    const movement = carousel.departInto(detail.index, drawAt);
+    movement.to({}, { duration: DEPART.hold });   // o pouso, com a tela já coberta
+    // mais devagar que os outros dois mergulhos, e só este — ver NOW_SEAM.pace.
+    // O rebobinamento da volta não se importa: ele pausa a timeline e anda com o
+    // playhead na mão, em tempo local (ver Carousel.returnFromDeparture).
+    movement.timeScale(NOW_SEAM.pace);
+    await movement;
+
+    location.href = '/now';
+  });
+
+  // Volta viva pelo BFCache: a timeline que levou à /now ainda existe.
+  window.addEventListener('pageshow', (event) => {
+    if (!(event as PageTransitionEvent).persisted || !leaving) return;
+    try {
+      sessionStorage.removeItem(NOW_RETURN_KEY);
+      sessionStorage.removeItem(NOW_HOME_KEY);
+    } catch {}
+    if (reducedMotion()) {
+      settle();
+      return;
+    }
+    requestAnimationFrame(() => revealed.then(() => returnToRing(true)));
+  });
+}
 
 // ——— Photos: página própria (/photos), aberta pelo clique no anel ———
 //

@@ -90,6 +90,20 @@
      e o fade vira uma colcha. O Backdrop 3D usa o mesmo 0.6s via GSAP
      (Backdrop.ts) — mudar aqui pede mudar lá. */
   --theme-fade: 0.6s ease;
+
+  /* ——— o tamanho da hora gigante da emenda com /now ———
+     Uma medida de PÁGINA morando no arquivo global, e o motivo é o mesmo do
+     data/gallery.ts: ela é um acordo entre DOIS documentos, não detalhe de um
+     deles. A home termina com a hora deste tamanho no meio da tela e a /now
+     começa com ela no mesmo lugar; entre os dois quadros o navegador troca de
+     documento. Duas declarações do mesmo clamp() seriam duas chances de o
+     número divergir num ajuste futuro — e divergir aqui não é um desalinho, é a
+     emenda inteira aparecendo.
+
+     Não troca com o tema (ver .now-clock em index.astro): o que está atrás
+     dela é a foto lavada de luz, que é clara nos dois temas. */
+  --now-clock-size: clamp(2.9rem, 12.5vw, 10.5rem);
+
   color-scheme: light;
 }
 
@@ -127,6 +141,14 @@ html[data-theme='dark'] {
   @view-transition {
     navigation: none;
   }
+}
+
+/* The entrance gate can request reduced motion independently of the operating
+   system. In that case the manual page choreography is already skipped; these
+   rules also remove the browser's cross-document snapshot animation. */
+html[data-motion='reduced']::view-transition-old(root),
+html[data-motion='reduced']::view-transition-new(root) {
+  animation: none;
 }
 
 * {

@@ -16,6 +16,7 @@ import { storedMotionMode } from '../motion';
 import {
   PHOTOS_RETURN_KEY, SEAM_ASPECT, SEAM_BACK_KEY, SEAM_OVERSCAN, SEAM_PHOTO,
 } from '../../data/gallery';
+import { viewportSize } from '../viewport';
 
 export function initMural() {
   const viewport = document.querySelector<HTMLElement>('[data-mural]');
@@ -241,7 +242,8 @@ function enterFromSeam(
   // valores voltam a 1 juntos enquanto a câmera recua.
   const tileAspect = seat.w / seat.h;
   const startAspectX = SEAM_ASPECT / tileAspect;
-  const seamW = Math.max(window.innerWidth, window.innerHeight * SEAM_ASPECT)
+  const viewport = viewportSize();
+  const seamW = Math.max(viewport.width, viewport.height * SEAM_ASPECT)
     * SEAM_OVERSCAN;
   const seamH = seamW / SEAM_ASPECT;
   const scale = seamH / seat.h;
@@ -373,7 +375,8 @@ function leaveToSeam(
 
   const tileAspect = seat.w / seat.h;
   const endAspectX = SEAM_ASPECT / tileAspect;
-  const seamW = Math.max(window.innerWidth, window.innerHeight * SEAM_ASPECT)
+  const viewport = viewportSize();
+  const seamW = Math.max(viewport.width, viewport.height * SEAM_ASPECT)
     * SEAM_OVERSCAN;
   const seamH = seamW / SEAM_ASPECT;
   const scale = seamH / seat.h;

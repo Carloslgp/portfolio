@@ -69,7 +69,7 @@ function month(value: string): string {
       document.documentElement.style.setProperty('--now-aspect', nowAspect);
       document.documentElement.style.setProperty('--now-overscan', nowOverscan);
       document.documentElement.style.setProperty('--now-rotation', nowRotation + 'deg');
-      document.documentElement.style.setProperty('--now-drift', nowDrift + 'vh');
+      document.documentElement.style.setProperty('--now-drift', nowDrift + 'dvh');
       try {
         if (sessionStorage.getItem('portfolio:now-entry')) {
           sessionStorage.removeItem('portfolio:now-entry');
@@ -264,6 +264,8 @@ function month(value: string): string {
   .now-entry {
     position: fixed;
     inset: 0;
+    width: var(--viewport-w);
+    height: var(--viewport-h);
     z-index: 12;
     visibility: hidden;
     pointer-events: none;
@@ -274,7 +276,7 @@ function month(value: string): string {
      mesmas variáveis (--now-aspect, --now-overscan, --now-rotation), postas no
      <html> pelo script do <head> a partir do NOW_SEAM. */
   .now-seam {
-    --now-seam-w: calc(max(100vw, 100vh * var(--now-aspect)) * var(--now-overscan));
+    --now-seam-w: calc(max(var(--viewport-w), var(--viewport-h) * var(--now-aspect)) * var(--now-overscan));
     --now-seam-h: calc(var(--now-seam-w) / var(--now-aspect));
     position: absolute;
     top: 50%;
@@ -307,7 +309,7 @@ function month(value: string): string {
      vem do --now-clock-size do global.css — o único lugar onde ele existe,
      justamente pra não haver duas versões do mesmo número. */
   .now-clock {
-    position: fixed;
+    position: absolute;
     top: 50%;
     left: 50%;
     z-index: 13;
@@ -579,7 +581,7 @@ function month(value: string): string {
 
   .back {
     position: fixed;
-    top: 1.5rem;
+    top: calc(1.5rem + env(safe-area-inset-top));
     left: 2rem;
     z-index: 6;
     padding: 0.35rem 0;
@@ -602,7 +604,7 @@ function month(value: string): string {
      nativo do navegador com dois SVGs empilhados dentro. */
   .theme {
     position: fixed;
-    top: 1.3rem;
+    top: calc(1.3rem + env(safe-area-inset-top));
     right: 1.5rem;
     z-index: 6;
     width: 44px;
@@ -695,8 +697,8 @@ function month(value: string): string {
      ela precisa ter pra onde ir.
 
      A conta do destino sai da própria caixa, e não de um número chutado por
-     tela: `50vh` leva o centro dela até a borda de baixo do viewport e
-     `--now-seam-h / 2` leva a beirada de cima junto. Os 3vh são folga contra
+     tela: `50dvh` leva o centro dela até a borda de baixo do viewport e
+     `--now-seam-h / 2` leva a beirada de cima junto. Os 3dvh são folga contra
      arredondamento subpixel — sem eles sobra uma tira de um pixel em algumas
      densidades de tela. Serve pra qualquer proporção de janela, inclusive as
      bem largas, onde a caixa passa de 120vh de altura.
@@ -708,7 +710,7 @@ function month(value: string): string {
   :global(html[data-now-entry='opening']) .now-seam,
   :global(html[data-now-exit='armed']) .now-seam {
     opacity: 1;
-    transform: translate(-50%, calc(-50% + 50vh + var(--now-seam-h) / 2 + 3vh));
+    transform: translate(-50%, calc(-50% + 50dvh + var(--now-seam-h) / 2 + 3dvh));
   }
 
   /* Só quem ABRE ou FECHA transiciona. `[data-now-exit='armed']` sozinho é uma

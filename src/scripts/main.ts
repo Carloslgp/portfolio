@@ -18,10 +18,11 @@ import {
 import {
   CRAFT_ENTRY_KEY, CRAFT_HOME_KEY, CRAFT_RETURN_KEY, CRAFT_SEAM, craftSeamBox,
 } from './craftNavigation';
+import { viewportSize } from './viewport';
 
-// Captured when this module is evaluated, before bootstrap waits for textures
-// and the entrance gate. A rebuilt home can otherwise miss `pagereveal` and
-// start shrinking Craft's returned frame underneath the browser snapshot.
+// Desktop keeps the native document cross-fade. Capture it before bootstrap
+// waits for textures so a rebuilt return never rewinds under its snapshot.
+// Mobile does not opt into that transition, so this remains resolved there.
 let craftRevealed: Promise<unknown> = Promise.resolve();
 window.addEventListener('pagereveal', (event) => {
   const transition = (event as any).viewTransition;
@@ -671,7 +672,7 @@ function initNowLink(carousel: Carousel, returningFromNow = false) {
     // anda em px de tela mesmo quando a pintura ainda é do tamanho da foto 3D.
     // É o que faz ela ter a mesma velocidade o caminho todo, em vez de acelerar
     // junto com o zoom. Positiva = pra baixo (ver NOW_SEAM.drift).
-    const drift = (NOW_SEAM.drift / 100) * window.innerHeight * w;
+    const drift = (NOW_SEAM.drift / 100) * viewportSize().height * w;
 
     seamEl.style.transform =
       `translate(-50%, -50%) translate(0, ${drift}px) ` +
@@ -827,12 +828,13 @@ function seamBox(flat: HTMLImageElement): { w: number; h: number } | null {
 
   // A troca de documento acontece ainda dentro da foto, não com a borda dela
   // encostada no viewport. /photos começa com exatamente a mesma sobra.
-  const w = Math.max(window.innerWidth, window.innerHeight * aspect) * SEAM_OVERSCAN;
+  const viewport = viewportSize();
+  const w = Math.max(viewport.width, viewport.height * aspect) * SEAM_OVERSCAN;
   const h = w / aspect;
   flat.style.width = `${w}px`;
   flat.style.height = `${h}px`;
-  flat.style.left = `${(window.innerWidth - w) / 2}px`;
-  flat.style.top = `${(window.innerHeight - h) / 2}px`;
+  flat.style.left = `${(viewport.width - w) / 2}px`;
+  flat.style.top = `${(viewport.height - h) / 2}px`;
   return { w, h };
 }
 
@@ -942,16 +944,12 @@ function initPhotosLink(carousel: Carousel) {
     location.href = '/photos';
   });
 
-  // A transição de página do navegador (@view-transition) tira um RETRATO do
-  // documento restaurado e o segura por cima enquanto faz o cross-fade. Começar
-  // o rebobinamento por baixo desse retrato gastaria o começo do movimento
-  // escondido, e ele reapareceria já no meio — um salto exatamente no ponto que
-  // a emenda existe pra costurar. `pagereveal` entrega a transição em curso,
-  // quando há uma; onde não há (Firefox, baixa animação), fica no resolvido.
+  // Desktop may still be holding the restored page under its native root
+  // snapshot. Mobile does not opt into it, so this promise stays resolved.
   let revealed: Promise<unknown> = Promise.resolve();
-  window.addEventListener('pagereveal', (e) => {
-    const vt = (e as any).viewTransition;
-    if (vt) revealed = vt.finished.catch(() => {});
+  window.addEventListener('pagereveal', (event) => {
+    const transition = (event as any).viewTransition;
+    if (transition) revealed = transition.finished.catch(() => {});
   });
 
   // O VOLTAR: o Chrome pode servir a home direto do BFCache, congelada
@@ -986,8 +984,8 @@ function initPhotosLink(carousel: Carousel) {
       // O `?? seam` não é decoração: sem caixa da emenda o drawFlat desiste de
       // desenhar, e desistir AQUI deixaria a foto parada cobrindo a tela.
       if (flat) seam = seamBox(flat) ?? seam;
-      // um rAF antes de olhar o `revealed`: o pagereveal chega na primeira
-      // oportunidade de desenho, que é justamente onde este callback espera
+      // No desktop, espere o retrato nativo soltar a página restaurada. No
+      // mobile não há view transition e a promessa já está resolvida.
       requestAnimationFrame(() => revealed.then(() => {
         const rewind = carousel.returnFromDeparture();
         if (rewind) return void rewind.then(settle);
@@ -1101,7 +1099,7 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     // visibility (e não opacity nem hidden): some de verdade da tela, mas
     // continua ocupando layout — o Lenis precisa da altura pra dimensionar a
     // página, e display: none tiraria isso do fluxo.
-    gsap.set(panel, { y: window.innerHeight, visibility: 'hidden' });
+    gsap.set(panel, { y: viewportSize().height, visibility: 'hidden' });
     panel.hidden = false;
     document.body.classList.add('is-about', 'is-descending');
     lenis.stop();                          // a descida é automática; sem gesto por cima
@@ -1153,7 +1151,7 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
     const reduced = reducedMotion();
     const dur = reduced
       ? 0
-      : Math.min(ABOUT.rewindMax, ABOUT.rewindMin + (from / window.innerHeight) * 0.28);
+      : Math.min(ABOUT.rewindMax, ABOUT.rewindMin + (from / viewportSize().height) * 0.28);
 
     return new Promise<void>((resolve) => {
       let done = false;
@@ -1206,7 +1204,7 @@ function initAbout(carousel: Carousel, lenis: Lenis) {
         tl!.timeScale(ABOUT.exitScale).reverse();
       });
     } else if (manual) {
-      await gsap.to(panel, { y: window.innerHeight, duration: 0.45, ease: 'power2.in' });
+      await gsap.to(panel, { y: viewportSize().height, duration: 0.45, ease: 'power2.in' });
     }
 
     tl = null;

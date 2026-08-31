@@ -12,6 +12,7 @@
 
 import { GL } from './config';
 import { targetRowHeight } from './layout';
+import { viewportSize } from '../viewport';
 
 /** "O ponteiro é um dedo?" — a pergunta que de fato acompanha uma GPU de
  *  orçamento apertado, e a mesma que o blur do mural já faz (BLUR
@@ -54,8 +55,7 @@ export function canvasPixelRatio(
  * grande tem 300 — e é daí que sai o telefone não pagar pela variante grande.
  */
 export function sourcePixelsFor(aspect: number): number {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const { width: w, height: h } = viewportSize();
   return targetRowHeight(w) * aspect * canvasPixelRatio(w, h);
 }
 

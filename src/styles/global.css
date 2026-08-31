@@ -91,6 +91,12 @@
      (Backdrop.ts) — mudar aqui pede mudar lá. */
   --theme-fade: 0.6s ease;
 
+  /* As cenas de tela cheia acompanham a área realmente visível no celular.
+     `vh` equivale ao viewport grande e fica alto demais enquanto as barras do
+     navegador estão abertas. */
+  --viewport-w: 100vw;
+  --viewport-h: 100vh;
+
   /* ——— o tamanho da hora gigante da emenda com /now ———
      Uma medida de PÁGINA morando no arquivo global, e o motivo é o mesmo do
      data/gallery.ts: ela é um acordo entre DOIS documentos, não detalhe de um
@@ -105,6 +111,13 @@
   --now-clock-size: clamp(2.9rem, 12.5vw, 10.5rem);
 
   color-scheme: light;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --viewport-w: 100dvw;
+    --viewport-h: 100dvh;
+  }
 }
 
 /* baixa animação: o tema troca num corte, como todo o resto dos enfeites */
@@ -124,28 +137,23 @@ html[data-theme='dark'] {
   color-scheme: dark;
 }
 
-/* ——— view transitions entre PÁGINAS (home ↔ /photos) ———
-   Cross-document e nativo, sem router SPA: a navegação é MPA de verdade — o
-   que destrói o render loop do Three.js e o Lenis de graça ao sair da home —
-   e o navegador costura as duas páginas num cross-fade. Chromium e Safari
-   fazem a transição; onde não há suporte, sobra uma navegação normal, que é
-   a degradação certa. Esta regra precisa existir nos DOIS documentos (e
-   existe: os dois importam este arquivo via Layout). */
-@view-transition {
-  navigation: auto;
+/* Cada rota já tem uma emenda própria de tela cheia. No mobile, ativar também
+   o cross-fade nativo da raiz duplicava o movimento e fotografava os dois
+   documentos com alturas diferentes conforme as barras do navegador. Ele fica
+   restrito ao desktop, preservando o acabamento que já existia ali sem
+   disputar a coreografia do anel no celular. */
+@media (hover: hover) and (pointer: fine) {
+  @view-transition {
+    navigation: auto;
+  }
 }
-/* preferência do SISTEMA por menos movimento corta a transição na raiz — a
-   escolha do portão não alcança aqui (CSS não lê sessionStorage), mas o
-   cross-fade é discreto o bastante pra valer como padrão */
+
 @media (prefers-reduced-motion: reduce) {
   @view-transition {
     navigation: none;
   }
 }
 
-/* The entrance gate can request reduced motion independently of the operating
-   system. In that case the manual page choreography is already skipped; these
-   rules also remove the browser's cross-document snapshot animation. */
 html[data-motion='reduced']::view-transition-old(root),
 html[data-motion='reduced']::view-transition-new(root) {
   animation: none;
@@ -172,12 +180,14 @@ body::-webkit-scrollbar {
 html,
 body {
   height: 100%;
+  min-height: 100%;
   /* o gesto lateral do trackpad gira o carrossel; sem isto o navegador ainda
      o interpreta como overscroll e dispara "voltar página" no meio do arrasto */
   overscroll-behavior: none;
 }
 
 body {
+  min-height: var(--viewport-h);
   background: var(--paper);
   color: var(--ink);
   /* O grosso do fade de tema mora AQUI: além do fundo, todo texto que herda a

@@ -20,6 +20,7 @@ import { storedMotionMode } from './motion';
 import {
   NOW_HOME_KEY, NOW_RETURN_KEY, clockWarp, msToNextMinute, nowDate, nowTime,
 } from './nowNavigation';
+import { viewportSize } from './viewport';
 
 /** Teto da espera pela thread livre, em ms. Mesmo número e mesmo motivo da
  *  cortina da /work: num celular lento o documento leva uns 400ms pra soltar a
@@ -152,7 +153,7 @@ export function initNow() {
     const to = clock.getBoundingClientRect();
     const from = stamp.getBoundingClientRect();
     if (!to.width || !from.width) return null;
-    if (from.bottom < 0 || from.top > window.innerHeight) return null;
+    if (from.bottom < 0 || from.top > viewportSize().height) return null;
 
     const warp = clockWarp(from, to);
     return `translate(-50%, -50%) translate(${warp.x}px, ${warp.y}px) scale(${warp.s})`;

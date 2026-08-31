@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ABOUT, CAM, PARALLAX_AMP, PARALLAX_EASE, RADIUS, SHATTER } from './config';
+import { viewportSize } from '../../scripts/viewport';
 
 // Dono ÚNICO da pose da câmera.
 //
@@ -76,7 +77,7 @@ export class CameraRig {
   // Quanto vale, em unidades de mundo, um pixel de tela no plano do vidro —
   // a conversão que faz a moldura rolar junto com a página.
   pxToWorld(px: number): number {
-    return px * ((this.frameHalf.h * 2) / window.innerHeight);
+    return px * ((this.frameHalf.h * 2) / viewportSize().height);
   }
 
   // Entrada da página: a câmera desce de cima do anel até a lateral.

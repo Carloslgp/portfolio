@@ -5,6 +5,7 @@
 // cutting it into horizontal tides. Keeping the geometry here prevents the two
 // documents from drifting apart when the transition is tuned.
 import { SEAM_ASPECT, SEAM_OVERSCAN } from '../data/gallery';
+import { viewportSize } from './viewport';
 
 export const CRAFT_ENTRY_KEY = 'portfolio:craft-entry';
 export const CRAFT_RETURN_KEY = 'portfolio:craft-return';
@@ -45,7 +46,8 @@ export const CRAFT_TIDES = [
 
 /** The full-screen seam rectangle for the current viewport, in CSS pixels. */
 export function craftSeamBox(): { w: number; h: number } {
-  const w = Math.max(window.innerWidth, window.innerHeight * CRAFT_SEAM.aspect)
+  const viewport = viewportSize();
+  const w = Math.max(viewport.width, viewport.height * CRAFT_SEAM.aspect)
     * CRAFT_SEAM.overscan;
   return { w, h: w / CRAFT_SEAM.aspect };
 }

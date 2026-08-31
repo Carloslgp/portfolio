@@ -17,6 +17,7 @@
 // dura pouco mais de um segundo — os dois lados viram junto, porque os dois
 // estão lendo o mesmo relógio. Um valor copiado é que ficaria velho.)
 import { SEAM_ASPECT } from '../data/gallery';
+import { viewportSize } from './viewport';
 
 export const NOW_ENTRY_KEY = 'portfolio:now-entry';
 export const NOW_RETURN_KEY = 'portfolio:now-return';
@@ -151,7 +152,8 @@ export const NOW_SEAM = {
  *  páginas (ver --now-seam-w / --now-seam-h); aqui ela existe porque o avanço
  *  precisa do número para interpolar a escala quadro a quadro. */
 export function nowSeamBox(): { w: number; h: number } {
-  const w = Math.max(window.innerWidth, window.innerHeight * NOW_SEAM.aspect) * NOW_SEAM.overscan;
+  const viewport = viewportSize();
+  const w = Math.max(viewport.width, viewport.height * NOW_SEAM.aspect) * NOW_SEAM.overscan;
   return { w, h: w / NOW_SEAM.aspect };
 }
 

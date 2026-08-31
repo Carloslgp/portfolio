@@ -475,8 +475,8 @@ function hasDetails(entry: Entry) {
     /* 100vw, e não `inset: 0`: com a goteira reservada, o bloco de contenção
        de um fixo para 15px antes da beirada da janela, e a cortina deixava uma
        tira de papel aparecendo à direita. vw conta a janela inteira. */
-    width: 100vw;
-    height: 100vh;
+    width: var(--viewport-w);
+    height: var(--viewport-h);
     z-index: 20;
     visibility: hidden;
     overflow: hidden;
@@ -505,7 +505,7 @@ function hasDetails(entry: Entry) {
      esquerda, 0 na da direita). As duas cópias caem no mesmo lugar e a costura
      entre elas some. */
   .work-transition .work-seam {
-    --seam-w: calc(max(100vw, 100vh * var(--seam-aspect)) * var(--seam-overscan));
+    --seam-w: calc(max(var(--viewport-w), var(--viewport-h) * var(--seam-aspect)) * var(--seam-overscan));
     --seam-h: calc(var(--seam-w) / var(--seam-aspect));
     position: absolute;
     top: 50%;
@@ -727,7 +727,7 @@ function hasDetails(entry: Entry) {
 
   .back {
     position: fixed;
-    top: 1.5rem;
+    top: calc(1.5rem + env(safe-area-inset-top));
     left: 2rem;
     z-index: 6;
     padding: 0.35rem 0;
@@ -758,7 +758,7 @@ function hasDetails(entry: Entry) {
 
   .theme {
     position: fixed;
-    top: 1.3rem;
+    top: calc(1.3rem + env(safe-area-inset-top));
     right: 1.5rem;
     z-index: 6;
     width: 44px;
@@ -802,7 +802,7 @@ function hasDetails(entry: Entry) {
   }
 
   .work-page {
-    min-height: 100vh;
+    min-height: var(--viewport-h);
   }
 
   /* A medida vertical desta página passou a ser vh, e não vw.

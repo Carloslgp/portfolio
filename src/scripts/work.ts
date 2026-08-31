@@ -1,5 +1,6 @@
 import { storedMotionMode } from './motion';
 import { WORK_HOME_KEY, WORK_RETURN_KEY } from './workNavigation';
+import { viewportSize } from './viewport';
 
 /** Teto da espera pela thread livre, em ms (ver calmFrame). Escolhido pelo que
  *  se mediu: o carregamento da /work num celular lento leva uns 400ms para
@@ -123,7 +124,7 @@ export function initWork() {
   // nativa mesmo.
   const syncHint = () => {
     const doc = document.documentElement;
-    const left = doc.scrollHeight - window.innerHeight - window.scrollY;
+    const left = doc.scrollHeight - viewportSize().height - window.scrollY;
     hint?.classList.toggle('is-gone', left <= HINT_END);
   };
 

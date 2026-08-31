@@ -5,6 +5,7 @@
 // frontmatter de cada página, pelo mesmo motivo do data/gallery.ts: é um acordo
 // entre dois documentos, não detalhe de um deles.
 import { SEAM_ASPECT, SEAM_OVERSCAN } from '../data/gallery';
+import { viewportSize } from './viewport';
 
 export const WORK_ENTRY_KEY = 'portfolio:work-entry';
 export const WORK_RETURN_KEY = 'portfolio:work-return';
@@ -64,6 +65,7 @@ export const WORK_SEAM = {
  *  páginas (ver --seam-w / --seam-h); aqui ela existe porque o avanço precisa
  *  do número para interpolar a escala quadro a quadro. */
 export function workSeamBox(): { w: number; h: number } {
-  const w = Math.max(window.innerWidth, window.innerHeight * WORK_SEAM.aspect) * WORK_SEAM.overscan;
+  const viewport = viewportSize();
+  const w = Math.max(viewport.width, viewport.height * WORK_SEAM.aspect) * WORK_SEAM.overscan;
   return { w, h: w / WORK_SEAM.aspect };
 }

@@ -66,7 +66,7 @@ const tideHeight = 100 / CRAFT_TIDES.length;
       <div
         class="craft-tide"
         data-craft-tide
-        style={`--tide-top:${index * tideHeight}vh;--tide-height:${tideHeight}vh;--tide-travel:${tide.travel};--tide-lift:${tide.lift};--tide-tilt:${tide.tilt};--tide-delay:${tide.delay}`}
+        style={`--tide-top:${index * tideHeight}dvh;--tide-height:${tideHeight}dvh;--tide-travel:${tide.travel};--tide-lift:${tide.lift};--tide-tilt:${tide.tilt};--tide-delay:${tide.delay}`}
       >
         <div class="craft-seam">
           <img src="/textures/craft.jpg" alt="" draggable="false" />
@@ -171,8 +171,8 @@ const tideHeight = 100 / CRAFT_TIDES.length;
     top: 0;
     left: 0;
     z-index: 20;
-    width: 100vw;
-    height: 100vh;
+    width: var(--viewport-w);
+    height: var(--viewport-h);
     visibility: hidden;
     overflow: hidden;
     pointer-events: none;
@@ -194,12 +194,12 @@ const tideHeight = 100 / CRAFT_TIDES.length;
   }
 
   .craft-seam {
-    --craft-seam-w: calc(max(100vw, 100vh * var(--craft-aspect)) * var(--craft-overscan));
+    --craft-seam-w: calc(max(var(--viewport-w), var(--viewport-h) * var(--craft-aspect)) * var(--craft-overscan));
     --craft-seam-h: calc(var(--craft-seam-w) / var(--craft-aspect));
     position: absolute;
     /* Every band points to the center of the viewport, expressed in its own
        coordinate system. This is what makes the seven crops one painting. */
-    top: calc(50vh - var(--tide-top));
+    top: calc(50dvh - var(--tide-top));
     left: 50%;
     width: var(--craft-seam-w);
     height: var(--craft-seam-h);
@@ -472,7 +472,7 @@ const tideHeight = 100 / CRAFT_TIDES.length;
 
   .back {
     position: fixed;
-    top: 1.5rem;
+    top: calc(1.5rem + env(safe-area-inset-top));
     left: 2rem;
     z-index: 6;
     padding: 0.35rem 0;
@@ -505,7 +505,7 @@ const tideHeight = 100 / CRAFT_TIDES.length;
 
   .theme {
     position: fixed;
-    top: 1.3rem;
+    top: calc(1.3rem + env(safe-area-inset-top));
     right: 1.5rem;
     z-index: 6;
     width: 44px;

@@ -68,6 +68,13 @@ export function hideLoader(): Promise<void> {
   const node = el();
   if (!node) return Promise.resolve();
 
+  // Mobile Safari can keep the visual viewport offset of a focused control
+  // when that control is removed with its parent. Release focus while the gate
+  // still exists so the fixed scene does not inherit a displaced viewport.
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && node.contains(active)) active.blur();
+  window.scrollTo(0, 0);
+
   setProgress(1);
   node.classList.add('is-done');
 

@@ -18,6 +18,7 @@ import {
   DEPART, GPU, coarsePointer, THETA_LEN, ARC_WIDTH,
   CLICK_SLOP, CLICK_SLOP_TOUCH, CLICK_TOLERANCE_TOUCH,
 } from './config';
+import { viewportSize } from '../../scripts/viewport';
 
 const ABOUT_INDEX = SECTIONS.findIndex((s) => s.id === 'about');
 
@@ -83,16 +84,18 @@ export class Carousel {
   private hoverY = 0;
   private hoverPending = false;
   private hovering = false;
+  private resizeFrame = 0;
 
   async init(canvas: HTMLCanvasElement, lenis: any) {
     this.lenis = lenis;
 
     this.canvas = canvas;
     const coarse = coarsePointer();
+    const viewport = viewportSize();
 
     // --- renderer: alpha ligado + clear transparente pra o "PORTFOLIO" do DOM aparecer atrás ---
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(viewport.width, viewport.height);
     this.renderer.setPixelRatio(
       Math.min(window.devicePixelRatio, coarse ? GPU.pixelRatioCoarse : GPU.pixelRatio),
     );
@@ -109,7 +112,7 @@ export class Carousel {
     pmrem.dispose();
 
     // --- câmera (posição vem do rig, já na lateral) ---
-    this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+    this.camera = new THREE.PerspectiveCamera(50, viewport.width / viewport.height, 0.1, 100);
 
     this.ribbonRest = captureRest(this.ribbon);
 
@@ -181,11 +184,13 @@ export class Carousel {
     this.updateViewRadius();
     this.backdrop.fit(this.camera, this.viewRadius);   // depende do viewRadius: vem depois
 
-    window.addEventListener('resize', this.onResize);
+    window.addEventListener('resize', this.scheduleResize);
+    window.visualViewport?.addEventListener('resize', this.scheduleResize);
     window.addEventListener('pointermove', (e) => {
+      const current = viewportSize();
       this.rig.setPointer(
-        (e.clientX / window.innerWidth) * 2 - 1,
-        (e.clientY / window.innerHeight) * 2 - 1,
+        (e.clientX / current.width) * 2 - 1,
+        (e.clientY / current.height) * 2 - 1,
       );
     });
 
@@ -250,9 +255,10 @@ export class Carousel {
 
   // raycast do ponteiro contra os segmentos visíveis; retorna o Segment atingido
   private rayAt(clientX: number, clientY: number): Segment | null {
+    const viewport = viewportSize();
     this.ndc.set(
-      (clientX / window.innerWidth) * 2 - 1,
-      -(clientY / window.innerHeight) * 2 + 1,
+      (clientX / viewport.width) * 2 - 1,
+      -(clientY / viewport.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(this.ndc, this.camera);
     const hit = this.raycaster.intersectObjects(this.segments.map((s) => s.mesh), false)[0];
@@ -267,7 +273,8 @@ export class Carousel {
   // ativo continuar cabendo na largura. O que importa é a distância até a FACE
   // frontal do cilindro (z = RADIUS), então o excedente escala a partir dela.
   private updateViewRadius() {
-    const aspect = window.innerWidth / window.innerHeight;
+    const viewport = viewportSize();
+    const aspect = viewport.width / viewport.height;
     const fit = Math.max(1, BASE_ASPECT / aspect);
     this.viewRadius = RADIUS + (CAM.side.radius - RADIUS) * fit;
   }
@@ -516,7 +523,8 @@ export class Carousel {
     const h = Math.abs(ndc(0, HEIGHT / 2, RADIUS).y - ndc(0, -HEIGHT / 2, RADIUS).y);
 
     // NDC vai de -1 a 1: metade da janela por unidade
-    return { w: (w / 2) * window.innerWidth, h: (h / 2) * window.innerHeight };
+    const viewport = viewportSize();
+    return { w: (w / 2) * viewport.width, h: (h / 2) * viewport.height };
   }
 
   // A VOLTA de /photos, quando a página de fotos devolve a MESMA foto cobrindo
@@ -715,7 +723,7 @@ export class Carousel {
   // 60fps atrás de uma página que a pessoa está lendo.
   setBorderScroll(px: number) {
     if (!this.inAbout) return;
-    const t = px / window.innerHeight;
+    const t = px / viewportSize().height;
     const o = 1 - THREE.MathUtils.smoothstep(t, ABOUT.fadeOut, 1);
     this.shatter.setScroll(this.rig.pxToWorld(px * ABOUT.parallax), o);
     this.idle = o <= 0.001;
@@ -827,11 +835,23 @@ export class Carousel {
   }
 
   private onResize = () => {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const viewport = viewportSize();
+    this.camera.aspect = viewport.width / viewport.height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(viewport.width, viewport.height);
     this.updateViewRadius();
     this.backdrop.fit(this.camera, this.viewRadius);
+  };
+
+  // Mobile browser bars can emit both Window and VisualViewport resize events
+  // for the same visible frame. Resize the WebGL buffers only once per frame;
+  // reallocating them twice is particularly expensive on a phone GPU.
+  private scheduleResize = () => {
+    if (this.resizeFrame) return;
+    this.resizeFrame = requestAnimationFrame(() => {
+      this.resizeFrame = 0;
+      this.onResize();
+    });
   };
 
   private loop = (time = 0) => {

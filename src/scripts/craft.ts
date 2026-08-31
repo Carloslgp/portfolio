@@ -8,28 +8,30 @@ const TIDE_CALM_FALLBACK = 420;
 /** Rede de segurança para um `transitionend` perdido ou uma camada sem transição. */
 const TIDE_TRANSITION_TIMEOUT = 2200;
 
-// Do not let the tides depart underneath the browser's cross-document
-// snapshot. The event is captured as soon as this module runs; unsupported
-// browsers resolve immediately and the timeout prevents an implementation bug
-// from ever holding the water curtain indefinitely.
+// O desktop ainda usa o cross-fade nativo entre documentos; capture o evento
+// assim que o módulo carregar para a cortina não abrir sob o snapshot. No
+// mobile essa transição não existe e a promessa resolve imediatamente.
 const pageRevealFinished = new Promise<void>((resolve) => {
-  if (!('onpagereveal' in window)) {
+  const usesNativeTransition = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (!usesNativeTransition || !('onpagereveal' in window)) {
     resolve();
     return;
   }
 
-  let finished = false;
+  let settled = false;
   const done = () => {
-    if (finished) return;
-    finished = true;
+    if (settled) return;
+    settled = true;
     resolve();
   };
 
   window.addEventListener('pagereveal', (event) => {
-    const transition = (event as any).viewTransition;
-    if (transition) void transition.finished.catch(() => {}).then(done);
+    const nativeTransition = (event as any).viewTransition;
+    if (nativeTransition) void nativeTransition.finished.catch(() => {}).then(done);
     else done();
   }, { once: true });
+
+  // Compatibilidade para navegadores que expõem o evento mas não o disparam.
   window.setTimeout(done, 700);
 });
 

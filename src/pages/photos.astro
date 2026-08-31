@@ -150,12 +150,17 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
             // arquivo. A correção de aspecto acontece junto com o recuo, no
             // bundle; aqui só importa pintar o mesmo quadro da home antes de o
             // navegador ter uma chance de mostrar o documento.
-            const w = Math.max(innerWidth, innerHeight * seamAspect) * seamOverscan;
+            const visual = window.visualViewport;
+            const viewportW = visual && Math.abs(visual.scale - 1) < 0.01
+              ? visual.width : innerWidth;
+            const viewportH = visual && Math.abs(visual.scale - 1) < 0.01
+              ? visual.height : innerHeight;
+            const w = Math.max(viewportW, viewportH * seamAspect) * seamOverscan;
             const h = w / seamAspect;
             hero.style.width = `${w}px`;
             hero.style.height = `${h}px`;
-            hero.style.left = `${(innerWidth - w) / 2}px`;
-            hero.style.top = `${(innerHeight - h) / 2}px`;
+            hero.style.left = `${(viewportW - w) / 2}px`;
+            hero.style.top = `${(viewportH - h) / 2}px`;
             hero.src = seamSrc;
           }
         } catch (e) {}
@@ -438,7 +443,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   }
 
   .mural-back {
-    top: 1.5rem;
+    top: calc(1.5rem + env(safe-area-inset-top));
     left: 2rem;
     padding: 0.35rem 0;
     font-size: 0.85rem;
@@ -467,7 +472,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   }
 
   .mural-title {
-    top: 1.6rem;
+    top: calc(1.6rem + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     font-size: 0.8rem;
@@ -480,7 +485,7 @@ const seam = photos.find((p) => p.id === SEAM_PHOTO) ?? null;
   .mural-credit {
     position: fixed;
     right: 2rem;
-    bottom: 1.45rem;
+    bottom: calc(1.45rem + env(safe-area-inset-bottom));
     max-width: 18rem;
     padding: 0.65rem 2.1rem 0.65rem 0.75rem;
     border: 1px solid rgba(255, 255, 255, 0.16);

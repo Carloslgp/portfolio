@@ -2,6 +2,7 @@
 // seção ativa; dispara 'carousel:step' / 'carousel:mode' de volta pro Carousel.
 import { SECTIONS } from '../components/carousel/config';
 import { reducedMotion } from './motion';
+import { viewportSize } from './viewport';
 
 export function initUI() {
   const label = document.querySelector<HTMLElement>('[data-active-label]');
@@ -51,7 +52,8 @@ function initCursor() {
   const cursor = document.querySelector<HTMLElement>('[data-cursor]');
   if (!cursor) return;
 
-  const mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  const viewport = viewportSize();
+  const mouse = { x: viewport.width / 2, y: viewport.height / 2 };
   const pos = { ...mouse };
   let shown = false;
 

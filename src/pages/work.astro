@@ -389,11 +389,11 @@ function hasDetails(entry: Entry) {
   import { initTheme } from '../scripts/theme';
   import { initWorkGallery } from '../scripts/workGallery';
   import { initWork } from '../scripts/work';
-  import { initWorkPanels } from '../scripts/workPanels';
+  import { initPanels } from '../scripts/panels';
 
   initTheme();
   initWorkGallery();
-  initWorkPanels();
+  initPanels({ tabs: '[data-work-tabs]', track: '[data-work-track]', rail: '[data-work-rail]' });
   initWork();
 </script>
 
@@ -952,7 +952,7 @@ function hasDetails(entry: Entry) {
     width: 100%;
   }
 
-  /* A altura do rail é a do painel ATIVO, medida pelo workPanels.ts.
+  /* A altura do rail é a do painel ATIVO, medida pelo panels.ts.
      Sem isto, os dois painéis ficam lado a lado numa fileira flex e a fileira
      fica com a altura do MAIOR: o grupo "Career" tem três entradas com lista de
      contribuições e é quase o dobro do outro, então a aba dos projetos herdava
@@ -990,7 +990,7 @@ function hasDetails(entry: Entry) {
 
   /* O portão de movimento do site (motion.ts), que é uma escolha do usuário e
      não a preferência do sistema — o @media lá embaixo não a enxerga. Quem
-     carimba é o workPanels.ts, com o mesmo booleano que já decide não animar
+     carimba é o panels.ts, com o mesmo booleano que já decide não animar
      as linhas do painel que entra. */
   :global(html[data-work-panels]) .work-rail[data-still] {
     transition: none;

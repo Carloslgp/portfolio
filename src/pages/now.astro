@@ -15,7 +15,7 @@
 // site tem: não há nada a sincronizar.
 import Layout from '../layouts/Layout.astro';
 import { NOW_SEAM, NOW_TZ } from '../scripts/nowNavigation';
-import { ASIDES, LEAD, NOW_NOTE, PLACE, STRANDS, UPDATED } from '../data/now';
+import { ASIDES, HORIZONS, LEAD, NOW_NOTE, PANELS, PLACE, STRANDS, UPDATED } from '../data/now';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -28,6 +28,29 @@ const MONTHS = [
 function month(value: string): string {
   const [year, m] = value.split('-');
   return m ? `${MONTHS[Number(m) - 1]} ${year}` : year;
+}
+
+/** A página em passos de animação, na mesma contagem da /work.
+ *
+ *  O passo 1 é a fileira de abas: ela ocupa altura entre o cabeçalho e a lista,
+ *  então precisa ocupar tempo também — senão a primeira linha entra antes do
+ *  controle que a comanda. O 2 é a nota do painel, e as linhas começam no 3. */
+const TABS_STEP = 1;
+const NOTE_STEP = TABS_STEP + 1;
+
+/** Quantas linhas do painel de abertura entram escalonadas com a cortina.
+ *
+ *  Só o painel que a página abre mostrando entra escalonado: o outro nasce fora
+ *  da tela, e animar quem ninguém vê é composição pura. Três porque a conta
+ *  muda com a tela — num notebook baixo a terceira já fica fora, num monitor
+ *  alto ela está lá, e uma linha visível que NÃO entra escalonada aparece mais
+ *  do que uma invisível que entra. */
+const REVEAL_ROWS = 3;
+
+/** O passo de uma linha do primeiro painel, ou null pra quem não é animado:
+ *  as linhas de baixo da dobra e o painel inteiro que nasce fora da tela. */
+function step(panel: number, row: number): number | null {
+  return panel === 0 && row < REVEAL_ROWS ? NOTE_STEP + 1 + row : null;
 }
 ---
 
@@ -70,6 +93,16 @@ function month(value: string): string {
       document.documentElement.style.setProperty('--now-overscan', nowOverscan);
       document.documentElement.style.setProperty('--now-rotation', nowRotation + 'deg');
       document.documentElement.style.setProperty('--now-drift', nowDrift + 'dvh');
+      /* A marca que liga o modo painel, igual à da /work: a página vira duas
+         telas que deslizam, em vez de duas listas empilhadas. Ela nasce AQUI,
+         antes do primeiro paint, e não no bundle — recortar a página em duas
+         depois do primeiro quadro é um salto de layout visível pra quem entra
+         por link direto (quem vem do anel não veria, porque a cortina cobre).
+
+         E ela nasce do JS de propósito: sem script as abas não trocam nada, e
+         uma página presa numa aba mostrando metade do que tem seria conteúdo
+         perdido. Sem a marca o CSS devolve as duas listas em sequência. */
+      document.documentElement.dataset.nowPanels = '';
       try {
         if (sessionStorage.getItem('portfolio:now-entry')) {
           sessionStorage.removeItem('portfolio:now-entry');
@@ -141,38 +174,127 @@ function month(value: string): string {
 
         <div class="now-title is-arriving" style="--i:0">
           <p class="eyebrow">Now</p>
-          <h1>What I’m doing</h1>
+          <h1>Now, and next</h1>
           <p class="lead">{LEAD}</p>
         </div>
       </header>
 
-      <ol class="strands">
-        {STRANDS.map((strand, i) => (
-          <li class="strand is-arriving" style={`--i:${i + 1}`}>
-            <p class="strand-label">{strand.label}</p>
-            <div class="strand-body">
-              <h2>
-                {strand.href
-                  ? <a href={strand.href} target="_blank" rel="noopener noreferrer">{strand.title}</a>
-                  : strand.title}
-              </h2>
-              {strand.since && <p class="strand-since">Since {month(strand.since)}</p>}
-              <p>{strand.body}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      {/* ——— as duas abas ———
+          A mesma fileira da /work, na mesma voz de versalete, e pelo mesmo
+          motivo: é um CONTROLE, e um controle que grita compete com o título
+          pela hierarquia. O que separa a ativa da outra é opacidade e a régua
+          embaixo, não tamanho — trocar de aba não pode mudar a altura da linha.
 
-      <ul class="asides is-arriving" style={`--i:${STRANDS.length + 1}`}>
-        {ASIDES.map((aside) => (
-          <li class="aside">
-            <span class="aside-label">{aside.label}</span>
-            <span class="aside-body">{aside.body}</span>
-          </li>
+          Aqui elas fazem uma coisa a mais do que fazem lá: são o TEMPO VERBAL
+          da lista embaixo delas. "Now" é relato, "Next" é intenção, e ler as
+          duas de seguida como uma lista só seria a página prometendo no mesmo
+          tom em que ela conta. */}
+      <div
+        class:list={['now-tabs', 'is-arriving']}
+        style={`--i:${TABS_STEP}`}
+        role="tablist"
+        aria-label="What is happening now, and what comes next"
+        data-now-tabs
+      >
+        {PANELS.map((panel, i) => (
+          <button
+            class="tab"
+            type="button"
+            role="tab"
+            id={`now-tab-${panel.id}`}
+            aria-controls={`now-panel-${panel.id}`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+          >
+            {panel.label}
+          </button>
         ))}
-      </ul>
+        {/* A régua acompanha a aba ativa. A medida vem do JS (offsetLeft e
+            offsetWidth da aba) porque as duas têm larguras diferentes e o
+            rótulo é conteúdo — deduzir a posição no CSS exigiria congelar a
+            largura, que é a única coisa que não posso prometer sobre texto. */}
+        <span class="tab-rule" aria-hidden="true"></span>
+      </div>
 
-      <footer class="now-foot is-arriving" style={`--i:${STRANDS.length + 2}`}>
+      <div class="now-track" data-now-track>
+        <div class="now-rail" data-now-rail>
+          {PANELS.map((panel, index) => (
+            <section
+              class="now-panel"
+              role="tabpanel"
+              id={`now-panel-${panel.id}`}
+              aria-labelledby={`now-tab-${panel.id}`}
+              tabindex="0"
+            >
+              <div class="now-column">
+                <p
+                  class:list={['panel-note', index === 0 && 'is-arriving']}
+                  style={index === 0 ? `--i:${NOTE_STEP}` : undefined}
+                >
+                  {panel.note}
+                </p>
+
+                {panel.id === 'now' ? (
+                  <>
+                    <ol class="strands">
+                      {STRANDS.map((strand, row) => (
+                        <li
+                          class:list={['strand', step(index, row) !== null && 'is-arriving']}
+                          style={`--row:${row + 1}${step(index, row) !== null ? `;--i:${step(index, row)}` : ''}`}
+                        >
+                          <p class="strand-label">{strand.label}</p>
+                          <div class="strand-body">
+                            <h2>
+                              {strand.href
+                                ? <a href={strand.href} target="_blank" rel="noopener noreferrer">{strand.title}</a>
+                                : strand.title}
+                            </h2>
+                            {strand.since && <p class="strand-since">Since {month(strand.since)}</p>}
+                            <p>{strand.body}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+
+                    <ul class="asides">
+                      {ASIDES.map((aside, row) => (
+                        <li class="aside" style={`--row:${STRANDS.length + 1 + row}`}>
+                          <span class="aside-label">{aside.label}</span>
+                          <span class="aside-body">{aside.body}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : HORIZONS.length > 0 ? (
+                  <ol class="strands">
+                    {HORIZONS.map((horizon, row) => (
+                      <li class="strand" style={`--row:${row + 1}`}>
+                        <p class="strand-label">{horizon.label}</p>
+                        <div class="strand-body">
+                          <h2>
+                            {horizon.href
+                              ? <a href={horizon.href} target="_blank" rel="noopener noreferrer">{horizon.title}</a>
+                              : horizon.title}
+                          </h2>
+                          {/* "By", e não "Since": é a única palavra que separa
+                              esta lista da outra linha por linha, e ela é o que
+                              impede uma data futura de ser lida como currículo
+                              já cumprido. Horizonte sem data não ganha linha
+                              nenhuma — ver o comentário do `when` em data/now.ts. */}
+                          {horizon.when && <p class="strand-since">By {month(horizon.when)}</p>}
+                          <p>{horizon.body}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+
+      <footer class="now-foot">
         <p>{NOW_NOTE}</p>
         <p class="now-doors">
           <a href="/work">the record</a>
@@ -216,8 +338,10 @@ function month(value: string): string {
 <script>
   import { initTheme } from '../scripts/theme';
   import { initNow } from '../scripts/now';
+  import { initPanels } from '../scripts/panels';
 
   initTheme();
+  initPanels({ tabs: '[data-now-tabs]', track: '[data-now-track]', rail: '[data-now-rail]' });
   initNow();
 </script>
 
@@ -372,19 +496,26 @@ function month(value: string): string {
         rgba(120, 138, 158, 0) 82%);
   }
 
-  /* ——— a página ——— */
+  /* ——— a página ———
+     A coluna de leitura virou variável, como na /work, porque agora duas coisas
+     precisam dela: o miolo, que vive dentro dela, e o trilho dos painéis, que
+     SANGRA pra fora e depois devolve o texto a ela. Com a medida em dois
+     lugares, o dia em que a coluna mudar é o dia em que o painel que sai passa a
+     evaporar no lugar errado. O gutter saiu do padding da página e entrou na
+     conta da coluna pelo mesmo motivo — o sangramento mede a partir dela. */
   .now-page {
+    --column: min(100% - 4rem, 46rem);
     position: relative;
     z-index: 1;
     min-height: 100dvh;
-    padding: clamp(5.5rem, 12vh, 9rem) 2rem clamp(4rem, 10vh, 7rem);
+    padding: clamp(5.5rem, 12vh, 9rem) 0 clamp(4rem, 10vh, 7rem);
     color: var(--ink);
     transition: color var(--theme-fade);
   }
 
   .now-inner {
-    max-width: 46rem;
-    margin: 0 auto;
+    width: var(--column);
+    margin-inline: auto;
   }
 
   .now-stamp {
@@ -455,13 +586,198 @@ function month(value: string): string {
     transition: color var(--theme-fade);
   }
 
+  /* ——— as abas ———
+     O mesmo desenho das abas da /work, e isso é o ponto: é o mesmo controle,
+     então tem que ser o mesmo controle. Duas fileiras de abas desenhadas
+     diferente no mesmo site seriam dois vocabulários pra uma ideia só — a mesma
+     disciplina que já vale pro "‹ Back" nesta página.
+
+     O que difere é UM número, o espaço debaixo da fileira, e ele difere porque
+     aqui há uma nota logo abaixo (ver o .now-tabs) — lá embaixo da fileira
+     começa uma lista, que não briga com o fio pela vizinhança. Se a /work
+     ganhar uma nota um dia, o número volta a ser o mesmo nas duas. */
+  .now-tabs {
+    position: relative;
+    display: flex;
+    gap: clamp(1.1rem, 3vw, 2rem);
+    align-items: center;
+    margin-top: clamp(2.4rem, 6vh, 3.6rem);
+    /* O espaço embaixo saiu do PADDING e virou MARGEM, e a diferença é a régua:
+       ela mora no `bottom: 0` desta caixa, então todo padding de baixo é
+       distância entre o rótulo e o fio dele. Com os 21px que havia aqui, o fio
+       ficava a um respiro da nota em itálico e a três da palavra "NOW" — e um
+       fio lê como pertencendo ao que está mais perto. Ele volta pra debaixo da
+       aba; o ar que a lista precisa vira margem, que a régua não enxerga. */
+    margin-bottom: clamp(1.5rem, 3.6vh, 2.2rem);
+    padding: clamp(0.65rem, 2.1vh, 1.4rem) 0 0.5rem;
+  }
+
+  .tab {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.2rem 0;
+    border: 0;
+    background: transparent;
+    color: rgba(var(--ink-rgb), 0.42);
+    font: inherit;
+    font-size: clamp(0.62rem, 1.5vw, 0.68rem);
+    font-weight: 650;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 200ms ease;
+  }
+
+  .tab:hover {
+    color: rgba(var(--ink-rgb), 0.7);
+  }
+
+  .tab[aria-selected='true'] {
+    color: var(--ink);
+    cursor: default;
+  }
+
+  /* O único fio horizontal da página. Ele não decora: é a resposta à pergunta
+     "qual das duas estou lendo" — que aqui é a pergunta "em que tempo verbal
+     estou". As bordas dos fios correm no outro eixo e dizem outra coisa
+     ("isto é uma lista"), então os dois não competem. */
+  .tab-rule {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: var(--rule-width, 0);
+    transform: translateX(var(--rule-x, 0));
+    background: var(--ink);
+    transition:
+      transform 480ms cubic-bezier(0.2, 0.86, 0.24, 1),
+      width 480ms cubic-bezier(0.2, 0.86, 0.24, 1),
+      background-color var(--theme-fade);
+  }
+
+  /* Antes da primeira medida a régua não tem onde estar, e nascer com largura
+     zero no canto esquerdo faria ela DESLIZAR do nada até a primeira aba no
+     carregamento. Fica escondida até o JS medir. */
+  .now-tabs:not([data-ready]) .tab-rule {
+    opacity: 0;
+  }
+
+  /* ——— o trilho ———
+     A janela recorta; quem anda é o rail. O rail tem a largura da janela e os
+     painéis TRANSBORDAM dele (flex: 0 0 100% de 100%), e é isso que faz
+     translateX(-100%) valer exatamente um painel — se o rail medisse a soma dos
+     painéis, cada -100% pularia os dois de uma vez.
+
+     E ele SANGRA pra fora da coluna, até a tela inteira: recortado nas 46rem da
+     coluna, o painel que sai evaporaria a meia tela da borda do monitor, com
+     página em branco depois dele — a troca leria como um cartão desaparecendo
+     no meio da tela, não como uma tela dando lugar à outra. A conta devolve
+     exatamente a largura que a coluna tirou, dos dois lados. */
+  .now-track {
+    min-height: 0;
+  }
+
+  :global(html[data-now-panels]) .now-track {
+    overflow: hidden;
+    margin-inline: calc(50% - 50vw);
+  }
+
+  .now-rail {
+    display: flex;
+    width: 100%;
+  }
+
+  /* A altura do rail é a do painel ATIVO, medida pelo panels.ts. Sem isto, os
+     dois ficam lado a lado numa fileira flex e a fileira fica com a altura do
+     MAIOR: o "Now" carrega os fios E as coisas leves, então o "Next" herdaria
+     algumas centenas de pixels de branco no fim da página — rolagem que não
+     leva a lugar nenhum. `align-items: start` é o que impede o painel curto de
+     ser esticado até lá.
+
+     A altura entra na mesma transição do deslize, e com a mesma curva: os dois
+     acontecem no mesmo gesto, e uma página que muda de tamanho num degrau
+     enquanto o conteúdo desliza lê como dois eventos em vez de um. */
+  :global(html[data-now-panels]) .now-rail {
+    align-items: start;
+    height: var(--rail-height, auto);
+    transform: translate3d(calc(var(--panel, 0) * -100% + var(--drag, 0px)), 0, 0);
+    transition:
+      transform var(--slide-dur, 620ms) cubic-bezier(0.5, 0, 0.15, 1),
+      height var(--slide-dur, 620ms) cubic-bezier(0.5, 0, 0.15, 1);
+  }
+
+  /* Enquanto o dedo está na tela o rail SEGUE o dedo: uma transição aqui
+     colocaria um atraso entre o toque e o desenho, que é a diferença entre
+     arrastar uma coisa e pedir pra ela ir. */
+  :global(html[data-now-panels]) .now-rail.is-dragging {
+    transition: none;
+  }
+
+  /* O portão de movimento do site (motion.ts), que é escolha do usuário e não
+     preferência do sistema — o @media lá embaixo não a enxerga. Quem carimba é
+     o panels.ts, com o mesmo booleano que já decide não animar as linhas. */
+  :global(html[data-now-panels]) .now-rail[data-still] {
+    transition: none;
+  }
+
+  .now-panel {
+    min-width: 0;
+  }
+
+  :global(html[data-now-panels]) .now-panel {
+    flex: 0 0 100%;
+    /* o gesto vertical rola a página; o horizontal continua sendo nosso */
+    touch-action: pan-y;
+  }
+
+  :global(html[data-now-panels]) .now-panel:focus-visible {
+    outline: 2px solid rgba(var(--ink-rgb), 0.4);
+    outline-offset: -2px;
+  }
+
+  /* O trilho sangra pra tela inteira; quem devolve o texto à coluna de leitura
+     é esta caixa, aqui dentro. */
+  :global(html[data-now-panels]) .now-column {
+    width: var(--column);
+    margin-inline: auto;
+  }
+
+  /* Sem script os dois painéis ficam empilhados, um depois do outro, e a página
+     rola como qualquer outra. */
+  :global(html:not([data-now-panels])) .now-rail {
+    display: block;
+  }
+
+  :global(html:not([data-now-panels])) .now-panel + .now-panel {
+    margin-top: clamp(2.4rem, 6vh, 3.6rem);
+  }
+
+  /* A linha que enquadra a lista. No "Next" ela é o aviso legal da metade
+     inteira, e por isso não é opcional: sem ela, cinco coisas boas escritas no
+     futuro leem como currículo antecipado. Playfair itálico, o mesmo aparte
+     serifado do .badge da /work e do verso no Songs — trocar de tipo já diz
+     "isto não é o corpo do texto", e diz sem acrescentar linha nenhuma. */
+  .panel-note {
+    max-width: 32rem;
+    color: rgba(var(--ink-rgb), 0.55);
+    font-family: "Playfair Display", Georgia, serif;
+    font-style: italic;
+    font-size: clamp(0.9rem, 1.9vw, 0.98rem);
+    line-height: 1.5;
+    transition: color var(--theme-fade);
+  }
+
   /* ——— os fios ———
      Duas colunas: o verbo à esquerda, sempre na mesma coluna, e o corpo à
      direita. A coluna do verbo é o que faz a página se ler como uma lista de
      coisas ACONTECENDO — os rótulos ficam alinhados um embaixo do outro e dá
-     pra varrer só eles. */
+     pra varrer só eles. A mesma forma serve às duas abas de propósito: o que
+     muda de uma pra outra é o tempo verbal, não o desenho, e desenhar o futuro
+     diferente sugeriria que ele é outro tipo de coisa. */
   .strands {
-    margin-top: clamp(2.8rem, 7vh, 4.5rem);
+    margin-top: clamp(1.4rem, 3.5vh, 2.2rem);
     list-style: none;
   }
 
@@ -552,6 +868,34 @@ function month(value: string): string {
     transition: color var(--theme-fade);
   }
 
+  /* ——— a troca de painel ———
+     O rail desliza inteiro, mas um retângulo rígido voando pro lado lê como
+     cartão sendo empurrado, não como página trocando. Então as linhas do painel
+     que ENTRA assentam um pouco atrás do rail, escalonadas, e vindo do lado de
+     onde o painel veio: --dir é +1 quando ele entra pela direita e -1 pela
+     esquerda.
+
+     É ATRASO, não aparição: nada aqui mexe em opacidade. Uma linha que nasce
+     transparente no meio da tela surge do nada, que é o contrário de entrar
+     pela borda — o painel inteiro atravessa opaco, e o escalonamento só faz as
+     linhas arrastarem um pouco atrás dele.
+
+     O teto do escalonamento (o min) existe porque ele mede posição na lista, e
+     numa lista longa o atraso da última linha passaria da duração do próprio
+     deslize — a linha assentaria depois de o painel já ter chegado. */
+  @keyframes row-settle {
+    from {
+      transform: translate3d(calc(var(--dir, 1) * 24px), 0, 0);
+    }
+  }
+
+  .now-panel.is-entering .panel-note,
+  .now-panel.is-entering .strand,
+  .now-panel.is-entering .aside {
+    animation: row-settle 460ms cubic-bezier(0.2, 0.86, 0.24, 1) backwards;
+    animation-delay: calc(min(var(--row, 0), 7) * 30ms + 40ms);
+  }
+
   .now-foot {
     margin-top: clamp(3rem, 8vh, 5rem);
     color: rgba(var(--ink-rgb), 0.6);
@@ -592,19 +936,41 @@ function month(value: string): string {
     transition: color var(--theme-fade);
   }
 
-  .back:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  /* O mesmo fio da /work, e não um `text-decoration` no :hover: o sublinhado
+     do texto nasce e morre de um quadro pro outro, e num canto onde nada mais
+     se mexe isso lê como se o botão não tivesse respondido ao mouse. O fio
+     CRESCE, e cresce da esquerda — a direção pra onde o link leva. */
+  .back::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .back:hover::after,
+  .back:focus-visible::after {
+    transform: scaleX(1);
   }
 
   /* ——— o botão de tema ———
-     As mesmas regras da /work, porque é o mesmo botão: a marca do tema fica na
-     mesma quina, no mesmo tamanho, em toda página que não é a home. O markup
-     tinha vindo junto e o estilo não — sem ele, o que sobrava era o botão
-     nativo do navegador com dois SVGs empilhados dentro. */
+     O mesmo botão da /work — mesmo tamanho, mesma quina da direita —, mas na
+     beira de BAIXO. O topo desta página é por onde a hora gigante desce e
+     pousa; é o único quadro que não pode ter um controle piscando na quina
+     disputando o olho com ela. Descendo, ele sai da rota do pouso e ainda fica
+     onde o polegar já está no telefone.
+
+     `env(safe-area-inset-bottom)` no lugar do -top pelo mesmo motivo de lá: o
+     iPhone tem a barra de gestos embaixo, e um botão colado nela é um botão que
+     o sistema intercepta antes da página. */
   .theme {
     position: fixed;
-    top: calc(1.3rem + env(safe-area-inset-top));
+    bottom: calc(1.3rem + env(safe-area-inset-bottom));
     right: 1.5rem;
     z-index: 6;
     width: 44px;
@@ -750,13 +1116,22 @@ function month(value: string): string {
   }
 
   @media (max-width: 46rem) {
+    /* O gutter mora na coluna, e não no padding da página: quem sangra pra
+       fora dela precisa saber exatamente quanto ela tirou. */
     .now-page {
-      padding-left: 1.4rem;
-      padding-right: 1.4rem;
+      --column: min(100% - 2.8rem, 46rem);
     }
 
     .back {
       left: 1.4rem;
+    }
+
+    .now-tabs {
+      gap: 0.9rem;
+    }
+
+    .tab {
+      letter-spacing: 0.1em;
     }
 
     .theme {
@@ -794,5 +1169,27 @@ function month(value: string): string {
     opacity: 1;
     transform: none;
     transition: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .back::after,
+    .is-arriving,
+    .tab-rule {
+      transition: none;
+    }
+
+    /* O [data-now-panels] repetido não é enfeite: a regra que LIGA o deslize é
+       `html[data-now-panels] .now-rail`, e media query não acrescenta
+       especificidade nenhuma — um `.now-rail` pelado aqui perde a disputa e a
+       transição continua rodando. */
+    :global(html[data-now-panels]) .now-rail {
+      transition: none;
+    }
+
+    .now-panel.is-entering .panel-note,
+    .now-panel.is-entering .strand,
+    .now-panel.is-entering .aside {
+      animation: none;
+    }
   }
 </style>

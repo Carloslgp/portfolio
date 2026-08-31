@@ -1,10 +1,10 @@
-// src/scripts/workPanels.ts — as duas telas da /work e a troca entre elas.
+// src/scripts/panels.ts — duas telas na mesma página, e a troca entre elas.
 //
-// A página rola de cima a baixo como qualquer outra; o que é horizontal aqui é
-// só a TROCA de grupo — um painel sai pra esquerda enquanto o outro entra pela
-// direita. O desenho inteiro (o recorte, o deslize, a régua embaixo da aba)
-// vive no CSS da work.astro; o que este arquivo faz é o que CSS não faz
-// sozinho:
+// A /work e a /now dividem este arquivo porque dividem o desenho: a página rola
+// de cima a baixo como qualquer outra, e o que é horizontal é só a TROCA de
+// grupo — um painel sai pra esquerda enquanto o outro entra pela direita. O
+// desenho inteiro (o recorte, o deslize, a régua embaixo da aba) vive no CSS de
+// cada página; o que este arquivo faz é o que CSS não faz sozinho:
 //
 //   • dizer QUAL painel está na tela (--panel no rail)
 //   • dar ao rail a altura do painel ativo, senão a fileira flex fica com a
@@ -15,8 +15,14 @@
 //   • medir a régua, porque a largura das abas é texto e texto não se prevê
 //   • o arrasto no toque
 //
-// O modo painel em si é ligado antes do primeiro paint, pelo script inline da
-// work.astro (html[data-work-panels]). Aqui já se assume ligado.
+// O modo painel em si é ligado antes do primeiro paint, pelo script inline de
+// cada página (html[data-work-panels], html[data-now-panels]). Aqui já se
+// assume ligado.
+//
+// O que este arquivo NÃO sabe é o nome das coisas: os seletores chegam por
+// parâmetro, e as classes que ele acende (is-entering, is-dragging) são
+// respondidas pelo CSS de cada página. Duas cópias deste comportamento seriam
+// duas chances de o arrasto da /now e o da /work divergirem no próximo ajuste.
 
 import { storedMotionMode } from './motion';
 
@@ -35,10 +41,18 @@ const DRAG_FLICK = 0.45;
  *  ia rolar o painel. */
 const DRAG_INTENT = 10;
 
-export function initWorkPanels() {
-  const tabs = document.querySelector<HTMLElement>('[data-work-tabs]');
-  const track = document.querySelector<HTMLElement>('[data-work-track]');
-  const rail = document.querySelector<HTMLElement>('[data-work-rail]');
+/** As três peças da página, por seletor: a fileira de abas, a janela que
+ *  recorta, e a fileira que anda por dentro dela. */
+export interface PanelDeck {
+  tabs: string;
+  track: string;
+  rail: string;
+}
+
+export function initPanels(deck: PanelDeck) {
+  const tabs = document.querySelector<HTMLElement>(deck.tabs);
+  const track = document.querySelector<HTMLElement>(deck.track);
+  const rail = document.querySelector<HTMLElement>(deck.rail);
   if (!tabs || !track || !rail) return;
 
   const buttons = [...tabs.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
@@ -77,10 +91,10 @@ export function initWorkPanels() {
   /** Dá ao rail a altura do painel ATIVO.
    *
    *  Os dois painéis são uma fileira flex, e uma fileira flex tem a altura do
-   *  maior: sem esta medida, a aba dos projetos herdaria a altura do "Career",
-   *  que é quase o dobro, e a página terminaria em centenas de pixels de branco
-   *  que rolam pra lugar nenhum. O CSS não consegue perguntar "qual dos meus
-   *  filhos está selecionado e quanto ele mede" — daqui é uma linha.
+   *  maior: sem esta medida, o grupo curto herdaria a altura do longo e a
+   *  página terminaria em centenas de pixels de branco que rolam pra lugar
+   *  nenhum. O CSS não consegue perguntar "qual dos meus filhos está
+   *  selecionado e quanto ele mede" — daqui é uma linha.
    *
    *  offsetHeight e não scrollHeight: o painel não rola por dentro (é a página
    *  que rola), então a caixa dele JÁ é o conteúdo inteiro — e scrollHeight

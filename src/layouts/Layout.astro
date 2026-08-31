@@ -47,6 +47,14 @@ const { lang = 'en' } = Astro.props;
           document.documentElement.dataset.theme = 'dark';
       } catch (e) {}
     </script>
+    <!-- A medida da área visível vira variável CSS aqui, uma vez por documento:
+         as camadas de tela cheia e a cena WebGL precisam da MESMA caixa, e no
+         celular `dvh` sozinho não dá conta (ver scripts/viewport.ts). Fica no
+         Layout porque toda rota tem uma emenda de tela cheia. -->
+    <script>
+      import { watchViewport } from '../scripts/viewport';
+      watchViewport();
+    </script>
     <slot name="head" />
   </head>
   <body>

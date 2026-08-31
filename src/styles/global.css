@@ -97,6 +97,13 @@
   --viewport-w: 100vw;
   --viewport-h: 100vh;
 
+  /* O quanto a área visível está deslocada DENTRO da caixa em que o navegador
+     ancora `position: fixed`. Zero em toda parte — menos no Safari do iPhone,
+     onde as duas se separam (scripts/viewport.ts escreve o valor medido, e a
+     regra html[data-viewport-inset] lá embaixo explica o resto). */
+  --viewport-top: 0px;
+  --viewport-left: 0px;
+
   /* ——— o tamanho da hora gigante da emenda com /now ———
      Uma medida de PÁGINA morando no arquivo global, e o motivo é o mesmo do
      data/gallery.ts: ela é um acordo entre DOIS documentos, não detalhe de um
@@ -184,6 +191,26 @@ body {
   /* o gesto lateral do trackpad gira o carrossel; sem isto o navegador ainda
      o interpreta como overscroll e dispara "voltar página" no meio do arrasto */
   overscroll-behavior: none;
+}
+
+/* ——— a UI subindo e a faixa vazia embaixo, no celular ———
+   A caixa em que o navegador ancora `position: fixed` deveria ser a área
+   visível, e no Safari do iPhone às vezes não é: numa página que não rola (é o
+   caso do carrossel — o `overflow: hidden` do body acima), as barras nunca
+   recolhem, e a caixa do `fixed` continua sendo a TELA INTEIRA, começando atrás
+   da barra de endereço. Toda camada de tela cheia nasce então alto demais: a UI
+   sobe pra debaixo da barra e sobra uma faixa de papel vazio embaixo.
+
+   scripts/viewport.ts mede a diferença (visualViewport.offsetTop) e só liga
+   este atributo quando ela existe E a página realmente não rola. O `transform`
+   faz do body o bloco contenedor de todo `fixed` de dentro, e a altura medida
+   fecha a caixa: a partir daí `top`, `bottom` e as camadas de tela cheia todas
+   se resolvem contra exatamente o que se vê. Sem o atributo — desktop, Android,
+   e o próprio iPhone no estado normal — nada disto existe. */
+html[data-viewport-inset] body {
+  height: var(--viewport-h);
+  min-height: var(--viewport-h);
+  transform: translate(var(--viewport-left), var(--viewport-top));
 }
 
 body {

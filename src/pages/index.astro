@@ -511,7 +511,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      beirada de uma rolagem com overscroll. */
   .paper {
     position: fixed;
-    inset: 0;
+    inset: var(--viewport-inset);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 0;
@@ -522,7 +522,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
 
   #scene {
     position: fixed;
-    inset: 0;
+    inset: var(--viewport-inset);
     width: var(--viewport-w);
     height: var(--viewport-h);
     display: block;
@@ -570,7 +570,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      janela sem passar por JS. */
   .work-portal {
     position: fixed;
-    inset: 0;
+    inset: var(--viewport-inset);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 14;
@@ -668,7 +668,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      still sheet into moving horizontal bands. */
   .craft-portal {
     position: fixed;
-    inset: 0;
+    inset: var(--viewport-inset);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 14;
@@ -800,7 +800,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      documentos precisam ser indistinguíveis. */
   .now-portal {
     position: fixed;
-    inset: 0;
+    inset: var(--viewport-inset);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 14;
@@ -896,7 +896,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   /* cortina de carregamento — acima de tudo (canvas 1, cursor 2, overlay 3) */
   .loader {
     position: fixed;
-    inset: 0;
+    inset: var(--viewport-inset);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 10;
@@ -1055,7 +1055,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   /* fundo gigante atrás do canvas */
   .bg-portfolio {
     position: fixed;
-    inset: 0;
+    inset: var(--viewport-inset);
     z-index: 0;
     display: flex;
     align-items: flex-start;
@@ -1074,7 +1074,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   /* overlay: transparente a clique; só filhos interativos capturam */
   .overlay {
     position: fixed;
-    inset: 0;
+    inset: var(--viewport-inset);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 3;
@@ -1087,8 +1087,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
 
   .intro {
     position: fixed;
-    top: calc(2rem + env(safe-area-inset-top));
-    left: 50%;
+    top: calc(2rem + max(env(safe-area-inset-top), var(--viewport-top)));
+    left: calc(var(--viewport-left) + var(--viewport-w) / 2);
     z-index: 4;
     font-size: 0.9rem;
     font-weight: 400;
@@ -1132,7 +1132,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      comportamento certo se o JS não rodar, já que estariam vazios. */
   .hud {
     position: fixed;
-    top: calc(2rem + env(safe-area-inset-top));
+    top: calc(2rem + max(env(safe-area-inset-top), var(--viewport-top)));
     z-index: 4;
     font-size: 0.8rem;
     line-height: 1.55;
@@ -1150,7 +1150,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   }
 
   .clock {
-    left: 2rem;
+    left: calc(2rem + var(--viewport-left));
     letter-spacing: 0.06em;
     /* dígitos de mesma largura: a virada do minuto não empurra o ", Curitiba" */
     font-variant-numeric: tabular-nums;
@@ -1161,7 +1161,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   }
 
   .quote {
-    right: 2rem;
+    right: calc(2rem + var(--viewport-right));
     max-width: min(26ch, 26vw);
     text-align: right;
     font-family: "Playfair Display", Georgia, serif;
@@ -1407,8 +1407,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      z-index 11 = acima da cortina (10): dá pra escolher o tema já no portão. */
   .theme {
     position: fixed;
-    right: 2rem;
-    bottom: calc(2.2rem + env(safe-area-inset-bottom));
+    right: calc(2rem + var(--viewport-right));
+    bottom: calc(2.2rem + max(env(safe-area-inset-bottom), var(--viewport-bottom)));
     z-index: 11;
     display: flex;
     align-items: center;
@@ -1782,8 +1782,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      (o offset fixo de 170px do .mode estouraria a largura no celular) */
   @media (max-width: 700px) {
     .intro {
-      top: calc(1.2rem + env(safe-area-inset-top));
-      width: calc(100vw - 2rem);
+      top: calc(1.2rem + max(env(safe-area-inset-top), var(--viewport-top)));
+      width: calc(var(--viewport-w) - 2rem);
       text-align: center;
       white-space: normal;
       font-size: 0.85rem;
@@ -1826,8 +1826,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     /* encosta à esquerda do .mode, na mesma faixa de baixo: o canto direito já
        é dele, e subir o tema pra cima do .mode invadiria a faixa da .quote */
     .theme {
-      right: calc(1rem + 48px + 0.6rem);
-      bottom: calc(1.2rem + env(safe-area-inset-bottom));
+      right: calc(1rem + 48px + 0.6rem + var(--viewport-right));
+      bottom: calc(1.2rem + max(env(safe-area-inset-bottom), var(--viewport-bottom)));
       width: 48px;
       height: 48px;
     }
@@ -1838,14 +1838,14 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
        nada em cima do card. */
     .hud {
       top: auto;
-      bottom: calc(5.4rem + env(safe-area-inset-bottom));
+      bottom: calc(5.4rem + max(env(safe-area-inset-bottom), var(--viewport-bottom)));
     }
     .clock {
-      left: 1rem;
+      left: calc(1rem + var(--viewport-left));
       font-size: 0.72rem;
     }
     .quote {
-      right: 1rem;
+      right: calc(1rem + var(--viewport-right));
       max-width: 56vw;
       font-size: 0.85rem;
     }
@@ -1854,14 +1854,15 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   /* paisagem baixa (celular deitado): comprime os respiros verticais */
   @media (max-height: 480px) {
     .bg-portfolio { padding-top: 1.2rem; }
-    .intro { top: calc(0.8rem + env(safe-area-inset-top)); }
-    .card, .mode, .theme { bottom: calc(1rem + env(safe-area-inset-bottom)); }
+    .intro { top: calc(0.8rem + max(env(safe-area-inset-top), var(--viewport-top))); }
+    .card, .mode { bottom: calc(1rem + env(safe-area-inset-bottom)); }
+    .theme { bottom: calc(1rem + max(env(safe-area-inset-bottom), var(--viewport-bottom))); }
   }
   /* ...e o mesmo para os cantos, só na faixa larga: abaixo de 700px eles já
      estão ancorados embaixo pela regra acima, e mexer no 'top' aqui os traria
      de volta pro topo no meio da tela deitada */
   @media (max-height: 480px) and (min-width: 701px) {
-    .hud { top: calc(0.8rem + env(safe-area-inset-top)); }
+    .hud { top: calc(0.8rem + max(env(safe-area-inset-top), var(--viewport-top))); }
     .quote { max-width: min(26ch, 22vw); font-size: 0.9rem; }
   }
 </style>

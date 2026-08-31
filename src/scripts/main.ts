@@ -18,7 +18,7 @@ import {
 import {
   CRAFT_ENTRY_KEY, CRAFT_HOME_KEY, CRAFT_RETURN_KEY, CRAFT_SEAM, craftSeamBox,
 } from './craftNavigation';
-import { viewportSize } from './viewport';
+import { viewportSize, viewportOffset } from './viewport';
 
 // Desktop keeps the native document cross-fade. Capture it before bootstrap
 // waits for textures so a rebuilt return never rewinds under its snapshot.
@@ -831,10 +831,14 @@ function seamBox(flat: HTMLImageElement): { w: number; h: number } | null {
   const viewport = viewportSize();
   const w = Math.max(viewport.width, viewport.height * aspect) * SEAM_OVERSCAN;
   const h = w / aspect;
+  // A .depart é `position: fixed`, e o zero do fixed não é o canto do que se vê
+  // no celular (ver viewport.ts). Centrar na área visível pede somar a folga —
+  // é a mesma conta que o `inset: var(--viewport-inset)` faz nas outras camadas.
+  const off = viewportOffset();
   flat.style.width = `${w}px`;
   flat.style.height = `${h}px`;
-  flat.style.left = `${(viewport.width - w) / 2}px`;
-  flat.style.top = `${(viewport.height - h) / 2}px`;
+  flat.style.left = `${off.left + (viewport.width - w) / 2}px`;
+  flat.style.top = `${off.top + (viewport.height - h) / 2}px`;
   return { w, h };
 }
 

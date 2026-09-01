@@ -833,7 +833,7 @@ function seamBox(flat: HTMLImageElement): { w: number; h: number } | null {
   const h = w / aspect;
   // A .depart é `position: fixed`, e o zero do fixed não é o canto do que se vê
   // no celular (ver viewport.ts). Centrar na área visível pede somar a folga —
-  // é a mesma conta que o `inset: var(--viewport-inset)` faz nas outras camadas.
+  // é a mesma conta que `--viewport-top/left` faz nas outras camadas.
   const off = viewportOffset();
   flat.style.width = `${w}px`;
   flat.style.height = `${h}px`;

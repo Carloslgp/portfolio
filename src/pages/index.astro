@@ -511,7 +511,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      beirada de uma rolagem com overscroll. */
   .paper {
     position: fixed;
-    inset: var(--viewport-inset);
+    top: var(--viewport-top);
+    left: var(--viewport-left);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 0;
@@ -522,7 +523,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
 
   #scene {
     position: fixed;
-    inset: var(--viewport-inset);
+    top: var(--viewport-top);
+    left: var(--viewport-left);
     width: var(--viewport-w);
     height: var(--viewport-h);
     display: block;
@@ -570,7 +572,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      janela sem passar por JS. */
   .work-portal {
     position: fixed;
-    inset: var(--viewport-inset);
+    top: var(--viewport-top);
+    left: var(--viewport-left);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 14;
@@ -668,7 +671,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      still sheet into moving horizontal bands. */
   .craft-portal {
     position: fixed;
-    inset: var(--viewport-inset);
+    top: var(--viewport-top);
+    left: var(--viewport-left);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 14;
@@ -800,7 +804,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
      documentos precisam ser indistinguíveis. */
   .now-portal {
     position: fixed;
-    inset: var(--viewport-inset);
+    top: var(--viewport-top);
+    left: var(--viewport-left);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 14;
@@ -896,7 +901,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   /* cortina de carregamento — acima de tudo (canvas 1, cursor 2, overlay 3) */
   .loader {
     position: fixed;
-    inset: var(--viewport-inset);
+    top: var(--viewport-top);
+    left: var(--viewport-left);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 10;
@@ -1054,8 +1060,11 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
 
   /* fundo gigante atrás do canvas */
   .bg-portfolio {
-    position: fixed;
-    inset: var(--viewport-inset);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     z-index: 0;
     display: flex;
     align-items: flex-start;
@@ -1074,7 +1083,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   /* overlay: transparente a clique; só filhos interativos capturam */
   .overlay {
     position: fixed;
-    inset: var(--viewport-inset);
+    top: var(--viewport-top);
+    left: var(--viewport-left);
     width: var(--viewport-w);
     height: var(--viewport-h);
     z-index: 3;

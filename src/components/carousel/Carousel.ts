@@ -95,7 +95,9 @@ export class Carousel {
 
     // --- renderer: alpha ligado + clear transparente pra o "PORTFOLIO" do DOM aparecer atrás ---
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    this.renderer.setSize(viewport.width, viewport.height);
+    // `false`: atualiza o buffer, mas não grava width/height inline no canvas.
+    // O tamanho visual pertence ao `dvh` do CSS desde o primeiro paint.
+    this.renderer.setSize(viewport.width, viewport.height, false);
     this.renderer.setPixelRatio(
       Math.min(window.devicePixelRatio, coarse ? GPU.pixelRatioCoarse : GPU.pixelRatio),
     );
@@ -181,15 +183,17 @@ export class Carousel {
       this.setMode(!!(e as CustomEvent).detail?.flat);
     });
 
-    this.updateViewRadius();
-    this.backdrop.fit(this.camera, this.viewRadius);   // depende do viewRadius: vem depois
-
     window.addEventListener('resize', this.scheduleResize);
     window.visualViewport?.addEventListener('resize', this.scheduleResize);
     // refreshViewport() também corrige leituras tardias sem evento nativo no
     // Chrome iOS. O DOM acompanha as variáveis CSS; a câmera e o buffer WebGL
     // precisam receber o mesmo tamanho para não manter a cena curta por baixo.
     window.addEventListener('viewport:change', this.scheduleResize);
+
+    // Texturas e fonte carregam de forma assíncrona. Uma mudança de viewport
+    // ocorrida durante esse await precede os listeners acima; esta leitura
+    // final fecha essa janela e encaixa câmera, buffer e backdrop no CSS atual.
+    this.onResize();
     window.addEventListener('pointermove', (e) => {
       const current = viewportSize();
       this.rig.setPointer(
@@ -842,7 +846,7 @@ export class Carousel {
     const viewport = viewportSize();
     this.camera.aspect = viewport.width / viewport.height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(viewport.width, viewport.height);
+    this.renderer.setSize(viewport.width, viewport.height, false);
     this.updateViewRadius();
     this.backdrop.fit(this.camera, this.viewRadius);
   };

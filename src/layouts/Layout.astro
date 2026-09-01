@@ -47,9 +47,9 @@ const { lang = 'en' } = Astro.props;
           document.documentElement.dataset.theme = 'dark';
       } catch (e) {}
     </script>
-    <!-- A medida da área visível vira variável CSS aqui, uma vez por documento:
-         as camadas de tela cheia e a cena WebGL precisam da MESMA caixa, e no
-         celular `dvh` sozinho não dá conta (ver scripts/viewport.ts). Fica no
+    <!-- O tamanho visível já nasce em `dvh` no CSS. Este medidor corrige apenas
+         a origem da caixa de `position: fixed` no iPhone e mantém a medida
+         usada pela cena WebGL sincronizada (ver scripts/viewport.ts). Fica no
          Layout porque toda rota tem uma emenda de tela cheia. -->
     <script>
       import { watchViewport } from '../scripts/viewport';

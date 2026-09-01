@@ -91,9 +91,9 @@
      (Backdrop.ts) — mudar aqui pede mudar lá. */
   --theme-fade: 0.6s ease;
 
-  /* As cenas de tela cheia acompanham a área realmente visível no celular.
-     `vh` equivale ao viewport grande e fica alto demais enquanto as barras do
-     navegador estão abertas. */
+  /* Fonte autoritativa do TAMANHO das cenas. Ela permanece em CSS: no cold
+     start do Chrome iOS, visualViewport pode reportar por alguns instantes uma
+     altura antiga, enquanto `dvh` já pinta a área correta. */
   --viewport-w: 100vw;
   --viewport-h: 100vh;
 
@@ -106,17 +106,15 @@
      e sobra uma faixa de papel vazio embaixo.
 
      Quem mede é scripts/viewport.ts, com uma sonda `position: fixed; inset: 0`
-     — a caixa perguntada ao navegador, não deduzida. Quem consome são os
-     `inset:` das camadas de tela cheia e os `calc()` dos cantos da UI. */
+     — a caixa perguntada ao navegador, não deduzida. Quem consome são o
+     `top/left` das camadas de tela cheia e os `calc()` dos cantos da UI. */
   --viewport-top: 0px;
   --viewport-left: 0px;
   --viewport-bottom: 0px;
   --viewport-right: 0px;
 
-  /* O atalho que as camadas de tela cheia usam: a área visível, e nada além.
-     Os fallbacks não são decoração: `inset` é um atalho, e um único var()
-     vazio aqui derrubaria a declaração inteira pra `auto` — a camada de tela
-     cheia perderia a posição em vez de perder a correção. */
+  /* Atalho para elementos sem width/height explícitos. As camadas principais
+     usam top/left + o tamanho em dvh para não criar uma caixa sobredefinida. */
   --viewport-inset: var(--viewport-top, 0px) var(--viewport-right, 0px)
     var(--viewport-bottom, 0px) var(--viewport-left, 0px);
 

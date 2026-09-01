@@ -10,9 +10,11 @@
  * vazio embaixo. É o bug que este módulo existe pra medir.
  *
  * Nada aqui é adivinhado: uma sonda `position: fixed; inset: 0` devolve a caixa
- * REAL do navegador, e a visualViewport devolve o que de fato aparece. A
- * diferença entre as duas vira variável CSS, e o zoom de pinça é ignorado de
- * propósito — dar zoom não pode redimensionar a cena.
+ * REAL do navegador, e outra sonda dimensionada em `dvh` devolve o tamanho que
+ * o CSS já usou para pintar a página. `visualViewport` entra apenas com a
+ * ORIGEM da área visível: no primeiro carregamento do Chrome no iPhone, seu
+ * width/height pode ficar provisório mesmo depois do layout estar correto.
+ * Transformar essa leitura provisória em px anulava justamente o `dvh` correto.
  */
 
 interface Metrics {
@@ -35,21 +37,53 @@ const ZERO: Metrics = { width: 1, height: 1, top: 0, left: 0, bottom: 0, right: 
  * há API que a reporte, mas há como perguntar a ela mesma. É a única medida
  * deste arquivo que não depende de acreditar no que o navegador diz.
  */
-let probe: HTMLElement | null = null;
+let fixedProbe: HTMLElement | null = null;
+let sizeProbe: HTMLElement | null = null;
 
 function fixedBox(): DOMRect | null {
   if (!document.body) return null;
 
-  if (!probe || !probe.isConnected) {
-    probe = document.createElement('div');
-    probe.setAttribute('aria-hidden', 'true');
+  if (!fixedProbe || !fixedProbe.isConnected) {
+    fixedProbe = document.createElement('div');
+    fixedProbe.setAttribute('aria-hidden', 'true');
     // Nada além do necessário: `contain` ou `transform` aqui mudariam a caixa
     // que a sonda deve reportar, e ela é a única testemunha da medida.
-    probe.style.cssText = 'position:fixed;inset:0;pointer-events:none;visibility:hidden';
-    document.body.appendChild(probe);
+    fixedProbe.style.cssText = 'position:fixed;inset:0;pointer-events:none;visibility:hidden';
+    document.body.appendChild(fixedProbe);
   }
 
-  return probe.getBoundingClientRect();
+  return fixedProbe.getBoundingClientRect();
+}
+
+/**
+ * O tamanho que o CSS usa desde o primeiro paint.
+ *
+ * A sonda usa as próprias variáveis globais para não duplicar a decisão de
+ * fallback (`dvh` quando existe, `vh` nos navegadores antigos). Tamanho e
+ * posição são responsabilidades separadas: ela é `fixed` só para não aumentar
+ * o scrollHeight e daqui lemos exclusivamente width/height.
+ */
+function cssViewportBox(): { width: number; height: number } {
+  const fallback = {
+    width: Math.max(1, window.innerWidth),
+    height: Math.max(1, window.innerHeight),
+  };
+  if (!document.body) return fallback;
+
+  if (!sizeProbe || !sizeProbe.isConnected) {
+    sizeProbe = document.createElement('div');
+    sizeProbe.setAttribute('aria-hidden', 'true');
+    sizeProbe.style.cssText =
+      'position:fixed;top:0;left:0;width:var(--viewport-w);height:var(--viewport-h);' +
+      'pointer-events:none;visibility:hidden';
+    document.body.appendChild(sizeProbe);
+  }
+
+  const box = sizeProbe.getBoundingClientRect();
+  return {
+    width: Number.isFinite(box.width) && box.width > 0 ? box.width : fallback.width,
+    height: Number.isFinite(box.height) && box.height > 0 ? box.height : fallback.height,
+  };
 }
 
 /**
@@ -80,9 +114,7 @@ function measure(): Metrics {
 
   const visual = window.visualViewport;
   const zoomed = visual ? Math.abs(visual.scale - 1) >= 0.01 : false;
-
-  const width = Math.max(1, visual && !zoomed ? visual.width : window.innerWidth);
-  const height = Math.max(1, visual && !zoomed ? visual.height : window.innerHeight);
+  const { width, height } = cssViewportBox();
 
   if (!visual || zoomed) return { width, height, top: 0, left: 0, bottom: 0, right: 0 };
 
@@ -90,11 +122,19 @@ function measure(): Metrics {
   if (!box) return { width, height, top: 0, left: 0, bottom: 0, right: 0 };
 
   // A sonda vem em coordenadas do viewport de layout; offsetTop/offsetLeft
-  // levam a área visível pro MESMO sistema. Daí é subtração.
-  const top = visual.offsetTop - box.top;
-  const left = visual.offsetLeft - box.left;
-  const bottom = box.bottom - (visual.offsetTop + height);
-  const right = box.right - (visual.offsetLeft + width);
+  // levam a área visível pro MESMO sistema. Daí é subtração. O tamanho vem do
+  // CSS, não de visual.width/height, porque esses dois valores podem estar
+  // provisórios no cold start do Chrome iOS.
+  // Distribui a sobra da caixa fixed sem jamais produzir uma geometria
+  // contraditória: top + height + bottom precisa continuar igual à altura da
+  // caixa. Isso também contém um offset provisório fora dos limites.
+  const slackY = Math.max(0, box.height - height);
+  const slackX = Math.max(0, box.width - width);
+  const clamp = (value: number, max: number) => Math.min(max, Math.max(0, value));
+  const top = clamp(visual.offsetTop - box.top, slackY);
+  const left = clamp(visual.offsetLeft - box.left, slackX);
+  const bottom = slackY - top;
+  const right = slackX - left;
 
   const off = (n: number) => (n > 0.5 ? Math.round(n * 100) / 100 : 0);
   const shift = { top: off(top), left: off(left), bottom: off(bottom), right: off(right) };
@@ -134,15 +174,21 @@ const px = (n: number) => `${Math.round(n * 100) / 100}px`;
 let written = '';
 
 /**
- * Publica a medida em variáveis CSS. É daqui que sai a caixa das camadas de
- * tela cheia e a régua dos cantos da UI (ver o `inset:` das camadas e os
- * `calc()` do .intro/.hud/.theme no index.astro). O `dvh` do global.css só
- * cobre a pintura anterior a este módulo.
+ * Publica apenas a POSIÇÃO em variáveis CSS. O tamanho continua em `dvh` no
+ * global.css e nunca é congelado num px vindo de `visualViewport`.
  */
 export function syncViewportVars(): void {
   // Timers são desacelerados em segundo plano e alguns WebViews chegam a
   // devolver 0×0 nesse estado. A retomada visível já chama refreshViewport().
   if (typeof document === 'undefined' || document.hidden) return;
+
+  const root = document.documentElement;
+
+  // Limpa valores deixados por uma versão anterior durante HMR/navegação. Em
+  // produção normalmente não há nada inline, mas a garantia custa só esta
+  // verificação e mantém a folha CSS como única dona do tamanho.
+  if (root.style.getPropertyValue('--viewport-w')) root.style.removeProperty('--viewport-w');
+  if (root.style.getPropertyValue('--viewport-h')) root.style.removeProperty('--viewport-h');
 
   const m = (cache = measure());
   const stamp = `${m.width}|${m.height}|${m.top}|${m.left}|${m.bottom}|${m.right}`;
@@ -151,9 +197,6 @@ export function syncViewportVars(): void {
   if (stamp === written) return;
   written = stamp;
 
-  const root = document.documentElement;
-  root.style.setProperty('--viewport-w', px(m.width));
-  root.style.setProperty('--viewport-h', px(m.height));
   root.style.setProperty('--viewport-top', px(m.top));
   root.style.setProperty('--viewport-left', px(m.left));
   root.style.setProperty('--viewport-bottom', px(m.bottom));
@@ -249,6 +292,10 @@ export function watchViewport(): void {
     const observer = new ResizeObserver(queueViewportSync);
     observer.observe(document.documentElement);
     if (document.body) observer.observe(document.body);
+    // `dvh` pode se acomodar sem um resize nativo no Chrome iOS. Esta é a
+    // testemunha direta da medida CSS, então observá-la atualiza também o
+    // cache/WebGL sem depender do evento que o navegador omitiu.
+    if (sizeProbe) observer.observe(sizeProbe);
   }
   if (typeof MutationObserver !== 'undefined' && document.body) {
     new MutationObserver(queueViewportSync).observe(document.body, {

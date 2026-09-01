@@ -88,7 +88,9 @@ export function initViewportDebug(): void {
     dvh.style.top = `${probeHeight('100dvh') - 2}px`;
     panel.style.top = `${vTop + 26}px`;
 
-    const s = doc.style;
+    // width/height pertencem à folha CSS; top/right/bottom/left são publicados
+    // inline pelo medidor. O estilo computado mostra as duas fontes juntas.
+    const s = getComputedStyle(doc);
     panel.textContent = [
       `screen      ${screen.width} x ${screen.height}`,
       `inner       ${window.innerWidth} x ${window.innerHeight}`,

@@ -21,6 +21,15 @@
  * medidas provisórias no primeiro carregamento e não avisa quando se acerta:
  * congelar o width/height dela em px anulava o `dvh` correto, e o offsetTop dela
  * punha a página inteira no lugar errado. Ela ficou só como reserva.
+ *
+ * O QUE ESTE MÓDULO NÃO RESOLVE — e onde já se perdeu tempo procurando. Havia
+ * um segundo desencontro, de mesma aparência, que nenhuma sonda daqui enxerga:
+ * com `viewport-fit=cover` na meta, o Chrome do iPhone desenha a página uns 90px
+ * acima da área visível e responde 0 em TODAS as fontes acima, inclusive nas
+ * safe-areas. Não era medida errada, era o trato do `cover` sendo quebrado; a
+ * cura foi tirar o `cover` (ver o comentário na meta do Layout.astro). Se a
+ * queixa voltar com as três sondas concordando em zero, o problema está lá, não
+ * aqui.
  */
 
 interface Metrics {

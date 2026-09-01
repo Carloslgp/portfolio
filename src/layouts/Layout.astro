@@ -17,28 +17,24 @@ const { lang = 'en' } = Astro.props;
 <html lang={lang}>
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
-    <!-- DIAGNÓSTICO TEMPORÁRIO — remover quando a causa do desalinho no Chrome
-         do iPhone estiver fechada.
+    <!-- SEM `viewport-fit=cover`, e isso não é esquecimento.
 
-         `viewport-fit=cover` manda o navegador desenhar de beirada a beirada e
-         devolver o quanto ele cobriu em `env(safe-area-inset-*)`. No iOS 26 ele
-         aceita a primeira parte e responde ZERO na segunda, o que deixa a
-         página sem como saber que está sendo pintada debaixo da barra. Abrir
-         com `?fit=auto` desliga o cover e diz, num print só, se é essa a causa.
-         is:inline e logo abaixo da meta: precisa valer antes do primeiro
-         layout, não depois do bundle. -->
-    <script is:inline>
-      try {
-        if (new URLSearchParams(location.search).get('fit') === 'auto')
-          document
-            .querySelector('meta[name="viewport"]')
-            .setAttribute('content', 'width=device-width, initial-scale=1');
-      } catch (e) {}
-    </script>
+         O `cover` é um trato de duas partes: o navegador desenha de beirada a
+         beirada e, em troca, devolve em `env(safe-area-inset-*)` o quanto ele
+         cobriu, pra página se defender. O Chrome do iPhone (medido no iOS 26.6)
+         cumpre a primeira metade e responde ZERO na segunda — e ainda posiciona
+         o viewport no topo FÍSICO da tela. O resultado é a página inteira
+         desenhada uns 90px pra cima, com o título sumindo atrás da barra de
+         endereço e uma faixa de papel vazio embaixo, sem nenhuma API do DOM
+         reportando o deslocamento: `visualViewport.offsetTop`, o canto do
+         documento e as próprias safe-areas respondem 0 (ver scripts/viewport.ts,
+         que existe pra medir exatamente esse desencontro e não conseguia ver
+         este). Sem o `cover`, a mesma página cai encaixada na área visível.
+
+         Repor o `cover` traz o bug de volta. Se algum dia for preciso — modo
+         standalone, por exemplo — o teste é abrir `/#vp` no iPhone: a régua
+         vermelha tem que encostar nas duas barras do navegador. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- As fontes são deste domínio agora (ver as @font-face do global.css), e
          por isso não há mais preconnect nenhum aqui: não existe terceiro no
          caminho crítico pra "pré-conectar".

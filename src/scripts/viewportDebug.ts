@@ -49,6 +49,14 @@ function where(selector: string, box: DOMRect): string {
   return `y${n(r.top - box.top)} h${n(r.height)}  x${n(r.left - box.left)} w${n(r.width)}`;
 }
 
+/** O `content=` da meta viewport em vigor — a experiência do `?fit=` precisa
+ *  aparecer no print, senão não dá pra saber qual das duas o print mostra. */
+function viewportFit(): string {
+  const meta = document.querySelector('meta[name="viewport"]');
+  const content = meta?.getAttribute('content') ?? '(sem meta)';
+  return content.includes('viewport-fit=cover') ? 'cover' : 'auto';
+}
+
 function line(color: string, label: string): HTMLElement {
   const el = document.createElement('div');
   el.style.cssText =
@@ -123,6 +131,15 @@ export function initViewportDebug(): void {
         + `  scale ${v ? v.scale.toFixed(2) : '-'}`,
       `FIXED BOX   ${Math.round(box.width)} x ${Math.round(box.height)}`
         + `  at ${Math.round(box.left)},${Math.round(box.top)}`,
+      // O deslocamento existe e NENHUMA das APIs acima o reporta. Estas são as
+      // que sobraram: screenY é, por definição, a distância do topo da tela até
+      // o topo da área de conteúdo — é o número exato que está faltando.
+      `screenY ${window.screenY}  outerH ${window.outerHeight}`
+        + `  availH ${screen.availHeight}`,
+      `pageTop ${v ? Math.round(v.pageTop) : '-'}`
+        + `   docEl y${Math.round(doc.getBoundingClientRect().top)}`
+        + ` h${Math.round(doc.getBoundingClientRect().height)}`,
+      `fit         ${viewportFit()}`,
       // As duas respostas para "onde começa o que se vê". Divergiram: a de
       // baixo é a que o medidor usa, a de cima é a que ele deixou de usar.
       `TOPO  visual ${Math.round(vTop)}   documento ${Math.round(oTop)}`,

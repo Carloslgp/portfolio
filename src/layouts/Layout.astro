@@ -21,6 +21,24 @@ const { lang = 'en' } = Astro.props;
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
+    <!-- DIAGNÓSTICO TEMPORÁRIO — remover quando a causa do desalinho no Chrome
+         do iPhone estiver fechada.
+
+         `viewport-fit=cover` manda o navegador desenhar de beirada a beirada e
+         devolver o quanto ele cobriu em `env(safe-area-inset-*)`. No iOS 26 ele
+         aceita a primeira parte e responde ZERO na segunda, o que deixa a
+         página sem como saber que está sendo pintada debaixo da barra. Abrir
+         com `?fit=auto` desliga o cover e diz, num print só, se é essa a causa.
+         is:inline e logo abaixo da meta: precisa valer antes do primeiro
+         layout, não depois do bundle. -->
+    <script is:inline>
+      try {
+        if (new URLSearchParams(location.search).get('fit') === 'auto')
+          document
+            .querySelector('meta[name="viewport"]')
+            .setAttribute('content', 'width=device-width, initial-scale=1');
+      } catch (e) {}
+    </script>
     <!-- As fontes são deste domínio agora (ver as @font-face do global.css), e
          por isso não há mais preconnect nenhum aqui: não existe terceiro no
          caminho crítico pra "pré-conectar".

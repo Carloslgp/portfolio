@@ -9,12 +9,18 @@
  * UI inteira sobe pra debaixo da barra de endereço e sobra uma faixa de papel
  * vazio embaixo. É o bug que este módulo existe pra medir.
  *
- * Nada aqui é adivinhado: uma sonda `position: fixed; inset: 0` devolve a caixa
- * REAL do navegador, e outra sonda dimensionada em `dvh` devolve o tamanho que
- * o CSS já usou para pintar a página. `visualViewport` entra apenas com a
- * ORIGEM da área visível: no primeiro carregamento do Chrome no iPhone, seu
- * width/height pode ficar provisório mesmo depois do layout estar correto.
- * Transformar essa leitura provisória em px anulava justamente o `dvh` correto.
+ * Nada aqui é adivinhado, e nada aqui vem de uma API que possa mentir. São três
+ * sondas no DOM, uma por pergunta:
+ *
+ *   `position: fixed; inset: 0`  → a caixa REAL onde o navegador ancora o fixed
+ *   dimensionada em `dvh`        → o tamanho que o CSS já usou pra pintar
+ *   `position: absolute; top: 0` → o canto do documento, ou seja, o topo do que
+ *                                  se vê (numa página que não rola, é o mesmo)
+ *
+ * As duas últimas existem porque a `visualViewport` do Chrome no iPhone entrega
+ * medidas provisórias no primeiro carregamento e não avisa quando se acerta:
+ * congelar o width/height dela em px anulava o `dvh` correto, e o offsetTop dela
+ * punha a página inteira no lugar errado. Ela ficou só como reserva.
  */
 
 interface Metrics {
@@ -39,6 +45,7 @@ const ZERO: Metrics = { width: 1, height: 1, top: 0, left: 0, bottom: 0, right: 
  */
 let fixedProbe: HTMLElement | null = null;
 let sizeProbe: HTMLElement | null = null;
+let docProbe: HTMLElement | null = null;
 
 function fixedBox(): DOMRect | null {
   if (!document.body) return null;
@@ -53,6 +60,41 @@ function fixedBox(): DOMRect | null {
   }
 
   return fixedProbe.getBoundingClientRect();
+}
+
+/**
+ * O CANTO DO DOCUMENTO — a testemunha que faltava.
+ *
+ * Onde a área visível começa era deduzido de `visualViewport.offsetTop`, e essa
+ * é justamente a leitura que o Chrome no iPhone entrega provisória na primeira
+ * abertura. Existe uma segunda fonte para o MESMO número, e ela não depende de
+ * API nenhuma: `position: absolute; top: 0` cai no canto do documento, e o
+ * navegador sempre pinta o canto do documento no topo do que se vê — é a única
+ * coisa que ele não pode esconder de quem não consegue rolar a página.
+ *
+ * A subtração contra a sonda do `fixed` dá a folga procurada, e como as duas
+ * medidas saem do mesmo `getBoundingClientRect()`, qualquer divergência de
+ * sistema de coordenadas entre os dois viewports se cancela no meio.
+ *
+ * Vale só com a página travada (ver locked()): assim que ela rola, este canto
+ * anda junto com a rolagem e deixa de descrever o topo da tela. É a mesma
+ * condição em que a correção é aplicada, então não há caso a mais para tratar.
+ */
+function documentBox(): DOMRect | null {
+  if (!document.body) return null;
+
+  if (!docProbe || !docProbe.isConnected) {
+    docProbe = document.createElement('div');
+    docProbe.setAttribute('aria-hidden', 'true');
+    // 1×1 e absoluto: não empurra o layout de ninguém e não entra no
+    // scrollHeight que o locked() consulta logo abaixo.
+    docProbe.style.cssText =
+      'position:absolute;top:0;left:0;width:1px;height:1px;' +
+      'pointer-events:none;visibility:hidden';
+    document.body.appendChild(docProbe);
+  }
+
+  return docProbe.getBoundingClientRect();
 }
 
 /**
@@ -112,27 +154,40 @@ function locked(): boolean {
 function measure(): Metrics {
   if (typeof window === 'undefined') return ZERO;
 
-  const visual = window.visualViewport;
-  const zoomed = visual ? Math.abs(visual.scale - 1) >= 0.01 : false;
   const { width, height } = cssViewportBox();
+  const flat: Metrics = { width, height, top: 0, left: 0, bottom: 0, right: 0 };
 
-  if (!visual || zoomed) return { width, height, top: 0, left: 0, bottom: 0, right: 0 };
+  // Perguntar ANTES de medir: fora da página travada a correção não vale de
+  // qualquer forma, e a pergunta poupa duas leituras de layout por evento nas
+  // rotas que rolam — que são as que mais disparam eventos.
+  if (!locked()) return flat;
+
+  const visual = window.visualViewport;
+  if (visual && Math.abs(visual.scale - 1) >= 0.01) return flat;
 
   const box = fixedBox();
-  if (!box) return { width, height, top: 0, left: 0, bottom: 0, right: 0 };
+  if (!box) return flat;
 
-  // A sonda vem em coordenadas do viewport de layout; offsetTop/offsetLeft
-  // levam a área visível pro MESMO sistema. Daí é subtração. O tamanho vem do
-  // CSS, não de visual.width/height, porque esses dois valores podem estar
-  // provisórios no cold start do Chrome iOS.
+  // Onde a área visível COMEÇA dentro da caixa do `fixed`. O canto do documento
+  // é a fonte primária porque não pode ficar provisório (ver documentBox); a
+  // visualViewport continua como reserva para quando a sonda não existir.
+  const doc = documentBox();
+  const origin = doc
+    ? { top: doc.top - box.top, left: doc.left - box.left }
+    : visual
+      ? { top: visual.offsetTop - box.top, left: visual.offsetLeft - box.left }
+      : { top: 0, left: 0 };
+
   // Distribui a sobra da caixa fixed sem jamais produzir uma geometria
   // contraditória: top + height + bottom precisa continuar igual à altura da
-  // caixa. Isso também contém um offset provisório fora dos limites.
+  // caixa. Isso também contém uma leitura provisória fora dos limites. O
+  // tamanho vem do CSS, não de visual.width/height, porque esses dois podem
+  // estar provisórios no cold start do Chrome iOS.
   const slackY = Math.max(0, box.height - height);
   const slackX = Math.max(0, box.width - width);
   const clamp = (value: number, max: number) => Math.min(max, Math.max(0, value));
-  const top = clamp(visual.offsetTop - box.top, slackY);
-  const left = clamp(visual.offsetLeft - box.left, slackX);
+  const top = clamp(origin.top, slackY);
+  const left = clamp(origin.left, slackX);
   const bottom = slackY - top;
   const right = slackX - left;
 
@@ -140,7 +195,7 @@ function measure(): Metrics {
   const shift = { top: off(top), left: off(left), bottom: off(bottom), right: off(right) };
 
   const any = shift.top || shift.left || shift.bottom || shift.right;
-  if (!any || !locked()) return { width, height, top: 0, left: 0, bottom: 0, right: 0 };
+  if (!any) return flat;
 
   return { width, height, ...shift };
 }
@@ -255,6 +310,16 @@ export function watchViewport(): void {
   watching = true;
 
   const start = () => {
+    // As sondas nascem AQUI, e não na primeira medida: `syncViewportVars` sai
+    // pela porta dos fundos quando o documento está oculto (uma aba aberta em
+    // segundo plano é o caso comum no celular), e sem elas os observadores
+    // abaixo não teriam o que observar — a rede de segurança inteira ficaria
+    // desarmada até um recarregamento.
+    fixedBox();
+    documentBox();
+    cssViewportBox();
+
+    observe();
     syncViewportVars();
     refreshViewport();
     if (location.hash === '#vp') {
@@ -285,19 +350,26 @@ export function watchViewport(): void {
   visual?.addEventListener('resize', refreshViewport);
   visual?.addEventListener('scroll', queueViewportSync);
   visual?.addEventListener('scrollend', refreshViewport);
+}
 
-  // abrir o About destrava a rolagem (body.is-about → overflow-y: auto), e a
-  // correção precisa sair de cena no mesmo instante
+/**
+ * Os observadores. Rodam depois das sondas existirem (ver start), senão o mais
+ * importante deles não teria alvo.
+ *
+ * O do `body` cobre abrir o About, que destrava a rolagem (body.is-about →
+ * overflow-y: auto) e precisa tirar a correção de cena no mesmo instante.
+ */
+function observe(): void {
   if (typeof ResizeObserver !== 'undefined') {
     const observer = new ResizeObserver(queueViewportSync);
     observer.observe(document.documentElement);
-    if (document.body) observer.observe(document.body);
+    observer.observe(document.body);
     // `dvh` pode se acomodar sem um resize nativo no Chrome iOS. Esta é a
     // testemunha direta da medida CSS, então observá-la atualiza também o
     // cache/WebGL sem depender do evento que o navegador omitiu.
     if (sizeProbe) observer.observe(sizeProbe);
   }
-  if (typeof MutationObserver !== 'undefined' && document.body) {
+  if (typeof MutationObserver !== 'undefined') {
     new MutationObserver(queueViewportSync).observe(document.body, {
       attributes: true,
       attributeFilter: ['class', 'style'],

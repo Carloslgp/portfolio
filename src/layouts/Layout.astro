@@ -17,24 +17,114 @@ const { lang = 'en' } = Astro.props;
 <html lang={lang}>
   <head>
     <meta charset="UTF-8" />
-    <!-- SEM `viewport-fit=cover`, e isso não é esquecimento.
+    <!-- O `cover` abaixo é um estado intermediário de propósito; o script logo
+         depois o troca por `auto` ainda durante a leitura do <head>, antes do
+         primeiro paint.
 
-         O `cover` é um trato de duas partes: o navegador desenha de beirada a
-         beirada e, em troca, devolve em `env(safe-area-inset-*)` o quanto ele
-         cobriu, pra página se defender. O Chrome do iPhone (medido no iOS 26.6)
-         cumpre a primeira metade e responde ZERO na segunda — e ainda posiciona
-         o viewport no topo FÍSICO da tela. O resultado é a página inteira
-         desenhada uns 90px pra cima, com o título sumindo atrás da barra de
-         endereço e uma faixa de papel vazio embaixo, sem nenhuma API do DOM
-         reportando o deslocamento: `visualViewport.offsetTop`, o canto do
-         documento e as próprias safe-areas respondem 0 (ver scripts/viewport.ts,
-         que existe pra medir exatamente esse desencontro e não conseguia ver
-         este). Sem o `cover`, a mesma página cai encaixada na área visível.
+         No Chrome do iPhone (iOS 26.6), declarar somente `viewport-fit=auto`
+         nem sempre desfaz o estado `cover` que o WKWebView guardou de uma
+         navegação ou restauração anterior. A página fica inteira 97px acima da
+         área visível, mas visualViewport, safe-area e getBoundingClientRect()
+         continuam respondendo zero. Por isso nenhuma correção CSS consegue
+         distinguir o quadro quebrado do correto.
 
-         Repor o `cover` traz o bug de volta. Se algum dia for preciso — modo
-         standalone, por exemplo — o teste é abrir `/#vp` no iPhone: a régua
-         vermelha tem que encostar nas duas barras do navegador. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+         A transição REAL `cover` -> `auto` força o WKWebView a recalcular seus
+         content insets e reproduz, em toda URL, o resultado que o antigo
+         `?fit=auto` comprovou no aparelho. Não condensar isto numa meta estática:
+         foi exatamente essa forma que deixou o estado antigo sobreviver. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <script is:inline>
+      (() => {
+        const meta = document.querySelector('meta[name="viewport"]');
+        if (!meta) return;
+
+        const auto = 'width=device-width, initial-scale=1, viewport-fit=auto';
+        const cover = 'width=device-width, initial-scale=1, viewport-fit=cover';
+
+        // A primeira troca acontece com o parser ainda no <head>: o navegador
+        // conhece os dois estados, mas nunca chega a pintar o estado `cover`.
+        meta.setAttribute('content', auto);
+
+        // A troca inicial é segura em qualquer navegador; os resets de retomada
+        // são específicos do WKWebView para não relayoutar páginas longas em
+        // plataformas que não têm este bug.
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+          || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (!isIOS) return;
+
+        let frame = 0;
+        let needsRestore = false;
+
+        const cancelConfirmation = () => {
+          if (!frame) return;
+          cancelAnimationFrame(frame);
+          frame = 0;
+        };
+
+        const isUnzoomed = () => !window.visualViewport
+          || Math.abs(window.visualViewport.scale - 1) < 0.01;
+
+        const restoreAuto = () => {
+          // Não desfaz o zoom de quem ampliou a página. O reset fica pendente e
+          // o resize da visualViewport o executa quando a escala voltar a 1.
+          if (document.hidden || !isUnzoomed()) {
+            needsRestore = true;
+            return;
+          }
+          if (frame) return;
+          needsRestore = false;
+
+          // Duas escritas síncronas não deixam um frame em `cover`. A confirmação
+          // no rAF dá ao WKWebView uma transação de camada para aplicar o inset;
+          // depois avisa o medidor para reler a geometria já no estado final.
+          meta.setAttribute('content', cover);
+          meta.setAttribute('content', auto);
+          frame = requestAnimationFrame(() => {
+            frame = 0;
+            meta.setAttribute('content', auto);
+            window.dispatchEvent(new Event('viewport:fit-reset'));
+          });
+        };
+
+        const requireRestore = () => {
+          needsRestore = true;
+          cancelConfirmation();
+          restoreAuto();
+        };
+
+        const suspend = () => {
+          needsRestore = true;
+          // rAFs podem ser congelados com o documento. Um handle antigo não
+          // pode bloquear o reset quando a aba voltar sem disparar pageshow.
+          cancelConfirmation();
+        };
+
+        // BFCache preserva o DOM e também o estado nativo errado. Restauração de
+        // aba do Chrome pode chegar só por focus/visibilitychange, sem pageshow.
+        window.addEventListener('pageshow', (event) => {
+          if (!event.persisted) return;
+          requireRestore();
+        });
+        window.addEventListener('pagehide', suspend);
+        window.addEventListener('blur', suspend);
+        window.addEventListener('focus', () => {
+          if (needsRestore) restoreAuto();
+        });
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) suspend();
+          else if (needsRestore) restoreAuto();
+        });
+        window.visualViewport?.addEventListener('resize', () => {
+          if (needsRestore && isUnzoomed()) restoreAuto();
+        });
+        window.visualViewport?.addEventListener('scrollend', () => {
+          if (needsRestore && isUnzoomed()) restoreAuto();
+        });
+      })();
+    </script>
     <!-- As fontes são deste domínio agora (ver as @font-face do global.css), e
          por isso não há mais preconnect nenhum aqui: não existe terceiro no
          caminho crítico pra "pré-conectar".

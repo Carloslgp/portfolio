@@ -49,12 +49,14 @@ function where(selector: string, box: DOMRect): string {
   return `y${n(r.top - box.top)} h${n(r.height)}  x${n(r.left - box.left)} w${n(r.width)}`;
 }
 
-/** O `content=` da meta viewport em vigor — a experiência do `?fit=` precisa
- *  aparecer no print, senão não dá pra saber qual das duas o print mostra. */
+/** O `content=` da meta viewport em vigor. Distinguir o `auto` explícito do
+ *  default permite confirmar que o reset pré-paint do Layout realmente rodou. */
 function viewportFit(): string {
   const meta = document.querySelector('meta[name="viewport"]');
-  const content = meta?.getAttribute('content') ?? '(sem meta)';
-  return content.includes('viewport-fit=cover') ? 'cover' : 'auto';
+  if (!meta) return '(sem meta)';
+  const content = meta.getAttribute('content') ?? '';
+  const value = content.match(/(?:^|,)\s*viewport-fit\s*=\s*(auto|contain|cover)/i)?.[1];
+  return value?.toLowerCase() ?? 'auto (default)';
 }
 
 function line(color: string, label: string): HTMLElement {

@@ -22,14 +22,14 @@
  * congelar o width/height dela em px anulava o `dvh` correto, e o offsetTop dela
  * punha a página inteira no lugar errado. Ela ficou só como reserva.
  *
- * O QUE ESTE MÓDULO NÃO RESOLVE — e onde já se perdeu tempo procurando. Havia
- * um segundo desencontro, de mesma aparência, que nenhuma sonda daqui enxerga:
- * com `viewport-fit=cover` na meta, o Chrome do iPhone desenha a página uns 90px
- * acima da área visível e responde 0 em TODAS as fontes acima, inclusive nas
- * safe-areas. Não era medida errada, era o trato do `cover` sendo quebrado; a
- * cura foi tirar o `cover` (ver o comentário na meta do Layout.astro). Se a
- * queixa voltar com as três sondas concordando em zero, o problema está lá, não
- * aqui.
+ * O QUE ESTE MÓDULO NÃO RESOLVE — e onde já se perdeu tempo procurando. Há um
+ * segundo desencontro, de mesma aparência, que nenhuma sonda daqui enxerga:
+ * quando o WKWebView conserva internamente `viewport-fit=cover`, o Chrome do
+ * iPhone desenha a página uns 90px acima da área visível e responde 0 em TODAS
+ * as fontes acima, inclusive nas safe-areas. Não é medida errada; é o content
+ * inset nativo preso no estado anterior. O Layout.astro força `cover` -> `auto`
+ * antes do primeiro paint e repete a troca ao restaurar a página. Este módulo
+ * recebe `viewport:fit-reset` depois da troca apenas para sincronizar a cena.
  */
 
 interface Metrics {
@@ -341,6 +341,10 @@ export function watchViewport(): void {
 
   window.addEventListener('resize', refreshViewport);
   window.addEventListener('orientationchange', refreshViewport);
+  // O script inline do Layout acabou de forçar `viewport-fit=auto`. A troca é
+  // quem corrige a composição nativa; esta releitura alinha CSS e WebGL ao novo
+  // quadro sem acoplar aquele script crítico (pré-paint) a este bundle.
+  window.addEventListener('viewport:fit-reset', refreshViewport);
   // voltar pra aba/página pela bfcache restaura um layout medido noutro estado
   window.addEventListener('pageshow', refreshViewport);
   window.addEventListener('load', refreshViewport);

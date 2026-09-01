@@ -12,6 +12,7 @@
 // HTML, pelo preload do index.astro. Quem manda no tempo de cortina agora é a
 // compilação dos shaders, não a rede — e é por isso que ela continua aqui.
 import { setMotionMode, storedMotionMode, type MotionMode } from './motion';
+import { refreshViewport, syncViewportVars } from './viewport';
 
 const el = () => document.querySelector<HTMLElement>('[data-loader]');
 
@@ -74,18 +75,42 @@ export function hideLoader(): Promise<void> {
   const active = document.activeElement;
   if (active instanceof HTMLElement && node.contains(active)) active.blur();
   window.scrollTo(0, 0);
+  // O Chrome iOS pode manter a altura provisória da primeira abertura mesmo
+  // depois de o portão perder foco, sem disparar resize. A sequência de
+  // estabilização mede de novo enquanto as barras do navegador se acomodam.
+  syncViewportVars();
+  refreshViewport();
 
   setProgress(1);
   node.classList.add('is-done');
 
   return new Promise((resolve) => {
+    let removed = false;
+    let guard = 0;
+
     const done = () => {
+      if (removed) return;
+      removed = true;
+      clearTimeout(guard);
+      node.removeEventListener('transitionend', onTransitionEnd);
       node.remove();
+      // A remoção da cortina é a última mudança grande da caixa inicial. Outra
+      // leitura síncrona atualiza também o cache que o Carousel vai usar logo
+      // depois desta Promise; a sequência cobre a acomodação tardia das barras.
+      syncViewportVars();
+      refreshViewport();
       resolve();
     };
-    node.addEventListener('transitionend', done, { once: true });
+
+    const onTransitionEnd = (event: TransitionEvent) => {
+      // O transform da barra interna termina antes do fade da cortina e o
+      // evento borbulha. Remover no evento do filho cortaria a entrada cedo.
+      if (event.target === node && event.propertyName === 'opacity') done();
+    };
+
+    node.addEventListener('transitionend', onTransitionEnd);
     // rede de segurança: em aba de fundo (ou com transições zeradas) o
     // transitionend pode nunca vir, e travar o boot seria pior que cortar seco
-    setTimeout(done, 900);
+    guard = window.setTimeout(done, 900);
   });
 }

@@ -186,6 +186,10 @@ export class Carousel {
 
     window.addEventListener('resize', this.scheduleResize);
     window.visualViewport?.addEventListener('resize', this.scheduleResize);
+    // refreshViewport() também corrige leituras tardias sem evento nativo no
+    // Chrome iOS. O DOM acompanha as variáveis CSS; a câmera e o buffer WebGL
+    // precisam receber o mesmo tamanho para não manter a cena curta por baixo.
+    window.addEventListener('viewport:change', this.scheduleResize);
     window.addEventListener('pointermove', (e) => {
       const current = viewportSize();
       this.rig.setPointer(

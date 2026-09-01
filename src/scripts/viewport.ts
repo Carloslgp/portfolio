@@ -140,7 +140,9 @@ let written = '';
  * cobre a pintura anterior a este módulo.
  */
 export function syncViewportVars(): void {
-  if (typeof document === 'undefined') return;
+  // Timers são desacelerados em segundo plano e alguns WebViews chegam a
+  // devolver 0×0 nesse estado. A retomada visível já chama refreshViewport().
+  if (typeof document === 'undefined' || document.hidden) return;
 
   const m = (cache = measure());
   const stamp = `${m.width}|${m.height}|${m.top}|${m.left}|${m.bottom}|${m.right}`;
@@ -161,6 +163,47 @@ export function syncViewportVars(): void {
   window.dispatchEvent(new CustomEvent('viewport:change'));
 }
 
+/*
+ * O Chrome no iPhone pode entregar a medida provisória da janela durante a
+ * primeira abertura e NÃO emitir outro resize quando termina de acomodar as
+ * barras. Se essa leitura única virar px nas variáveis acima, a página fica
+ * congelada curta até o app ser fechado e aberto — quando focus/pageshow fazem
+ * uma nova leitura.
+ *
+ * As amostras abaixo cobrem justamente essa acomodação tardia. São só seis
+ * leituras distribuídas em três segundos (não um polling por frame), e toda
+ * nova mudança reinicia a sequência a partir do estado mais recente.
+ */
+const SETTLE_DELAYS = [0, 100, 300, 700, 1500, 3000] as const;
+let syncFrame = 0;
+let settleTimers: number[] = [];
+
+function queueViewportSync(): void {
+  if (typeof window === 'undefined' || document.hidden) return;
+  cancelAnimationFrame(syncFrame);
+  syncFrame = requestAnimationFrame(syncViewportVars);
+}
+
+/**
+ * Mede agora e de novo enquanto a UI do navegador termina de se posicionar.
+ * Também é chamada por loading.ts depois que o portão perde foco e sai do DOM:
+ * no Chrome iOS essa mudança visual nem sempre vem acompanhada de resize.
+ */
+export function refreshViewport(): void {
+  if (typeof window === 'undefined') return;
+
+  settleTimers.forEach((timer) => clearTimeout(timer));
+  settleTimers = [];
+
+  SETTLE_DELAYS.forEach((delay) => {
+    if (delay === 0) {
+      queueViewportSync();
+      return;
+    }
+    settleTimers.push(window.setTimeout(queueViewportSync, delay));
+  });
+}
+
 let watching = false;
 
 /** Mantém as variáveis acima em dia com o navegador. Idempotente. */
@@ -168,25 +211,9 @@ export function watchViewport(): void {
   if (typeof window === 'undefined' || watching) return;
   watching = true;
 
-  let frame = 0;
-  const sync = () => {
-    cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(syncViewportVars);
-  };
-
-  // O iOS reporta o tamanho ANTIGO enquanto as barras ainda animam, e de novo
-  // logo depois de virar a tela. Uma leitura atrasada pega o valor assentado;
-  // sem ela a página fica com a medida do estado que acabou de sair.
-  let settle = 0;
-  const syncAndSettle = () => {
-    sync();
-    clearTimeout(settle);
-    settle = window.setTimeout(sync, 400);
-  };
-
   const start = () => {
     syncViewportVars();
-    syncAndSettle();
+    refreshViewport();
     if (location.hash === '#vp') {
       import('./viewportDebug').then((m) => m.initViewportDebug()).catch(() => {});
     }
@@ -195,29 +222,36 @@ export function watchViewport(): void {
   if (document.body) start();
   else document.addEventListener('DOMContentLoaded', start, { once: true });
 
-  window.addEventListener('resize', syncAndSettle);
-  window.addEventListener('orientationchange', syncAndSettle);
+  window.addEventListener('resize', refreshViewport);
+  window.addEventListener('orientationchange', refreshViewport);
   // voltar pra aba/página pela bfcache restaura um layout medido noutro estado
-  window.addEventListener('pageshow', syncAndSettle);
-  window.addEventListener('load', syncAndSettle);
+  window.addEventListener('pageshow', refreshViewport);
+  window.addEventListener('load', refreshViewport);
+  // No iOS, reabrir o Chrome nem sempre restaura a página via pageshow; focus
+  // e visibilitychange cobrem essa retomada sem depender do caminho escolhido.
+  window.addEventListener('focus', refreshViewport);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshViewport();
+  });
 
   // Sem ouvir o `scroll` do window: quem avisa que a área visível ANDOU dentro
   // da caixa do fixed — o movimento das barras — é o scroll da visualViewport,
   // e o do documento só repetiria o aviso cobrando uma leitura de layout por
   // quadro nas rotas que rolam.
   const visual = window.visualViewport;
-  visual?.addEventListener('resize', syncAndSettle);
-  visual?.addEventListener('scroll', sync);
+  visual?.addEventListener('resize', refreshViewport);
+  visual?.addEventListener('scroll', queueViewportSync);
+  visual?.addEventListener('scrollend', refreshViewport);
 
   // abrir o About destrava a rolagem (body.is-about → overflow-y: auto), e a
   // correção precisa sair de cena no mesmo instante
   if (typeof ResizeObserver !== 'undefined') {
-    const observer = new ResizeObserver(sync);
+    const observer = new ResizeObserver(queueViewportSync);
     observer.observe(document.documentElement);
     if (document.body) observer.observe(document.body);
   }
   if (typeof MutationObserver !== 'undefined' && document.body) {
-    new MutationObserver(sync).observe(document.body, {
+    new MutationObserver(queueViewportSync).observe(document.body, {
       attributes: true,
       attributeFilter: ['class', 'style'],
     });

@@ -70,6 +70,14 @@ const POLICY = [
     quality: 80,
   },
   {
+    // A imagem da aba Next da /now (.strand-figure). A caixa tem 24rem de teto
+    // (384px), então 900 já é dpr 2 com folga — e é a largura em que a captura
+    // de Hall of Fame chegou aqui, depois de cortadas as tarjas pretas.
+    dir: 'public/images/now',
+    maxSide: 900,
+    quality: 80,
+  },
+  {
     // As capas das músicas: 5,5rem (88px) na fila, e o modal não passa disso.
     dir: 'public/images/about_albuns_photos',
     maxSide: 480,

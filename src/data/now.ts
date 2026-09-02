@@ -37,7 +37,7 @@
  *
  *  É o número mais importante do arquivo. A página inteira fala no presente, e
  *  a única coisa que autoriza um presente escrito é dizer de quando ele é. */
-export const UPDATED = '2026-08';
+export const UPDATED = '2026-09';
 
 /** Onde eu estou. Sai ao lado da hora, no cabeçalho — os dois juntos são a
  *  resposta completa de "agora": um instante e um lugar. */
@@ -53,10 +53,10 @@ export const LEAD =
  *  O rótulo e a nota moram aqui e não no template pelo mesmo motivo de todo o
  *  resto do arquivo: são frases da página.
  *
- *  A nota do "Next" está fazendo o papel de estado vazio enquanto os HORIZONS
- *  não existem — é ela que impede a aba de ser uma tela em branco. Quando a
- *  lista for escrita, esta linha é a primeira coisa a trocar: no lugar de dizer
- *  que não há nada, ela passa a enquadrar o que há. */
+ *  A nota do "Next" não é mais estado vazio: agora que os HORIZONS existem, ela
+ *  ENQUADRA a lista, e o que ela precisa dizer é que aquilo não é cronograma.
+ *  Sem essa linha, cinco itens no futuro se leem como prazo assumido — que é
+ *  exatamente o que o `when` opcional lá embaixo se recusa a inventar. */
 export type PanelId = 'now' | 'next';
 
 export const PANELS: { id: PanelId; label: string; note: string }[] = [
@@ -68,7 +68,9 @@ export const PANELS: { id: PanelId; label: string; note: string }[] = [
   {
     id: 'next',
     label: 'Next',
-    note: 'Nothing written here yet.',
+    note:
+      'Things I owe myself, not a roadmap. None of them carries a date, and ' +
+      'that is the honest part.',
   },
 ];
 
@@ -210,32 +212,105 @@ export interface Horizon {
    *  simplesmente não mostra linha nenhuma — não há "sem previsão" impresso,
    *  porque isso é ruído com cara de dado. */
   when?: string;
+  /** A COISA em si, quando ela já tem endereço: o repositório do que eu vou
+   *  terminar. Vira link do título, e por isso não serve pra referência — um
+   *  título linkado diz "isto é aquilo". */
   href?: string;
   body: string;
+  /** O que me deu a ideia, e que NÃO é meu. Existe separado do `href` por
+   *  causa dessa diferença: o jogo que eu quero fazer não é o Pixel Car Racer,
+   *  então pendurar o link dele no título seria a página se apropriando de uma
+   *  coisa que já existe. Sai numa linha discreta embaixo do corpo, dizendo de
+   *  onde veio. */
+  ref?: { href: string; label: string };
+  /** Uma imagem, quando o horizonte é sobre uma coisa que se VÊ.
+   *
+   *  Nenhum outro item da página tem foto, e é isso que faz esta funcionar: a
+   *  Pokédex é a única linha das duas abas que fala de um acervo, e um acervo
+   *  descrito em duas frases é abstrato até você ver a tela. Se um dia tiver
+   *  três destas, elas viram um padrão e param de significar — o campo é
+   *  opcional pra continuar sendo exceção.
+   *
+   *  O arquivo mora em public/images/now/ (ver a regra dessa pasta em
+   *  scripts/optimize-images.mjs). `alt` é obrigatório junto: a imagem carrega
+   *  sentido, então ela tem que existir também pra quem não a vê. */
+  figure?: { src: string; alt: string; caption?: string };
 }
 
-/** VAZIA por enquanto, e de propósito: as frases desta aba são as únicas do
- *  site escritas no futuro, e futuro sobre a própria vida não se terceiriza.
- *  A aba existe, a forma existe, e a lista espera.
- *
- *  Pra preencher, um objeto por horizonte — a ORDEM da lista é a ordem da
- *  página, do que já está em movimento pro que ainda é vontade. Sem ordenação
+/** O que ainda não aconteceu, na ORDEM em que eu contaria — do que já tem
+ *  código escrito pro que é só vontade com data de validade. Sem ordenação
  *  automática, e aqui isso pesa mais que nos STRANDS: uma lista de futuro
  *  ordenada por data promete um cronograma, e não existe cronograma nenhum.
  *
- *    {
- *      id: 'algum-id',
- *      label: 'Shipping',
- *      title: 'A coisa',
- *      when: '2027-03',   // opcional — ver o comentário do campo acima
- *      href: 'https://…', // opcional
- *      body: 'O que é, em duas ou três frases.',
- *    }
+ *  Nenhum item tem `when`, e isso é a coisa mais deliberada do bloco. Eu sei o
+ *  que quero fazer e não sei quando — escrever mês em cinco linhas dessas seria
+ *  inventar o único dado que a página não pode inventar, justamente na aba que
+ *  fala no futuro. Quem ganhar prazo de verdade ganha o campo.
  *
- *  Enquanto ela estiver vazia a aba mostra só a nota do PANELS, e o painel
- *  encolhe até a altura dela — que é o desenho certo pra uma lista que ainda
- *  não foi escrita, e não um defeito a esconder. */
-export const HORIZONS: Horizon[] = [];
+ *  Quando um destes acontecer, ele NÃO é reescrito: muda de lista (pra STRANDS,
+ *  com `since` no lugar do `when`) e o UPDATED lá em cima muda junto. */
+export const HORIZONS: Horizon[] = [
+  {
+    id: 'lynx',
+    label: 'Finishing',
+    title: 'Lynx',
+    href: 'https://github.com/Carloslgp/lynx-engine',
+    body:
+      'Lynx is my 2D engine in C++ with SDL2 and OpenGL. It builds and runs, ' +
+      'then I stopped. I want to study OpenGL properly and rewrite the renderer ' +
+      'knowing what the driver is actually doing, instead of whatever made the ' +
+      'triangle appear.',
+  },
+  {
+    id: 'math',
+    label: 'Studying',
+    title: 'Math, again',
+    body:
+      'It was my favorite part of the course and the first thing to fall off ' +
+      'when work and side projects fill the week. Linear algebra and calculus ' +
+      'show up in everything I build anyway, so I want the foundation solid ' +
+      'instead of good enough.',
+  },
+  {
+    id: 'pixel-game',
+    label: 'Shipping',
+    title: 'My first mobile game',
+    ref: {
+      href: 'https://apps.apple.com/br/app/pixel-car-racer/id1068808996',
+      label: 'Pixel Car Racer',
+    },
+    body:
+      'Pixel Car Racer was the game I played to death as a kid. Buy a car, tear ' +
+      'it apart, rebuild it, race it. Development stopped and nothing replaced ' +
+      'it, so I want my own take: garage, parts, tuning, drag races, pixel art ' +
+      'I make myself. Small scope, actually released.',
+  },
+  {
+    id: 'homer',
+    label: 'Reading',
+    title: 'The Iliad and the Odyssey',
+    body:
+      'Both are on my shelf. Neither has been opened. Bought them with real ' +
+      'intention and let them sit there, which is somehow worse than never ' +
+      'buying them.',
+  },
+  {
+    id: 'pokedex',
+    label: 'Moving',
+    title: 'My Pokédex, into Pokémon Home',
+    body:
+      'Bank is shutting down and years of collection are still stuck on the ' +
+      '3DS. This one has a deadline and no excuse.',
+    figure: {
+      src: '/images/now/pokemon-hall-of-fame.webp',
+      alt:
+        'Pixel-art Pokémon Hall of Fame screen showing Venusaur, Ninetales, ' +
+        'Snorlax, Lapras, Alakazam, and Dragonite beneath the words ' +
+        '“Welcome to the HALL OF FAME!”',
+      caption: 'Pokémon FireRed. The collection this is about starts here.',
+    },
+  },
+];
 
 /** A última linha da página, e as duas portas que ela abre. Mesmo papel do
  *  CRAFT_NOTE em data/work.ts: o que ficou de fora daqui precisa continuar

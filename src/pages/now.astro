@@ -283,6 +283,45 @@ function step(panel: number, row: number): number | null {
                               nenhuma — ver o comentário do `when` em data/now.ts. */}
                           {horizon.when && <p class="strand-since">By {month(horizon.when)}</p>}
                           <p>{horizon.body}</p>
+
+                          {/* A referência vem DEPOIS do corpo e em voz baixa:
+                              ela não é o horizonte, é de onde ele veio. Se
+                              subisse pro título viraria a coisa em si — ver o
+                              comentário do `ref` em data/now.ts. */}
+                          {horizon.ref && (
+                            <div class="strand-ref">
+                              {/* Uma DIV e não um P de propósito: o corpo do
+                                  fio é estilizado por `p:last-of-type`, e um
+                                  parágrafo depois dele roubaria a regra. */}
+                              <span>After</span>
+                              <a href={horizon.ref.href} target="_blank" rel="noopener noreferrer">
+                                {horizon.ref.label}
+                              </a>
+                            </div>
+                          )}
+
+                          {/* A única imagem das duas abas. `lazy` sem culpa:
+                              este painel nasce fora da tela e ninguém o vê
+                              antes de trocar de aba, então baixá-la no primeiro
+                              quadro seria peso pago por quem talvez nem chegue
+                              aqui. As medidas vão no atributo pra reservar a
+                              caixa antes do arquivo chegar — sem elas a lista
+                              inteira pula quando ele chega. */}
+                          {horizon.figure && (
+                            <figure class="strand-figure">
+                              <img
+                                src={horizon.figure.src}
+                                alt={horizon.figure.alt}
+                                width="900"
+                                height="601"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                              {horizon.figure.caption && (
+                                <figcaption>{horizon.figure.caption}</figcaption>
+                              )}
+                            </figure>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -827,11 +866,81 @@ function step(panel: number, row: number): number | null {
     transition: color var(--theme-fade);
   }
 
-  .strand-body p:last-child {
+  /* `last-of-type`, e não `last-child`: no painel Next o corpo pode ter uma
+     referência e uma figura depois dele, e o parágrafo do texto continua sendo
+     o último P da caixa nos dois casos. Com `last-child` os horizontes com
+     imagem perderiam a cor e o respiro do corpo. */
+  .strand-body p:last-of-type {
     margin-top: 0.7rem;
     color: rgba(var(--ink-rgb), 0.74);
     font-size: 0.92rem;
     line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  /* ——— a referência, e a imagem ———
+     As duas só existem na aba Next, e as duas são a MESMA aposta: um horizonte
+     é a coisa mais abstrata que esta página escreve, e uma frase no futuro
+     ganha corpo quando tem de onde ter vindo. Por isso as duas falam baixo — a
+     referência no tamanho da data, a legenda em itálico como a nota do painel.
+     Se elas competissem com o título, a lista de intenções viraria vitrine. */
+  .strand-ref {
+    margin-top: 0.55rem;
+    color: rgba(var(--ink-rgb), 0.45);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    transition: color var(--theme-fade);
+  }
+
+  .strand-ref span {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 650;
+    margin-right: 0.4rem;
+  }
+
+  .strand-ref a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--ink-rgb), 0.28);
+    text-underline-offset: 3px;
+    transition: color 0.3s ease, text-decoration-color 0.3s ease;
+  }
+
+  .strand-ref a:hover {
+    color: rgba(var(--ink-rgb), 0.85);
+    text-decoration-color: rgba(var(--ink-rgb), 0.7);
+  }
+
+  /* A imagem não vai à largura do corpo: 24rem é o tamanho em que a tela de
+     Hall of Fame ainda se lê inteira sem virar o assunto da linha. O
+     `aspect-ratio` casado com o width/height do <img> é o que impede o pulo de
+     layout quando o arquivo chega — ela é lazy, então chega mesmo depois. */
+  .strand-figure {
+    margin-top: 0.95rem;
+    max-width: 24rem;
+  }
+
+  .strand-figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 900 / 601;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(var(--ink-rgb), 0.1);
+    /* a sombra é a mesma do selo da /work: a tela é escura e sem ela a imagem
+       fica flutuando no papel claro */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: border-color var(--theme-fade);
+  }
+
+  .strand-figure figcaption {
+    margin-top: 0.45rem;
+    color: rgba(var(--ink-rgb), 0.45);
+    font-family: "Playfair Display", Georgia, serif;
+    font-style: italic;
+    font-size: 0.8rem;
+    line-height: 1.5;
     transition: color var(--theme-fade);
   }
 

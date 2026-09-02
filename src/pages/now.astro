@@ -509,6 +509,34 @@ function step(panel: number, row: number): number | null {
      Fixo, atrás de tudo, sem animação nenhuma. A pintura sai e ele aparece.
      Em px de altura e não em vh: ele emoldura o CABEÇALHO, e num celular
      deitado 60vh cobriria a página inteira. */
+  /* A CALIBRAGEM do claro é a parte difícil, e ela não é a mesma conta do
+     escuro. No escuro basta uma luz fraca: o papel é quase preto e qualquer
+     claridade por cima dele já tem forma. No branco não existe "clarear" — quem
+     desenha é o que ESCURECE, e um cinza tímido sobre branco não fica sutil,
+     fica invisível. Foram duas tentativas só subindo a opacidade do céu antes
+     de ficar claro que o problema era outro: um radial de 72vh, mais claro no
+     meio, não se lê como sombra em papel branco; se lê como "a página está meio
+     cinza". Falta BORDA.
+
+     Por isso o claro tem DUAS camadas, e a ordem importa (a primeira pinta por
+     cima):
+
+       1. a faixa — uma sombra curta colada no topo, que morre em ~22vh. É ela
+          que tem limite e por isso é ela que se vê: começa em algum lugar e
+          acaba em outro, que é o que faz o olho chamar aquilo de sombra.
+       2. o céu — o mesmo radial largo de antes, agora fazendo o papel do
+          ambiente: leva o cinza da faixa até o branco sem uma emenda no meio
+          do caminho.
+
+     Sozinha, a faixa vira um cabeçalho cinza com corte reto lá embaixo. Sozinho,
+     o céu é o que estava aqui e sumia. Se precisar de mais presença, sobe a
+     opacidade do PRIMEIRO stop da faixa; se ficar pesado, é o mesmo número que
+     desce. O escuro fica fora disto de propósito: lá a luz já se lê, e a mesma
+     faixa por cima de um papel quase preto só empastaria o topo.
+
+     Nos dois casos a queda inteira acontece FORA da coluna de leitura, e as
+     duas camadas já morreram na altura em que a primeira linha da lista
+     começa. */
   .now-sky {
     position: fixed;
     top: 0;
@@ -518,10 +546,16 @@ function step(panel: number, row: number): number | null {
     height: min(72vh, 640px);
     pointer-events: none;
     background:
+      linear-gradient(180deg,
+        rgba(24, 32, 48, 0.16) 0%,
+        rgba(24, 32, 48, 0.07) 42%,
+        rgba(24, 32, 48, 0) 100%) center top / 100% min(22vh, 190px) no-repeat,
       radial-gradient(120% 100% at 50% -12%,
-        rgba(255, 246, 236, 0.9) 0%,
-        rgba(232, 233, 238, 0.55) 42%,
-        rgba(232, 233, 238, 0) 82%);
+        rgba(255, 252, 247, 1) 0%,
+        rgba(231, 234, 241, 0.98) 26%,
+        rgba(197, 205, 220, 0.95) 56%,
+        rgba(200, 208, 222, 0.5) 74%,
+        rgba(200, 208, 222, 0) 90%) center top / 100% 100% no-repeat;
   }
 
   /* No escuro a mesma luz, muito mais fraca e um pouco mais fria: o papel aqui

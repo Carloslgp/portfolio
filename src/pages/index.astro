@@ -1725,10 +1725,11 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
 
   /* A exceção à moldura: uma imagem que não é fotografia entra no tamanho em
      que nasceu. A tirinha do fim tem 415px de origem — a coluna tem ~624 e a
-     esticaria, e o corte em 3/2 comeria os balões, que são a imagem inteira.
-     Sem aspect-ratio a figure passa a ter a altura da imagem; o fit-content
-     dá a ela a largura do ARQUIVO, então o teto é o pixel que existe e não
-     tem número mágico aqui pra sair de sincronia com a imagem depois. Em
+     esticaria, e o corte da moldura comeria os balões, que são a imagem
+     inteira. Sem aspect-ratio a figure passa a ter a altura da imagem; o
+     fit-content dá a ela a largura do ARQUIVO, então o teto é o pixel que
+     existe e não tem número mágico aqui pra sair de sincronia com a imagem
+     depois — reenquadrar a tirinha é trocar o arquivo, sem tocar no CSS. Em
      coluna estreita o max-width devolve a mão pro container. */
   .shot.is-natural {
     width: fit-content;

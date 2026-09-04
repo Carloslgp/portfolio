@@ -48,11 +48,12 @@ type Paragraph = string;
  *
  *  `natural` desliga a moldura 3/2 e deixa a imagem no tamanho em que ela
  *  nasceu, centrada na coluna. É pra imagem que não é fotografia: a tirinha
- *  do fim tem 415px de origem e balões que encostam nas bordas — esticá-la
- *  até os ~624px da coluna a deixa borrada, e o `cover` da moldura cortaria
- *  fora justamente a fala, que é a imagem inteira. As fotos continuam em
- *  `cover`, que é onde a moldura fixa ganha: elas têm pixel de sobra e nada
- *  de essencial encostado na borda. */
+ *  do fim tem 415px de origem, e esticá-la até os ~624px da coluna a deixa
+ *  borrada. O corte dela já é 4/3 (o céu vazio de cima saiu no arquivo, não
+ *  no CSS), mas os balões encostam nas bordas do que sobrou, então o `cover`
+ *  da moldura ainda comeria fala — e a fala é a imagem inteira. As fotos
+ *  continuam em `cover`, que é onde a moldura fixa ganha: elas têm pixel de
+ *  sobra e nada de essencial encostado na borda. */
 type Photo = {
   photo: string;
   src?: string;

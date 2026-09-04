@@ -372,7 +372,10 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
                       medida é a da foto, então pôr a imagem depois não mexe
                       em nada do que está em volta. */}
                   {isPhoto(block) && (
-                    <figure class:list={['shot', { 'is-empty': !block.src && !block.video }]}>
+                    <figure class:list={['shot', {
+                      'is-empty': !block.src && !block.video,
+                      'is-natural': block.natural,
+                    }]}>
                       {block.video
                         /* preload="none": o vídeo mora no meio de uma página
                            longa que muita gente nunca rola até o fim. Até lá o
@@ -1718,6 +1721,24 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   .shot .is-contained {
     object-fit: contain;
     background: #000;
+  }
+
+  /* A exceção à moldura: uma imagem que não é fotografia entra no tamanho em
+     que nasceu. A tirinha do fim tem 415px de origem — a coluna tem ~624 e a
+     esticaria, e o corte em 3/2 comeria os balões, que são a imagem inteira.
+     Sem aspect-ratio a figure passa a ter a altura da imagem; o fit-content
+     dá a ela a largura do ARQUIVO, então o teto é o pixel que existe e não
+     tem número mágico aqui pra sair de sincronia com a imagem depois. Em
+     coluna estreita o max-width devolve a mão pro container. */
+  .shot.is-natural {
+    width: fit-content;
+    margin-inline: auto;
+    aspect-ratio: auto;
+  }
+  .shot.is-natural img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
   }
 
   /* Só enquanto está vazio. O tracejado é de propósito: um retângulo cinza

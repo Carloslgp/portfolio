@@ -44,13 +44,22 @@ type Paragraph = string;
  *  navegador redesenha na CPU pra sempre; o mesmo trecho em VP9 tem 36 KB e é
  *  decodificado em hardware. O `poster` é o que aparece até o vídeo começar —
  *  e é tudo que aparece em baixa animação, porque lá ele não toca
- *  (ver scripts/shots.ts). */
+ *  (ver scripts/shots.ts).
+ *
+ *  `natural` desliga a moldura 3/2 e deixa a imagem no tamanho em que ela
+ *  nasceu, centrada na coluna. É pra imagem que não é fotografia: a tirinha
+ *  do fim tem 415px de origem e balões que encostam nas bordas — esticá-la
+ *  até os ~624px da coluna a deixa borrada, e o `cover` da moldura cortaria
+ *  fora justamente a fala, que é a imagem inteira. As fotos continuam em
+ *  `cover`, que é onde a moldura fixa ganha: elas têm pixel de sobra e nada
+ *  de essencial encostado na borda. */
 type Photo = {
   photo: string;
   src?: string;
   video?: string;
   poster?: string;
   fit?: 'cover' | 'contain';
+  natural?: boolean;
 };
 
 /** Uma foto da fita 3D. `title` é o que aparece na legenda embaixo (e o que um
@@ -221,6 +230,15 @@ export const TOPICS: Topic[] = [
       '(The gardenia bonsai listens too. It has strong, silent opinions.)',
       'As you can see, I love to talk, but I’ll spare you the rest before this turns into a novel. If you’d like to keep talking, send me a message.',
       'And whatever page of life you’re on right now: I hope it’s a good one. And if it’s not, I hope the next chapter turns the corner soon.',
+      // fecha a página inteira, e é o mesmo pensamento do parágrafo acima dito
+      // por quem disse primeiro. `natural`: é tirinha, não fotografia — entra
+      // no tamanho dela (ver o tipo Photo lá em cima).
+      {
+        photo:
+          'Charlie Brown and Snoopy sitting on a dock. Charlie Brown: “Um dia, nós vamos morrer, Snoopy.” Snoopy: “Sim, mas todos os outros dias, a gente vai viver.”',
+        src: '/images/about_main_photos/closing.webp',
+        natural: true,
+      },
     ],
   },
 ];

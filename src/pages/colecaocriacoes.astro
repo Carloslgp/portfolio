@@ -13,7 +13,15 @@ import Layout from '../layouts/Layout.astro';
 
   <div class="paper" aria-hidden="true"></div>
 
-  <a class="back" href="/">‹ Voltar</a>
+  {/* O `noreferrer` é o que faz a home rodar a abertura inteira ao voltar daqui.
+      Ela decide entre a descida da câmera e o anel instantâneo pelo referrer
+      (main.ts → isInternalArrival), e pular a descida só faz sentido pras
+      páginas do anel: quem volta de lá já a assistiu e ainda renasce no
+      segmento de onde saiu. Esta página não está no anel e não é linkada em
+      lugar nenhum — chega-se nela pela URL — então sair daqui é uma chegada de
+      verdade, não um passo atrás. Sem isto o anel aparecia estático depois da
+      cortina de carregamento. */}
+  <a class="back" href="/" rel="noreferrer">‹ Voltar</a>
 
   <button
     class="theme"

@@ -1,0 +1,337 @@
+---
+// /colecaocriacoes é página de TESTE: existe pra experimentar conteúdo/layout
+// isolado, sem herdar a cena 3D nem a transição de água do craft — só o
+// vocabulário visual clássico do site (papel/tinta + botão de tema).
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout lang="pt">
+  <Fragment slot="head">
+    <title>Coleção de Criações · Carlos Leonardo</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </Fragment>
+
+  <div class="paper" aria-hidden="true"></div>
+
+  <a class="back" href="/">‹ Voltar</a>
+
+  <button
+    class="theme"
+    data-theme-toggle
+    aria-pressed="false"
+    aria-label="Alternar tema claro/escuro"
+    title="Tema claro / escuro"
+  >
+    <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
+    </svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+    </svg>
+  </button>
+
+  <main class="cc-page">
+    <div class="cc-inner">
+      <header class="cc-head">
+        <p class="eyebrow">Teste</p>
+        <h1>Coleção de<br /><em>criações.</em></h1>
+        <p class="lead">
+          Página isolada para experimentar conteúdo e layout, mantendo o
+          mesmo vocabulário visual do resto do site — papel, tinta e o
+          mesmo botão de tema.
+        </p>
+      </header>
+
+      <section class="cc-status" aria-labelledby="cc-status-title">
+        <p class="status-k">Estado</p>
+        <div class="status-copy">
+          <h2 id="cc-status-title">Ainda em rascunho.</h2>
+          <p>Esta rota não está linkada em nenhum outro lugar do site — ela existe só para teste.</p>
+        </div>
+      </section>
+
+      <footer class="cc-foot">
+        <p>Enquanto isso, o resto do site continua aqui.</p>
+        <nav aria-label="Explorar o portfolio">
+          <a href="/work">Work</a>
+          <a href="/craft">Craft</a>
+          <a href="/photos">Photos</a>
+          <a href="/#about">About</a>
+        </nav>
+      </footer>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { initTheme } from '../scripts/theme';
+
+  initTheme();
+</script>
+
+<style>
+  .paper {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--paper);
+    transition: background-color var(--theme-fade);
+  }
+
+  .back {
+    position: fixed;
+    top: calc(1.5rem + env(safe-area-inset-top));
+    left: 2rem;
+    z-index: 6;
+    padding: 0.35rem 0;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color var(--theme-fade);
+  }
+
+  .back::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0.12rem;
+    left: 1.05rem;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .back:hover::after,
+  .back:focus-visible::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  .theme {
+    position: fixed;
+    top: calc(1.3rem + env(safe-area-inset-top));
+    right: 1.5rem;
+    z-index: 6;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(var(--ink-rgb), 0.12);
+    border-radius: 999px;
+    background: rgba(90, 90, 90, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--ink);
+    cursor: pointer;
+    transition:
+      background 0.2s,
+      color var(--theme-fade),
+      border-color var(--theme-fade);
+  }
+
+  .theme:hover {
+    background: rgba(90, 90, 90, 0.42);
+  }
+
+  .theme svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    transition: opacity var(--theme-fade), transform var(--theme-fade);
+  }
+
+  .theme .icon-sun {
+    opacity: 0;
+    transform: rotate(-90deg);
+  }
+
+  :global(html[data-theme='dark']) .theme .icon-moon {
+    opacity: 0;
+    transform: rotate(90deg);
+  }
+
+  :global(html[data-theme='dark']) .theme .icon-sun {
+    opacity: 1;
+    transform: none;
+  }
+
+  .cc-page {
+    position: relative;
+    z-index: 1;
+    min-height: 100dvh;
+    padding: clamp(6.5rem, 13vh, 9rem) 2rem clamp(2.5rem, 6vh, 4rem);
+    color: var(--ink);
+    transition: color var(--theme-fade);
+  }
+
+  .cc-inner {
+    width: min(68rem, 100%);
+    min-height: calc(100dvh - clamp(9rem, 19vh, 13rem));
+    margin: 0 auto;
+    display: grid;
+    grid-template-rows: minmax(18rem, 1fr) auto auto;
+    align-items: end;
+  }
+
+  .eyebrow {
+    margin-bottom: 1rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-head h1 {
+    max-width: 10ch;
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(4rem, min(11vw, 15vh), 8.8rem);
+    font-weight: 600;
+    line-height: 0.82;
+    letter-spacing: -0.065em;
+  }
+
+  .cc-head h1 em {
+    font-weight: 400;
+  }
+
+  .lead {
+    max-width: 31rem;
+    margin-top: clamp(1.4rem, 3.5vh, 2.2rem);
+    color: rgba(var(--ink-rgb), 0.68);
+    font-size: clamp(0.95rem, 1.4vw, 1.08rem);
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-status {
+    display: grid;
+    grid-template-columns: minmax(8rem, 0.34fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    margin-top: clamp(3rem, 8vh, 6rem);
+    padding: 1.45rem 0;
+    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
+    border-bottom: 1px solid rgba(var(--ink-rgb), 0.13);
+    transition: border-color var(--theme-fade);
+  }
+
+  .status-k {
+    padding-top: 0.24rem;
+    color: rgba(var(--ink-rgb), 0.42);
+    font-size: 0.66rem;
+    font-weight: 650;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .status-copy {
+    display: grid;
+    grid-template-columns: minmax(9rem, 0.62fr) minmax(16rem, 1fr);
+    gap: 1.5rem;
+  }
+
+  .status-copy h2 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(1.35rem, 2.5vw, 1.9rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+  }
+
+  .status-copy p {
+    max-width: 30rem;
+    color: rgba(var(--ink-rgb), 0.62);
+    font-size: 0.88rem;
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 2rem;
+    padding-top: 1.55rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.76rem;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-foot nav {
+    display: flex;
+    gap: 1.25rem;
+  }
+
+  .cc-foot a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--ink-rgb), 0.25);
+    text-underline-offset: 3px;
+    transition: color var(--theme-fade), text-decoration-color 0.25s ease;
+  }
+
+  .cc-foot a:hover,
+  .cc-foot a:focus-visible {
+    text-decoration-color: currentColor;
+  }
+
+  @media (max-width: 46rem) {
+    .cc-page {
+      padding: 6.5rem 1.35rem 2rem;
+    }
+
+    .cc-inner {
+      min-height: calc(100dvh - 8.5rem);
+      grid-template-rows: minmax(18rem, 1fr) auto auto;
+    }
+
+    .cc-head h1 {
+      font-size: clamp(3.7rem, 18vw, 6.5rem);
+    }
+
+    .cc-status,
+    .status-copy {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.65rem;
+    }
+
+    .status-k {
+      padding-top: 0;
+    }
+
+    .status-copy p {
+      max-width: 28rem;
+    }
+
+    .cc-foot {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .back {
+      left: 1.25rem;
+    }
+
+    .theme {
+      right: 1rem;
+      width: 40px;
+      height: 40px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .theme svg,
+    .back,
+    .back::after,
+    .theme {
+      transition: none;
+    }
+  }
+</style>

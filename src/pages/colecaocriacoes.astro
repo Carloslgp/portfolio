@@ -72,6 +72,12 @@ const slides = await Promise.all(
       format: IMAGE.FORMAT,
       quality: IMAGE.QUALITY,
     });
+    // que forma esta criação toma no palco: o que a criação pediu, ou o
+    // ciclo de STAGE.CYCLE percorrido pela ordem da lista (ver config.ts).
+    // Vira um data-attribute e acaba aí — quem desenha é o CSS, e o motor
+    // de encaixe só mede a moldura que sair disso.
+    const layout = creation.layout ?? STAGE.CYCLE[index % STAGE.CYCLE.length];
+
     return {
       ...creation,
       index,
@@ -81,11 +87,12 @@ const slides = await Promise.all(
       srcset: img.srcSet.attribute,
       ratio: creation.image.width / creation.image.height,
       from: creation.from ?? 'right',
-      // que forma esta criação toma no palco: o que a criação pediu, ou o
-      // ciclo de STAGE.CYCLE percorrido pela ordem da lista (ver config.ts).
-      // Vira um data-attribute e acaba aí — quem desenha é o CSS, e o motor
-      // de encaixe só mede a moldura que sair disso.
-      layout: creation.layout ?? STAGE.CYCLE[index % STAGE.CYCLE.length],
+      layout,
+      // a única coisa que a composição decide fora do CSS: a `full` leva a
+      // foto a 100vw e as outras a cabem na moldura (ver IMAGE.SIZES /
+      // SIZES_FULL). Precisa ser aqui porque quem escolhe a variante é o
+      // navegador, lendo o atributo, antes de qualquer script rodar.
+      sizes: layout === 'full' ? IMAGE.SIZES_FULL : IMAGE.SIZES,
     };
   }),
 );
@@ -222,7 +229,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
               <img
                 src={s.src}
                 srcset={s.srcset}
-                sizes={IMAGE.SIZES}
+                sizes={s.sizes}
                 alt=""
                 loading={s.index === 0 ? 'eager' : 'lazy'}
                 decoding="async"
@@ -260,7 +267,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
             <img
               src={s.src}
               srcset={s.srcset}
-              sizes={IMAGE.SIZES}
+              sizes={s.sizes}
               alt={s.alt}
               loading={s.index === 0 ? 'eager' : 'lazy'}
               decoding="async"

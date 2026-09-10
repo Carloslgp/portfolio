@@ -168,14 +168,30 @@ export const STATIC = {
 
 // ——— as variantes de imagem geradas no build ———
 export const IMAGE = {
-  /** Larguras pedidas ao pipeline do Astro. A moldura ocupa no máximo ~46vw
-   *  no desktop e a tela inteira no celular; 1440 cobre um notebook de dpr 2
-   *  e 720 cobre o celular sem baixar o dobro à toa. O navegador escolhe pelo
-   *  `sizes` abaixo. */
-  WIDTHS: [720, 1440],
+  /** Larguras pedidas ao pipeline do Astro. 720 cobre o celular sem baixar o
+   *  dobro à toa; 1440 cobre um notebook de dpr 2 numa moldura comum; 2160 é
+   *  pra composição `full`, que leva a foto a 100vw — num notebook retina
+   *  isso são 2880 pixels de tela, e parar em 1440 seria dobrar cada pixel
+   *  justamente na composição que mostra a foto maior.
+   *
+   *  O Astro não amplia: numa foto de origem menor que a maior largura daqui,
+   *  a variante que sai é a da própria fonte, e o srcset a declara pelo
+   *  tamanho real. Então pedir 2160 não inventa pixel — só deixa de jogar
+   *  fora os que existem. */
+  WIDTHS: [720, 1440, 2160],
   FORMAT: 'webp',
   QUALITY: 76,
+
+  /** Quanto da largura da tela a foto ocupa, pro navegador escolher a
+   *  variante. Uma moldura comum cabe em ~46vw no desktop e vai à largura
+   *  toda no celular. */
   SIZES: '(max-width: 46rem) 100vw, 46vw',
+
+  /** A composição `full` é outro caso: a foto cobre a tela em qualquer
+   *  largura. Declarar 46vw ali faria o navegador baixar menos da metade do
+   *  que vai mostrar — e a página escolhe entre um e outro no build, porque
+   *  já sabe a composição de cada criação. */
+  SIZES_FULL: '100vw',
 } as const;
 
 // ——— o canva de fotos ao fundo (ver field.ts e fieldLayout.ts) ———

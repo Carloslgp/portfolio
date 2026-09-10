@@ -158,9 +158,28 @@ export function createField(input: FieldInput): FieldDriver {
       s.cx = box.cx;
       s.cy = box.cy;
       s.fw = box.w;
-      // o iris vive no tamanho da moldura e abre o recorte; os outros vivem
-      // no tamanho da miniatura e crescem por escala
-      s.px = DOCKING[s.effect]?.reveal ? box.w : FIELD.FEATURED_VMIN * vmin;
+      // O elemento é LAYOUTADO no tamanho em que a foto vai PARAR, e o
+      // encaixe escala pra baixo — nunca pra cima.
+      //
+      // A ordem importa e custou qualidade: antes ele nascia do tamanho da
+      // miniatura (18vmin) e crescia por transform. Num celular isso é uma
+      // caixa de 70px recebendo scale(6.8) pra cobrir a tela — e o navegador
+      // rasteriza a imagem na caixa, não no resultado do transform. A GPU
+      // então estica 70px de pixels rasterizados por 6.8, com o arquivo de
+      // 1153px baixado e sem uso. O `backface-visibility: hidden` do .cc-card
+      // sela isso: força camada própria, que é rasterizada uma vez.
+      //
+      // Deitado no tamanho final, o mesmo caminho vira uma redução — que é
+      // sempre nítida — e a miniatura no canva passa a ser a foto grande
+      // desenhada pequena, que é o que ela sempre foi conceitualmente.
+      //
+      // O Math.max é pro caso contrário: numa composição de moldura pequena
+      // (quiet) a miniatura pode ser MAIOR que o destino, e aí quem manda no
+      // layout é ela, pra continuar valendo "nunca ampliar".
+      //
+      // O iris não usa escala nenhuma (abre um recorte no tamanho da
+      // moldura), e a conta acima já lhe dá exatamente isso.
+      s.px = Math.max(FIELD.FEATURED_VMIN * vmin, box.w);
       s.el.style.width = `${s.px.toFixed(2)}px`;
     });
     field.classList.add('is-ready');

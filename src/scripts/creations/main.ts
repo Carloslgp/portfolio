@@ -158,6 +158,9 @@ export function initCreations() {
           cards: [...field.querySelectorAll<HTMLElement>('[data-cc-card]')],
           featured: [...field.querySelectorAll<HTMLElement>('[data-cc-featured]')],
           frames: parts.map((p) => p.frame),
+          // o vão entre as linhas do título: é a caixa em que a fita da
+          // abertura corre, e o motor a mede como mede as molduras
+          ribbon: hero.querySelector<HTMLElement>('[data-cc-ribbon]'),
           creations: N,
           phases,
         })
@@ -293,7 +296,10 @@ function heroTimeline(hero: HTMLElement, nav: HTMLElement | null): gsap.core.Tim
     const w = at(OPENING.TITLE);
     tl.fromTo(
       title,
-      { opacity: 1, scale: 1, y: 0, transformOrigin: 'left center' },
+      // centro, e não a esquerda: a abertura passou a ser uma composição
+      // centrada (a fita corre entre as duas linhas), então crescer a partir
+      // da borda esquerda arrastaria o título pro lado enquanto some
+      { opacity: 1, scale: 1, y: 0, transformOrigin: 'center center' },
       {
         opacity: 0,
         scale: OPENING.TITLE_SCALE,

@@ -34,7 +34,7 @@
 // (.cc-media, que na versão simples mostra a própria foto): aqui ela só é
 // MEDIDA, e a foto que se vê no palco é sempre a do canva.
 import type { Effect } from '../../data/creations';
-import { EFFECTS, FIELD, SCROLL } from './config';
+import { EFFECTS, FIELD, RIBBON, SCROLL } from './config';
 import { DOCKING, smooth, type Phases } from './effects';
 
 export interface FieldInput {
@@ -45,6 +45,8 @@ export interface FieldInput {
   featured: HTMLElement[];
   /** as molduras a medir, uma por criação, na ordem */
   frames: HTMLElement[];
+  /** o vão entre as linhas do título, onde a fita da abertura corre */
+  ribbon: HTMLElement | null;
   creations: number;
   phases: Phases;
 }
@@ -78,9 +80,13 @@ export function createField(input: FieldInput): FieldDriver {
     lit: el.dataset.lit === '1',
     heroOk: el.dataset.heroOk === '1',
     stageOk: el.dataset.stageOk === '1',
+    /** lugar na fita da abertura; -1 não participa (ver fieldLayout.ts) */
+    rank: num(el.dataset.rank, -1),
     px: 0,
     off: false,
   }));
+
+  const ranks = common.reduce((n, c) => Math.max(n, c.rank + 1), 0);
 
   const stars = input.featured.map((el) => ({
     el,
@@ -132,12 +138,21 @@ export function createField(input: FieldInput): FieldDriver {
   let W = 0;
   let VH = 0;
   let vmin = 0;
+  /** o vão entre as duas linhas do título, onde a fita corre. Medido, e não
+   *  calculado, pelo mesmo motivo da moldura das criações: a tipografia decide
+   *  onde o vão cai, e o motor só precisa saber a caixa. */
+  let band = { x: 0, y: 0, w: 0, h: 0 };
 
   const measure = () => {
     const rect = field.getBoundingClientRect();
     W = rect.width;
     VH = rect.height;
     vmin = Math.min(W, VH) / 100;
+
+    const slot = input.ribbon?.getBoundingClientRect();
+    band = slot
+      ? { x: slot.left - rect.left, y: slot.top - rect.top, w: slot.width, h: slot.height }
+      : { x: 0, y: VH * 0.3, w: W, h: VH * 0.4 };
     common.forEach((c) => {
       c.px = c.w * vmin;
       c.el.style.width = `${c.px.toFixed(2)}px`;
@@ -189,6 +204,66 @@ export function createField(input: FieldInput): FieldDriver {
     if (item.off === off) return;
     item.off = off;
     item.el.classList.toggle('is-off', off);
+  };
+
+  // ——— a fita da abertura ———
+  //
+  // Três funções puras de t, como todo o resto deste arquivo. A abertura
+  // inteira acontece em t ∈ [0, H]; depois disso `open` devolve 1 e nada aqui
+  // custa nada.
+  //
+  // O tempo se parte em dois: o APERTO (até GATHER), em que a curva se fecha —
+  // encolhe em amplitude, em comprimento e em tamanho de foto — e o ESTOURO,
+  // em que cada foto vai da curva até o lugar dela no canva. O aperto existe
+  // pra dar de onde partir: sem ele o estouro é só um espalhar, com ele é uma
+  // coisa que se soltou.
+  //
+  // O estouro é uma potência, não uma reta: começa devagar (a fita ainda
+  // parece inteira, o olho tem tempo de ver que ela É a página) e termina
+  // rápido, com as fotas de fora indo embora depressa.
+
+  /** Quanto da abertura já passou, 0 a 1. */
+  const openAt = (t: number) => clamp(t / H);
+
+  /** O aperto: 0 no início, 1 no instante em que o estouro começa. */
+  const gatherAt = (p: number) => clamp(p / RIBBON.GATHER);
+
+  /** O estouro: 0 enquanto ainda aperta, 1 quando a foto chegou ao canva. */
+  const burstAt = (p: number) => {
+    const u = clamp((p - RIBBON.GATHER) / (1 - RIBBON.GATHER));
+    return Math.pow(u, RIBBON.FALL); // parte devagar, chega acelerando
+  };
+
+  /** Onde a foto de posto `rank` está na curva, já apertada por `k`.
+   *
+   *  x = meio - AMPLITUDE·sen(2π·u) é um período completo de senoide, que
+   *  desenhado de cima pra baixo é um S: sai do meio, bojo pra um lado, cruza,
+   *  bojo pro outro, volta ao meio. `u` é a posição na fita, 0 no topo.
+   *
+   *  O aperto encolhe o COMPRIMENTO em volta do meio (por isso `us`, e não
+   *  `u`, na altura) mas mantém a onda em `u`: a curva se fecha como uma mola,
+   *  sem perder as voltas. */
+  const ribbonAt = (rank: number, w: number, k: number) => {
+    const u = ranks > 1 ? rank / (ranks - 1) : 0.5;
+    // recuado dentro do vão (PAD) porque a conta dá o CENTRO da foto: sem
+    // isso metade da primeira e da última sobra pra fora, sobre o título
+    const inset = RIBBON.PAD + u * (1 - 2 * RIBBON.PAD);
+    const us = 0.5 + (inset - 0.5) * lerp(1, RIBBON.TIGHT_SPAN, k);
+    // as duas medidas saem da ALTURA da faixa, pra curva ter a mesma forma em
+    // qualquer tela (ver AMPLITUDE e CARD no config); a largura só entra como
+    // freio, pra janela estreita
+    const amp =
+      Math.min(RIBBON.AMPLITUDE * band.h, RIBBON.MAX_W * W) * lerp(1, RIBBON.TIGHT_AMP, k);
+    // o tamanho relativo entre as fotos se mantém: cada uma é o tamanho-base
+    // vezes o quanto ela é maior ou menor que a foto média do canva
+    const alvo = RIBBON.CARD * band.h * lerp(1, RIBBON.TIGHT_SIZE, k) * (w / FIELD.SIZES_VMIN[1]);
+    return {
+      cx: band.x + band.w / 2 - amp * Math.sin(Math.PI * 2 * u),
+      cy: band.y + band.h * us,
+      // nunca acima de 1: o caminho até o canva é uma ampliação, e passar do
+      // tamanho natural do elemento custaria nitidez
+      scale: Math.min(1, alvo / (w * vmin)),
+    };
   };
 
   /** A respiração em t: 1 na abertura e depois do fim; dentro de cada
@@ -259,19 +334,56 @@ export function createField(input: FieldInput): FieldDriver {
       else delete root.dataset.overPhoto;
     }
 
+    // a abertura: enquanto ela corre, as fotos da fita mandam na cena
+    const p = openAt(t);
+    const aberta = p >= 1;
+    const gather = aberta ? 1 : gatherAt(p);
+    const burst = aberta ? 1 : burstAt(p);
+
     for (const c of common) {
       const h = c.px / c.ratio;
-      const cy = c.yc * VH - shift;
-      if (cy + h / 2 < -cull || cy - h / 2 > VH + cull) {
+      let cx = c.x * W;
+      let cy = c.yc * VH - shift;
+      let scale = 1;
+      let fita = 0;
+
+      // Na fita, a foto é levada da curva até o lugar dela no canva. O
+      // caminho é uma mistura simples entre as duas poses, e é ele que faz o
+      // "junta e cai": no fim do estouro a maioria já está fora da tela,
+      // porque o lugar delas no canva é lá embaixo.
+      //
+      // O tamanho é ESCALA e nunca largura: o elemento continua deitado no
+      // tamanho de canva, e a fita é ele desenhado menor (SCALE < 1). Reduzir
+      // é nítido; o contrário custaria a qualidade que a foto das criações já
+      // ensinou a não perder.
+      if (!aberta && c.rank >= 0) {
+        const r = ribbonAt(c.rank, c.w, gather);
+        cx = lerp(r.cx, cx, burst);
+        cy = lerp(r.cy, cy, burst);
+        scale = lerp(r.scale, 1, burst);
+        fita = 1 - burst;
+      }
+
+      // as que não estão na fita só entram quando ela já se desfez: durante a
+      // abertura a cena é a curva, e um canva normal por baixo dela seria
+      // ruído competindo com o gesto
+      const hidden = !aberta && c.rank < 0;
+      const meia = h * scale;
+      if (hidden || cy + meia / 2 < -cull || cy - meia / 2 > VH + cull) {
         setOff(c, true);
         continue;
       }
       setOff(c, false);
-      const cx = c.x * W;
-      c.el.style.transform = `translate3d(${(cx - c.px / 2).toFixed(1)}px, ${(cy - h / 2).toFixed(1)}px, 0)`;
+
+      const t3 = `translate3d(${(cx - c.px / 2).toFixed(1)}px, ${(cy - h / 2).toFixed(1)}px, 0)`;
+      c.el.style.transform = scale === 1 ? t3 : `${t3} scale(${scale.toFixed(4)})`;
+
       const hero = c.lit && c.heroOk ? FIELD.LIT : FIELD.GHOST;
       const stage = c.lit && c.stageOk ? FIELD.LIT : FIELD.GHOST;
       c.el.style.setProperty('--level', lerp(hero, stage, mix).toFixed(4));
+      // na fita ela é a página inteira, então acesa por cima de qualquer
+      // regra do canva — inclusive do teto do celular (ver o CSS do .cc-card)
+      c.el.style.setProperty('--ribbon-a', fita.toFixed(4));
     }
 
     for (const s of stars) {

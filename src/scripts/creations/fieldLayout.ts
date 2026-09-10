@@ -11,7 +11,7 @@
 // As fotos das CRIAÇÕES não passam por aqui: a posição delas no canva é
 // função da moldura em que vão se encaixar, que só se conhece na tela (ver
 // field.ts).
-import { FIELD, SCROLL } from './config';
+import { FIELD, RIBBON, SCROLL } from './config';
 
 export interface FieldCard {
   /** qual foto: posição em FIELD_PHOTOS */
@@ -29,6 +29,10 @@ export interface FieldCard {
   stageOk: boolean;
   /** só entra em tela larga (ver FIELD.MOBILE.EVERY) */
   wideOnly: boolean;
+  /** posição na fita da abertura, 0 = topo da curva; -1 = não participa.
+   *  ONDE isso cai na tela é medido no cliente (ver field.ts) — aqui só se
+   *  decide QUEM entra e em que ordem. */
+  rank: number;
 }
 
 /** mulberry32 — o mesmo gerador determinístico do mural (photos/layout.ts):
@@ -105,8 +109,31 @@ export function layoutField(photos: number, creations: number): FieldCard[] {
         heroOk: outside(x / 100, FIELD.SAFE_X.hero),
         stageOk: outside(x / 100, FIELD.SAFE_X.stage),
         wideOnly: cards.length % FIELD.MOBILE.EVERY !== 0,
+        rank: -1,
       });
     }
   }
+
+  // ——— quem forma a fita da abertura ———
+  //
+  // As primeiras COUNT fotos do canva que aparecem em TODA tela. O filtro de
+  // wideOnly não é detalhe: no celular metade das fotos comuns é escondida por
+  // CSS, e uma fita montada sem olhar isso perderia metade dos membros
+  // justamente na tela em que ela é o primeiro que se vê.
+  //
+  // "As primeiras" porque a fita se desmancha PRA DENTRO do canva: cada foto
+  // vai da curva até o lugar dela, e as de cima do canva são as que terminam
+  // perto da tela. As outras seguem pra fora dela, que é o que faz o estouro
+  // parecer um espalhar e não um sumiço — elas não somem, elas vão embora.
+  //
+  // A ordem é a do canva (linha a linha, de cima pra baixo), e vira a ordem na
+  // curva: assim ninguém cruza o caminho de ninguém no estouro.
+  cards
+    .filter((c) => !c.wideOnly)
+    .slice(0, RIBBON.COUNT)
+    .forEach((c, i) => {
+      c.rank = i;
+    });
+
   return cards;
 }

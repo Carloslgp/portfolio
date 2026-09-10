@@ -128,12 +128,15 @@ export const LAYOUT = {
 export const OPENING = {
   /** Em que ordem as peças da abertura somem, em frações do trecho dela
    *  (SCROLL.HERO_SCREENS). A dica de rolar some primeiro — ela já cumpriu o
-   *  papel no instante em que a pessoa rolou; o rótulo e o parágrafo vão em
-   *  seguida; o título fica por último, crescendo um pouco enquanto esmaece,
-   *  como se a câmera passasse por ele. Cada par é [início, duração]. */
-  HINT: [0, 0.25],
-  SOFT: [0.1, 0.5],
-  TITLE: [0.2, 0.7],
+   *  papel no instante em que a pessoa rolou. O resto agora ESPERA a fita: o
+   *  título é metade da composição (a curva corre entre as duas linhas dele),
+   *  então ele tem que estar inteiro enquanto ela se aperta, e só sair quando
+   *  ela estourar. Somem antes disso e o aperto acontece numa tela vazia, que
+   *  é o gesto sem o motivo. Daí o rótulo e o parágrafo saírem em RIBBON.
+   *  GATHER (0.28) e o título logo atrás. Cada par é [início, duração]. */
+  HINT: [0, 0.22],
+  SOFT: [0.3, 0.38],
+  TITLE: [0.38, 0.46],
   /** o próprio bloco da abertura sai de cena (visibility) no fim do trecho,
    *  pra não ficar por baixo das criações recebendo clique */
   BLOCK: [0.92, 0.08],
@@ -145,6 +148,83 @@ export const OPENING = {
   TITLE_SCALE: 1.06,
   TITLE_LIFT_VH: 8,
   SOFT_LIFT: 24,
+} as const;
+
+// ——— a fita da abertura ———
+//
+// A página abre com as fotos reunidas numa curva em S entre as duas linhas do
+// título — ela aperta, estoura e se espalha, e o que sobra espalhado JÁ É o
+// canva de fundo. A referência é a mesma que deu origem ao canva, a "Tracing
+// Art" do Getty.
+//
+// A ideia que faz isto valer a pena: a fita não é uma animação de entrada
+// separada que some pra dar lugar à página. Ela é o canva em outra pose. As
+// fotos da curva são as MESMAS que ficam no fundo o resto da rolagem, e o que
+// se vê é elas indo pro lugar delas — nada aparece do nada e nada é
+// descartado. Um crossfade entre "abertura" e "página" seria mais fácil e
+// diria outra coisa.
+//
+// Onde a fita fica não está aqui: é MEDIDO. Há um vão entre as duas linhas do
+// título (o [data-cc-ribbon] no markup) e o field.ts lê a caixa dele, do
+// mesmo jeito que lê a moldura de cada criação. Assim a curva cai entre as
+// linhas em qualquer tela, sem que estes números precisem saber de tipografia.
+export const RIBBON = {
+  /** Quantas fotos formam a curva. O canva tem ~9 por tela, então 44 são umas
+   *  cinco telas de canva reunidas num lugar só — e é dessa densidade que vem
+   *  a leitura de "fita", com as fotos se encavalando. Menos que isso vira uma
+   *  fileira de fotos soltas. */
+  COUNT: 56,
+
+  /** O S. A curva é `x = meio - AMPLITUDE * sen(2π·u)` com u indo de 0 no topo
+   *  a 1 na base: um período completo, que é exatamente um S — sai do meio,
+   *  bojo pra esquerda, cruza, bojo pra direita, volta ao meio.
+   *
+   *  A amplitude é fração da ALTURA DA FAIXA, e não da largura da tela. Isso
+   *  não é detalhe: em fração da largura o S sai com a proporção da janela —
+   *  estreito e alto no celular, e no desktop 245px pra cada lado dentro de
+   *  uma faixa de 342px de altura, o que não é um S, é um borrão na diagonal.
+   *  Amarrada à altura, a curva tem a MESMA forma em qualquer tela, que é o
+   *  que uma assinatura visual precisa ter.
+   *
+   *  MAX_W é o freio pra tela estreita: numa janela fina, 0.3 da altura da
+   *  faixa passaria da largura disponível. */
+  AMPLITUDE: 0.3,
+  MAX_W: 0.22,
+
+  /** Recuo da curva dentro do vão, em fração da altura dele. A conta põe o
+   *  CENTRO da foto na curva, então sem recuo metade da primeira e da última
+   *  ficam pra fora do vão — encostando nas linhas do título, que é
+   *  exatamente o que a composição não pode ter. */
+  PAD: 0.14,
+
+  /** Tamanho de uma foto na fita, em fração da altura da faixa — pelo mesmo
+   *  motivo da amplitude. Em vmin (que é como o canva mede) a mesma foto sai
+   *  2,3x maior no desktop que no celular, e a fita deixa de ser uma fita:
+   *  vira uma pilha de fotos grandes se encavalando. Presa à altura da faixa,
+   *  cabe sempre o mesmo tanto de foto na curva.
+   *
+   *  O tamanho relativo entre elas se mantém: cada uma é este valor vezes o
+   *  quanto ela é maior ou menor que a foto média do canva. E o resultado é
+   *  travado em no máximo 1x o tamanho de canva, porque o caminho até lá é
+   *  uma ampliação e ampliar além do natural é perder nitidez — a mesma lição
+   *  que a foto das criações já tinha ensinado. */
+  CARD: 0.13,
+
+  /** O aperto, antes do estouro: a fração da abertura em que a fita se
+   *  comprime, e quanto ela encolhe em amplitude, comprimento e tamanho.
+   *  Existe porque sem ele o estouro não tem de onde partir — a fita precisa
+   *  se fechar pra que abrir signifique alguma coisa. */
+  GATHER: 0.28,
+
+  /** A curva do estouro. Maior que 1 é queda: começa devagar e acelera, que é
+   *  o que "cai" quer dizer. Começou em 3 e estava errado — com expoente 3,
+   *  na metade da abertura só 1% do caminho tinha sido feito, e o que se via
+   *  era uma fita parada por meia tela e um borrão no fim. Em 1.6 o movimento
+   *  se distribui pela rolagem e ainda chega acelerando. */
+  FALL: 1.6,
+  TIGHT_AMP: 0.34,
+  TIGHT_SPAN: 0.55,
+  TIGHT_SIZE: 0.74,
 } as const;
 
 export const CLOSING = {

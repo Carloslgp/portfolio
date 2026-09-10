@@ -209,6 +209,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
             data-lit={c.lit ? '1' : '0'}
             data-hero-ok={c.heroOk ? '1' : '0'}
             data-stage-ok={c.stageOk ? '1' : '0'}
+            data-rank={c.rank}
             style={`--ratio:${c.ratio.toFixed(4)}`}
           >
             <img src={c.src} alt="" loading="lazy" decoding="async" draggable="false" />
@@ -242,7 +243,20 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
 
       <header class="cc-hero" data-cc-hero>
         <p class="eyebrow" data-cc-hero-kicker>{OPENING.kicker}</p>
-        <h1 data-cc-hero-title>{OPENING.title.line1}<br /><em>{OPENING.title.line2}</em></h1>
+        {/* O título parte em duas com um VÃO no meio: é ali que a fita da
+            abertura corre (o canva reunido numa curva em S, ver RIBBON no
+            config). O vão é um span vazio e sem conteúdo de propósito — ele
+            existe pra ser MEDIDO pelo field.ts, do mesmo jeito que a moldura
+            de cada criação, e assim a curva cai entre as linhas em qualquer
+            tipografia e qualquer tela, sem que o motor saiba de fonte.
+
+            Continua um <h1> só: pro leitor de tela o texto segue sendo
+            "Coleção de criações.", em ordem, e o vão não diz nada. */}
+        <h1 data-cc-hero-title>
+          <span class="cc-title-line">{OPENING.title.line1}</span>{' '}
+          <span class="cc-ribbon-slot" data-cc-ribbon aria-hidden="true"></span>
+          <span class="cc-title-line"><em>{OPENING.title.line2}</em></span>
+        </h1>
         <p class="lead" data-cc-hero-lead>{OPENING.lead}</p>
         <p class="cc-hint" data-cc-hero-hint aria-hidden="true"><span>{OPENING.hint}</span></p>
       </header>
@@ -408,7 +422,14 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     left: 0;
     margin: 0;
     aspect-ratio: var(--ratio);
-    opacity: calc(min(var(--level, 0), var(--lit-cap, 1)) * var(--breath));
+    /* O max(--ribbon-a, ...) é a fita da abertura passando por cima das
+       regras do canva. Lá ela não é fundo — é a página inteira — então acende
+       por inteiro, inclusive acima do teto do celular (--lit-cap), que existe
+       pra fundo não competir com texto e ali não há texto pra competir. Fora
+       da abertura --ribbon-a é 0 e a conta é a de sempre. */
+    opacity: calc(
+      max(var(--ribbon-a, 0), min(var(--level, 0), var(--lit-cap, 1))) * var(--breath)
+    );
     transform-origin: center center;
     backface-visibility: hidden;
   }
@@ -449,12 +470,17 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
   }
 
   /* ——— a abertura ——— */
+  /* Composição centrada e simétrica, e tem que ser: a fita corre ENTRE as
+     duas linhas do título, e uma curva centrada sob um título alinhado à
+     esquerda não é composição, é sobreposição. */
   .cc-hero {
     position: relative;
     min-height: var(--viewport-h);
     display: grid;
     align-content: center;
-    padding: clamp(6.5rem, 13vh, 9rem) clamp(1.5rem, 6vw, 6rem) clamp(6rem, 14vh, 8rem);
+    justify-items: center;
+    text-align: center;
+    padding: clamp(3rem, 7vh, 5rem) clamp(1.5rem, 6vw, 6rem) clamp(2.5rem, 6vh, 4.5rem);
   }
 
   :global(html[data-creations='stage']) .cc-hero {
@@ -473,17 +499,38 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     transition: color var(--theme-fade);
   }
 
+  /* A tipografia encolheu: com o vão da fita no meio, as duas linhas mais o
+     vão mais o rótulo e o parágrafo têm que caber numa tela SEM rolar — a
+     abertura é a única parte da página que não tem pra onde crescer. */
   .cc-hero h1 {
-    max-width: 10ch;
+    display: grid;
+    justify-items: center;
     font-family: "Playfair Display", Georgia, serif;
-    font-size: clamp(4rem, min(11vw, 15vh), 8.8rem);
+    font-size: clamp(2.6rem, min(8vw, 9.5vh), 5.6rem);
     font-weight: 600;
-    line-height: 0.82;
-    letter-spacing: -0.065em;
+    line-height: 0.9;
+    letter-spacing: -0.055em;
   }
 
   .cc-hero h1 em {
     font-weight: 400;
+  }
+
+  /* O VÃO onde a fita corre. Não tem conteúdo e não desenha nada: é uma caixa
+     pro field.ts MEDIR (getBoundingClientRect), do mesmo jeito que ele mede a
+     moldura de cada criação. Por isso a curva cai entre as linhas em qualquer
+     tipografia e qualquer tela, sem que o motor saiba o que é uma fonte.
+
+     Na versão simples não há canva nem fita, e ele colapsa — senão seria um
+     buraco no meio do título sem motivo nenhum. */
+  .cc-ribbon-slot {
+    display: block;
+    width: 100%;
+    height: 0;
+  }
+
+  :global(html[data-creations='stage']) .cc-ribbon-slot {
+    height: min(38dvh, 24rem);
   }
 
   .lead {

@@ -13,11 +13,12 @@
 //     scroll pro progresso dela. A unidade de tempo da mestra é a ALTURA DE
 //     TELA: 1 segundo de timeline = 1 viewport de rolagem, então o `end` do
 //     trigger sai direto da duração. Todos os números moram em config.ts.
-//   • Cada criação termina invisível e a seguinte começa invisível (ver
-//     effects.ts): entre duas há um respiro de papel, nunca as duas juntas.
-//   • Atrás de tudo, o campo de fotos (field.ts) anda na mesma timeline: deriva
-//     contínua, troca de constelação a cada fronteira e escurece durante a
-//     leitura — é fundo, e se comporta como fundo.
+//   • O texto de cada criação termina invisível e o da seguinte começa
+//     invisível (ver effects.ts): entre duas há um respiro, nunca as duas
+//     juntas.
+//   • Atrás de tudo, o canva de fotos (field.ts) é função do mesmo tempo: rola
+//     com a página, escurece durante a leitura — e é de lá que a foto de cada
+//     criação vem, subindo e crescendo até a moldura, sem aparecer do nada.
 //
 // A decisão "palco ou versão simples" NÃO é tomada aqui: é do script inline
 // no <head> da página, antes do primeiro paint (ele lê a escolha do portão de
@@ -33,7 +34,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { Effect } from '../../data/creations';
 import { viewportSize } from '../viewport';
 import { CLOSING, OPENING, SCROLL, STATIC } from './config';
-import { BUILDERS, type Phases, type SlideParts } from './effects';
+import { DOCKING, slideTimeline, type Phases, type SlideParts } from './effects';
 import { createField } from './field';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -107,7 +108,7 @@ export function initCreations() {
     console.warn('[creations] stage unavailable — falling back to the stacked layout', err);
     ScrollTrigger.getAll().forEach((trigger) => trigger.kill(true));
     gsap.set(stage.querySelectorAll('*'), {
-      clearProps: 'transform,opacity,visibility,clipPath,transformOrigin,perspective',
+      clearProps: 'transform,opacity,visibility,clipPath,transformOrigin,perspective,width',
     });
     html.dataset.creations = 'static';
     staticMode();
@@ -137,25 +138,35 @@ export function initCreations() {
 
     const master = gsap.timeline({ paused: true });
     master.add(heroTimeline(hero, nav), 0);
-    slides.forEach((slide, i) => {
-      const effect = slide.dataset.effect as Effect;
-      const build = BUILDERS[effect];
-      if (!build) throw new Error(`unknown effect "${effect}" on creation ${pad(i + 1)}`);
-      master.add(build(partsOf(slide), phases), H + i * SPC);
+    const parts = slides.map((slide, i) => {
+      const p = partsOf(slide);
+      if (!(p.effect in DOCKING)) throw new Error(`unknown effect "${p.effect}" on creation ${pad(i + 1)}`);
+      master.add(slideTimeline(p, phases), H + i * SPC);
+      return p;
     });
-    // O campo de fotos ao fundo (ver field.ts): a deriva entra na mestra como
-    // tween; as luzes são função do tempo dela, recalculadas a cada render —
-    // pela própria mestra, e não pelo onUpdate do trigger, pra seguirem o
-    // MESMO relógio do resto quando SCRUB tem inércia.
+    master.set({}, {}, total);
+
+    // O canva de fotos ao fundo (ver field.ts) é função do tempo da mestra,
+    // recalculado a cada render dela — pela própria mestra, e não pelo
+    // onUpdate do trigger, pra seguir o MESMO relógio do resto quando SCRUB
+    // tem inércia. As molduras das criações são medidas aqui e remedidas no
+    // refresh: é nelas que as fotos do canva se encaixam.
     const field = stage.querySelector<HTMLElement>('[data-cc-field]');
-    const cards = [...stage.querySelectorAll<HTMLElement>('[data-cc-card]')];
-    if (field && cards.length) {
-      const driver = createField(field, cards, N, phases, total);
-      master.add(driver.timeline, 0);
+    const driver = field
+      ? createField({
+          field,
+          cards: [...field.querySelectorAll<HTMLElement>('[data-cc-card]')],
+          featured: [...field.querySelectorAll<HTMLElement>('[data-cc-featured]')],
+          frames: parts.map((p) => p.frame),
+          creations: N,
+          phases,
+        })
+      : null;
+    if (driver) {
+      driver.measure();
       master.eventCallback('onUpdate', () => driver.apply(master.time()));
       driver.apply(0);
     }
-    master.set({}, {}, total);
 
     // Qual criação está ativa, a partir do progresso do trigger. Antes da
     // abertura terminar não há nenhuma; depois do fim, a última fica com a
@@ -187,7 +198,12 @@ export function initCreations() {
       animation: master,
       invalidateOnRefresh: true,
       onUpdate: (self) => sync(self.progress),
-      onRefresh: (self) => sync(self.progress),
+      onRefresh: (self) => {
+        // a tela mudou (giro, janela): as molduras estão em outro lugar
+        driver?.measure();
+        driver?.apply(master.time());
+        sync(self.progress);
+      },
     });
 
     // O salto do indicador: a posição de scroll que corresponde ao meio da
@@ -229,17 +245,16 @@ export function initCreations() {
 }
 
 /** As peças de uma criação, achadas pelos data-attributes do markup. A
- *  moldura é obrigatória — sem ela o efeito não tem o que mover, e é melhor
- *  falhar aqui (e cair na versão simples) do que animar `null`. */
-function partsOf(slide: HTMLElement): SlideParts {
-  const media = slide.querySelector<HTMLElement>('[data-cc-media]');
-  if (!media) throw new Error(`creation "${slide.id}" has no [data-cc-media]`);
+ *  moldura é obrigatória — é nela que a foto do canva se encaixa, e é melhor
+ *  falhar aqui (e cair na versão simples) do que encaixar em `null`. */
+function partsOf(slide: HTMLElement): SlideParts & { frame: HTMLElement } {
+  const frame = slide.querySelector<HTMLElement>('[data-cc-media]');
+  if (!frame) throw new Error(`creation "${slide.id}" has no [data-cc-media]`);
   return {
     root: slide,
-    media,
+    frame,
     copy: [...slide.querySelectorAll<HTMLElement>('[data-cc-line]')],
-    curtain: slide.querySelector<HTMLElement>('[data-cc-curtain]'),
-    pieces: [...slide.querySelectorAll<HTMLElement>('[data-cc-piece]')],
+    effect: slide.dataset.effect as Effect,
     from: slide.dataset.from === 'left' ? 'left' : 'right',
   };
 }

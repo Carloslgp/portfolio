@@ -60,14 +60,20 @@ ordem da lista. Não há campo pra eles.
 
 ## Os efeitos
 
-| `effect`    | entrada                                             | saída                         |
-|-------------|-----------------------------------------------------|-------------------------------|
-| `'grow'`    | a imagem cresce do centro                           | encolhe                       |
-| `'slide'`   | a imagem desliza de um lado (`from`)                | sai pelo lado oposto          |
-| `'curtain'` | um painel de tinta cobre a tela e sobe revelando    | o painel desce de volta       |
-| `'pieces'`  | a imagem chega em tiras que se encaixam             | as tiras se soltam            |
-| `'iris'`    | um círculo abre do centro e revela imagem e texto   | o círculo fecha               |
-| `'flip'`    | a imagem entra tombada em 3D pela base e assenta    | tomba pra trás pelo topo      |
+A foto de toda criação já está no canva de fundo, como miniatura. Conforme
+você rola ela sobe com o canva e se encaixa na moldura; na saída volta ao
+canva e segue subindo. O efeito é **como** ela se encaixa:
+
+| `effect`   | como a miniatura chega à moldura                                    |
+|------------|----------------------------------------------------------------------|
+| `'grow'`   | sobe do canva crescendo até o tamanho da moldura                     |
+| `'slide'`  | vem de um lado da tela (`from`)                                      |
+| `'tilt'`   | sobe deitada pra trás e se levanta                                   |
+| `'pieces'` | se encaixa em tiras verticais, do centro pras bordas                 |
+| `'iris'`   | a miniatura é um recorte da foto, que se abre até a foto inteira     |
+| `'flip'`   | sobe girando ao redor do eixo vertical                               |
+
+A saída é sempre o espelho da entrada.
 
 **Uma regra:** duas criações vizinhas não podem usar o mesmo efeito. Se
 acontecer (ao reordenar, por exemplo), o `astro build` / `astro dev` para com
@@ -96,18 +102,22 @@ Efeito com nome errado também é recusado — o editor já autocompleta a lista
   `rel="noreferrer"` automaticamente (é o que faz a home rodar a abertura
   inteira ao voltar).
 
-## As fotos do fundo
+## O canva de fotos do fundo
 
-Atrás da abertura e das criações há um campo de fotos espalhadas, quase todas
-apagadas e algumas acesas, que se desloca e troca de constelação conforme se
-rola. Quais fotos entram é a lista **`FIELD_PHOTOS`** em `creations.ts`: só os
-imports, na ordem que quiser (a posição de cada uma é sorteada no build, sempre
-igual). Pode ter mais ou menos fotos que `FIELD.COUNT` (config): com menos, a
-lista repete; com mais, sobram.
+Atrás da abertura e das criações há um canva de fotos espalhadas que rola
+com a página: pra baixo as fotos sobem e aparecem novas por baixo, pra cima o
+contrário. A maioria é fantasma; algumas acendem nas margens; durante a pausa
+de leitura de cada criação o canva inteiro escurece. Quais fotos entram é a
+lista **`FIELD_PHOTOS`** em `creations.ts`: só os imports, na ordem que quiser
+(a posição de cada uma é sorteada no build, sempre igual). O canva tem mais
+lugares que fotos, então a lista repete — quanto mais fotos, menos repetição.
 
-O campo é decorativo (sem alt), não existe na versão simples e no celular fica
-com menos fotos e mais fraco. Quantas aparecem, o tamanho, quanto se movem, o
-quanto acendem e a semente do sorteio ficam em `config.ts` → `FIELD`.
+A foto de cada criação **não** precisa estar nessa lista: ela entra no canva
+por conta própria, como miniatura, e é de lá que vem se encaixar na moldura.
+
+O canva é decorativo (sem alt), não existe na versão simples e no celular fica
+com metade das fotos e mais fraco. Velocidade, densidade, tamanhos, luzes e a
+semente do sorteio ficam em `config.ts` → `FIELD`.
 
 ## Velocidade, duração e ajuste fino
 
@@ -119,13 +129,14 @@ Não ficam no arquivo de conteúdo. Tudo está em
 - `SCROLL.PHASES` — quanto da criação é entrada, pausa de leitura e saída;
 - `SCROLL.SCRUB` — `true` (colado no scroll) ou um número de segundos de
   inércia, ex.: `0.3`;
-- `EFFECTS.*` — o ajuste de cada efeito (tamanho inicial do grow, número de
-  tiras do pieces, ângulo do flip…);
 - `LAYOUT.MIN_STAGE_HEIGHT` — abaixo desta altura de tela a página mostra a
   versão simples (empilhada);
-- `FIELD.*` — o campo de fotos do fundo: `COUNT`, `SEED` (trocar sorteia
-  outro arranjo), `DRIFT_VH` (quanto se move), `GHOST`/`LIT`/`BREATH_MIN`
-  (quanto aparece), `LIT_PER`/`OFF_PER` (quantas acendem e somem por trecho).
+- `FIELD.*` — o canva de fotos do fundo: `RATE` (velocidade em relação à
+  página), `ROW_VH`/`FILL` (densidade), `SIZES_VMIN`/`FEATURED_VMIN`
+  (tamanhos), `GHOST`/`LIT`/`BREATH_MIN`/`LIT_SHARE` (quanto aparece),
+  `SEED` (trocar sorteia outro arranjo);
+- `EFFECTS.*` — o ajuste de cada encaixe (ângulo do tilt e do flip, número
+  de tiras do pieces, de que distância o slide vem).
 
 ## Quando a página mostra a versão simples
 

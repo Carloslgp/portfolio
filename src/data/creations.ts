@@ -42,12 +42,11 @@ import mock06 from '../assets/photos/glacier-valley.webp';
 import mock07 from '../assets/photos/neon-dance.webp';
 import mock08 from '../assets/photos/chapel-ceiling.webp';
 
-// ——— as fotos do campo de fundo ———
+// ——— as fotos do canva de fundo ———
 // TROCAR à vontade: são fotos do mural que não estão nas criações. A ordem
-// não importa (a posição de cada uma é sorteada no build) e pode haver mais
-// ou menos que FIELD.COUNT (config) — com menos, a lista repete; com mais,
-// sobram. Quantas aparecem, o tamanho, o movimento e as luzes ficam em
-// scripts/creations/config.ts → FIELD.
+// não importa (a posição de cada uma é sorteada no build). Quantas cabem, o
+// tamanho, a velocidade e as luzes ficam em scripts/creations/config.ts →
+// FIELD.
 import field01 from '../assets/photos/florence-duomo-marble.webp';
 import field02 from '../assets/photos/dinosaur-skeleton.webp';
 import field03 from '../assets/photos/primavera-graces.webp';
@@ -66,25 +65,42 @@ import field15 from '../assets/photos/sea-sparkle.webp';
 import field16 from '../assets/photos/train-window-fields.webp';
 import field17 from '../assets/photos/bare-tree-blossoms.webp';
 import field18 from '../assets/photos/vertical-forest-tower.webp';
+import field19 from '../assets/photos/alpine-valley.webp';
+import field20 from '../assets/photos/angel-lute-detail.webp';
+import field21 from '../assets/photos/clear-water-stones.webp';
+import field22 from '../assets/photos/florence-duomo-alley.webp';
+import field23 from '../assets/photos/lake-and-cliff-bw.webp';
+import field24 from '../assets/photos/skylight-clouds.webp';
+import field25 from '../assets/photos/life-is-strange-triptych.webp';
+import field26 from '../assets/photos/minecraft-torchlight.webp';
+import field27 from '../assets/photos/rdr2-snow-rider.webp';
+import field28 from '../assets/photos/primavera-flora.webp';
+import field29 from '../assets/photos/IMG_0430-limpa.webp';
+import field30 from '../assets/photos/IMG_0433-limpa.webp';
 
-/** As fotos espalhadas ao fundo do palco. Decorativas: não têm alt nem
- *  legenda, e a versão simples da página não as mostra. */
+/** As fotos comuns do canva de fundo. Decorativas: não têm alt nem legenda,
+ *  e a versão simples da página não as mostra. O canva tem mais lugares que
+ *  fotos (uns 90 no desktop), então a lista REPETE — quanto mais fotos aqui,
+ *  menos repetição. A das criações entra no canva por conta própria. */
 export const FIELD_PHOTOS: ImageMetadata[] = [
   field01, field02, field03, field04, field05, field06, field07, field08, field09,
   field10, field11, field12, field13, field14, field15, field16, field17, field18,
+  field19, field20, field21, field22, field23, field24, field25, field26, field27,
+  field28, field29, field30,
 ];
 
-/** Os efeitos disponíveis. Cada um é uma animação de entrada E de saída (a
- *  saída é o espelho da entrada):
- *    grow    — cresce do centro; sai encolhendo
- *    slide   — desliza de um lado (ver `from`) e sai pelo outro
- *    curtain — um painel de tinta cobre a tela e sobe revelando; desce na saída
- *    pieces  — a imagem chega em tiras que se encaixam; saem se soltando
- *    iris    — abertura circular a partir do centro; fecha na saída
- *    flip    — entra tombada em 3D pela base e assenta; sai tombando pelo topo
- *  Um efeito novo é uma função a mais em scripts/creations/effects.ts e um
+/** Os efeitos disponíveis. A foto de toda criação já está no canva de fundo
+ *  como miniatura; o efeito é COMO ela sobe e se encaixa na moldura (a saída
+ *  é o espelho: ela volta ao canva e segue subindo):
+ *    grow   — sobe do canva crescendo até a moldura
+ *    slide  — vem de um lado da tela (ver `from`)
+ *    tilt   — sobe deitada pra trás e se levanta
+ *    pieces — se encaixa em tiras verticais, uma depois da outra
+ *    iris   — a miniatura é um recorte da foto, que se abre até a foto inteira
+ *    flip   — sobe girando ao redor do eixo vertical
+ *  Um efeito novo é uma entrada a mais em scripts/creations/effects.ts e um
  *  nome a mais aqui — o tipo Effect sai desta lista. */
-export const EFFECT_NAMES = ['grow', 'slide', 'curtain', 'pieces', 'iris', 'flip'] as const;
+export const EFFECT_NAMES = ['grow', 'slide', 'tilt', 'pieces', 'iris', 'flip'] as const;
 export type Effect = (typeof EFFECT_NAMES)[number];
 
 /** O que a criação é. Vira o rótulo do meio na linha de cima do texto
@@ -208,7 +224,7 @@ export const CREATIONS: Creation[] = [
     image: mock03, // TROCAR
     alt: 'Imagem mock da criação 03: fachada brutalista',
     link: { label: 'Ver o repositório (link mock)', href: 'https://example.com/' },
-    effect: 'curtain',
+    effect: 'tilt',
   },
   {
     id: 'mock-04',

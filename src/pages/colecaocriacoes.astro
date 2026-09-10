@@ -913,9 +913,30 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
       padding: 4.5rem 2.9rem 2.5rem 1.35rem;
     }
 
+    /* Uma coluna só não tem "outro lado" pra moldura ir, mas tem FOLGA: a
+       moldura ocupa pouco mais da metade da largura, então encostá-la à
+       direita em vez de à esquerda é um deslocamento de uns 150px, e é bem
+       visível. Isso mais o tamanho dá o mesmo ritmo do desktop com os meios
+       que o empilhado tem.
+
+       O deslocamento VERTICAL (--shift) fica de fora aqui, e de propósito:
+       `top` não reflui, então descer a moldura num layout que já é apertado
+       a jogaria por cima do título. No desktop ela tem a coluna inteira e
+       nada embaixo, então lá o mesmo recurso é seguro. */
     .cc-media {
-      --frame-h: 36dvh;
+      --frame-h: calc(36dvh * var(--scale, 1));
       justify-self: start;
+    }
+
+    /* Ela para antes da borda do conteúdo porque o indicador lateral é mais
+       largo que o padding direito do slide: o contador "02 / 08" avança uns
+       13px sobre a área de conteúdo. Isso nunca importou — nada encostava
+       ali, e o texto que chega perto passa por baixo dele em outra altura.
+       A moldura da direita é alta e cruza o meio da tela, que é justamente
+       onde o indicador vive; sem esta folga o nav (z 6) atravessa a foto. */
+    .cc-slide[data-side='right'] .cc-media {
+      justify-self: end;
+      margin-right: 1.4rem;
     }
 
     .cc-kicker {
@@ -993,7 +1014,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     }
 
     .cc-media {
-      --frame-h: 30dvh;
+      --frame-h: calc(30dvh * var(--scale, 1));
     }
 
     .cc-title {

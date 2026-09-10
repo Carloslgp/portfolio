@@ -1,14 +1,120 @@
 ---
-// /colecaocriacoes é página de TESTE: existe pra experimentar conteúdo/layout
-// isolado, sem herdar a cena 3D nem a transição de água do craft — só o
-// vocabulário visual clássico do site (papel/tinta + botão de tema).
+// /colecaocriacoes — a Coleção de Criações como uma sequência dirigida pelo
+// scroll: abertura, uma criação por tela (presa enquanto a animação dela
+// acontece) e um fechamento, com um indicador lateral de posição.
+//
+// Esta página não conhece nenhuma frase: tudo que aparece vem de
+// src/data/creations.ts (com o guia src/data/creations.md ao lado). Os
+// números da rolagem e dos efeitos vêm de src/scripts/creations/config.ts, e
+// o motor é src/scripts/creations/. Aqui só há markup, CSS e a checagem do
+// build logo abaixo.
+//
+// Sem a cena 3D nem a transição de água do craft, de propósito: o vocabulário
+// é o clássico do site (papel/tinta + botão de tema).
+import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
+import { CLOSING, CREATIONS, EFFECT_NAMES, KIND_LABEL, OPENING, UI } from '../data/creations';
+import { EFFECTS, IMAGE, LAYOUT } from '../scripts/creations/config';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+// ——— o que o build recusa ———
+//
+// O tipo já impede um efeito inexistente no editor, mas a regra das vizinhas
+// e a dos ids repetidos só existem em tempo de build — e é aqui que a lista
+// inteira está à mão. A mensagem diz QUAL criação e O QUE fazer, porque quem
+// vai ler é quem acabou de reordenar a lista, não quem escreveu isto.
+const known = new Set<string>(EFFECT_NAMES);
+const ids = new Set<string>();
+CREATIONS.forEach((creation, i) => {
+  const here = `a criação ${pad(i + 1)} ("${creation.id}")`;
+  if (!known.has(creation.effect)) {
+    throw new Error(
+      `Coleção de Criações: ${here} usa o efeito "${creation.effect}", que não existe. ` +
+        `Os efeitos são: ${EFFECT_NAMES.join(', ')} (src/data/creations.ts).`,
+    );
+  }
+  if (ids.has(creation.id)) {
+    throw new Error(
+      `Coleção de Criações: ${here} repete um id que já existe na lista. ` +
+        `Cada criação precisa de um id próprio (src/data/creations.ts).`,
+    );
+  }
+  ids.add(creation.id);
+  const prev = CREATIONS[i - 1];
+  if (prev && prev.effect === creation.effect) {
+    throw new Error(
+      `Coleção de Criações: as criações ${pad(i)} ("${prev.id}") e ${pad(i + 1)} ("${creation.id}") ` +
+        `usam o mesmo efeito "${creation.effect}" em sequência. Troque o efeito de uma delas ` +
+        `em src/data/creations.ts.`,
+    );
+  }
+});
+
+// As variantes de cada imagem saem do pipeline do Astro no build (ver IMAGE
+// no config). A proporção viaja como variável CSS: é ela que dimensiona a
+// moldura, então uma foto deitada e uma em pé cabem na mesma tela sem que
+// nenhuma seja cortada pra caber numa caixa fixa.
+const slides = await Promise.all(
+  CREATIONS.map(async (creation, index) => {
+    const img = await getImage({
+      src: creation.image,
+      widths: [...IMAGE.WIDTHS],
+      format: IMAGE.FORMAT,
+      quality: IMAGE.QUALITY,
+    });
+    return {
+      ...creation,
+      index,
+      number: pad(index + 1),
+      anchor: `criacao-${pad(index + 1)}`,
+      src: img.src,
+      srcset: img.srcSet.attribute,
+      ratio: creation.image.width / creation.image.height,
+      from: creation.from ?? 'right',
+    };
+  }),
+);
+
+const total = pad(CREATIONS.length);
+const pieceIndexes = Array.from({ length: EFFECTS.PIECES.COUNT }, (_, k) => k);
 ---
 
 <Layout lang="pt">
   <Fragment slot="head">
     <title>Coleção de Criações · Carlos Leonardo</title>
     <meta name="robots" content="noindex, nofollow" />
+    <link
+      rel="preload"
+      href="/fonts/playfair-600-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    {/* Palco ou versão simples? Decidido AQUI, antes do primeiro paint, e não
+        no bundle: os dois layouts têm alturas de página muito diferentes (um
+        palco de uma tela contra oito criações empilhadas), e trocar de um pro
+        outro depois do primeiro quadro é a página inteira pulando.
+
+        A resposta vem de duas perguntas. Baixa animação: a escolha feita no
+        portão do site (sessionStorage, ver scripts/motion.ts) manda; o
+        prefers-reduced-motion do sistema só vale pra quem entrou por link
+        direto e nunca passou pelo portão. E "cabe?": abaixo de uma altura
+        mínima a tela presa não tem onde pôr moldura + texto (ver LAYOUT no
+        config). Sem JS nada disto roda, a marca não existe e o CSS entrega a
+        versão simples — que é o layout padrão de propósito. */}
+    <script is:inline define:vars={{ minStageHeight: LAYOUT.MIN_STAGE_HEIGHT }}>
+      try {
+        var mode = sessionStorage.getItem('motion-mode');
+        if (mode === 'full' || mode === 'reduced')
+          document.documentElement.dataset.motion = mode;
+        var reduced = mode === 'reduced' ||
+          (!mode && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        var fits = window.innerHeight >= minStageHeight;
+        document.documentElement.dataset.creations = !reduced && fits ? 'stage' : 'static';
+      } catch (e) {}
+    </script>
   </Fragment>
 
   <div class="paper" aria-hidden="true"></div>
@@ -40,42 +146,127 @@ import Layout from '../layouts/Layout.astro';
   </button>
 
   <main class="cc-page">
-    <div class="cc-inner">
-      <header class="cc-head">
-        <p class="eyebrow">Teste</p>
-        <h1>Coleção de<br /><em>criações.</em></h1>
-        <p class="lead">
-          Página isolada para experimentar conteúdo e layout, mantendo o
-          mesmo vocabulário visual do resto do site — papel, tinta e o
-          mesmo botão de tema.
-        </p>
+    {/* O palco: no modo 'stage' é uma tela de altura, presa pelo ScrollTrigger,
+        com a abertura e as criações empilhadas em camadas dentro dele; na
+        versão simples é só um contêiner, e as mesmas peças viram blocos de
+        uma tela cada. Mesmo HTML, dois CSS. */}
+    <div class="cc-stage" data-cc-stage>
+      <header class="cc-hero" data-cc-hero>
+        <p class="eyebrow" data-cc-hero-kicker>{OPENING.kicker}</p>
+        <h1 data-cc-hero-title>{OPENING.title.line1}<br /><em>{OPENING.title.line2}</em></h1>
+        <p class="lead" data-cc-hero-lead>{OPENING.lead}</p>
+        <p class="cc-hint" data-cc-hero-hint aria-hidden="true"><span>{OPENING.hint}</span></p>
       </header>
 
-      <section class="cc-status" aria-labelledby="cc-status-title">
-        <p class="status-k">Estado</p>
-        <div class="status-copy">
-          <h2 id="cc-status-title">Ainda em rascunho.</h2>
-          <p>Esta rota não está linkada em nenhum outro lugar do site — ela existe só para teste.</p>
-        </div>
-      </section>
+      {slides.map((s) => (
+        <section
+          class="cc-slide"
+          id={s.anchor}
+          data-cc-slide
+          data-effect={s.effect}
+          data-from={s.from}
+          aria-labelledby={`${s.anchor}-titulo`}
+          style={`--ratio:${s.ratio.toFixed(4)}`}
+        >
+          {/* A moldura. Pro efeito `pieces` ela vira N tiras, cada uma com a
+              MESMA <img> deslocada pra mostrar só a sua fatia (a largura da
+              img é N vezes a da tira; o left desloca k tiras). Em repouso as
+              tiras formam a imagem inteira — é o que a versão simples mostra —
+              e é um pedido só de rede, porque a URL é a mesma. */}
+          <div
+            class:list={['cc-media', { 'is-pieces': s.effect === 'pieces' }]}
+            data-cc-media
+            style={s.effect === 'pieces' ? `--n:${EFFECTS.PIECES.COUNT}` : undefined}
+          >
+            {s.effect === 'pieces' ? (
+              pieceIndexes.map((k) => (
+                <div class="cc-piece" data-cc-piece style={`--k:${k}`}>
+                  <img
+                    src={s.src}
+                    srcset={s.srcset}
+                    sizes={IMAGE.SIZES}
+                    alt={k === 0 ? s.alt : ''}
+                    loading={s.index === 0 ? 'eager' : 'lazy'}
+                    decoding="async"
+                    draggable="false"
+                  />
+                </div>
+              ))
+            ) : (
+              <img
+                src={s.src}
+                srcset={s.srcset}
+                sizes={IMAGE.SIZES}
+                alt={s.alt}
+                loading={s.index === 0 ? 'eager' : 'lazy'}
+                decoding="async"
+                draggable="false"
+              />
+            )}
+          </div>
 
-      <footer class="cc-foot">
-        <p>Enquanto isso, o resto do site continua aqui.</p>
-        <nav aria-label="Explorar o portfolio">
-          <a href="/work">Work</a>
-          <a href="/craft">Craft</a>
-          <a href="/photos">Photos</a>
-          <a href="/#about">About</a>
-        </nav>
-      </footer>
+          <div class="cc-copy">
+            <p class="cc-kicker" data-cc-line>
+              {UI.item} {s.number} · {KIND_LABEL[s.kind]}{s.date && ` · ${s.date}`}
+            </p>
+            <h2 class="cc-title" id={`${s.anchor}-titulo`} data-cc-line>{s.title}</h2>
+            <p class="cc-desc" data-cc-line>{s.description}</p>
+            {s.link && (
+              <a class="cc-link" data-cc-line href={s.link.href} target="_blank" rel="noopener">
+                {s.link.label} <span aria-hidden="true">{UI.linkMark}</span>
+              </a>
+            )}
+          </div>
+
+          {s.effect === 'curtain' && <div class="cc-curtain" data-cc-curtain aria-hidden="true"></div>}
+        </section>
+      ))}
     </div>
+
+    <footer class="cc-closing" data-cc-closing>
+      <div class="cc-closing-inner" data-cc-closing-inner>
+        <p class="eyebrow">{CLOSING.kicker}</p>
+        <h2>{CLOSING.title}</h2>
+        <p class="lead">{CLOSING.text}</p>
+        <nav aria-label="Voltar pro resto do site">
+          {CLOSING.links.map((link) => (
+            <a href={link.href} rel={link.href === '/' ? 'noreferrer' : undefined}>{link.label}</a>
+          ))}
+        </nav>
+      </div>
+    </footer>
   </main>
+
+  {/* O indicador: um traço por criação e o contador. Os traços são âncoras de
+      verdade — na versão simples o navegador as resolve sozinho, e no palco o
+      script troca o destino pela posição de scroll da criação. */}
+  <nav class="cc-nav" data-cc-nav aria-label={UI.nav}>
+    <p class="cc-nav-count" aria-live="polite">
+      <span data-cc-nav-current>—</span><span class="cc-nav-sep">/</span><span>{total}</span>
+    </p>
+    <ol>
+      {slides.map((s) => (
+        <li>
+          <a
+            href={`#${s.anchor}`}
+            data-cc-nav-item
+            aria-label={`${UI.jump} ${s.number} de ${total}: ${s.title}`}
+          >
+            <span class="cc-nav-num" aria-hidden="true">{s.number}</span>
+            <span class="cc-nav-mark" aria-hidden="true"></span>
+          </a>
+        </li>
+      ))}
+    </ol>
+  </nav>
 </Layout>
 
 <script>
   import { initTheme } from '../scripts/theme';
+  import { initCreations } from '../scripts/creations/main';
 
   initTheme();
+  initCreations();
 </script>
 
 <style>
@@ -87,6 +278,406 @@ import Layout from '../layouts/Layout.astro';
     transition: background-color var(--theme-fade);
   }
 
+  /* A página rola — e o global.css dá a html e body o `height: 100%` +
+     `overflow: hidden` de que a HOME precisa (canvas fixo, quem rola lá é o
+     Lenis). Aqui os dois voltam ao normal, como na /work e na /craft. Sem
+     isto o sintoma engana: o overflow do body propaga pro viewport, a página
+     aparece inteira e nenhum gesto chega nela. */
+  :global(html:has(.cc-page)),
+  :global(html:has(.cc-page) body) {
+    height: auto;
+    overflow: visible;
+  }
+
+  .cc-page {
+    position: relative;
+    z-index: 1;
+    color: var(--ink);
+    transition: color var(--theme-fade);
+  }
+
+  /* ——— o palco ———
+     O CSS padrão é a VERSÃO SIMPLES (blocos empilhados, uma tela cada). O
+     palco só existe sob html[data-creations='stage'], que o script inline do
+     <head> escreve quando há JS, animação e altura pra isso. Errar pro lado
+     do empilhado é errar pro lado que sempre funciona. */
+  .cc-stage {
+    position: relative;
+  }
+
+  :global(html[data-creations='stage']) .cc-stage {
+    height: var(--viewport-h);
+    overflow: hidden;
+  }
+
+  /* ——— a abertura ——— */
+  .cc-hero {
+    position: relative;
+    min-height: var(--viewport-h);
+    display: grid;
+    align-content: center;
+    padding: clamp(6.5rem, 13vh, 9rem) clamp(1.5rem, 6vw, 6rem) clamp(6rem, 14vh, 8rem);
+  }
+
+  :global(html[data-creations='stage']) .cc-hero {
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+  }
+
+  .eyebrow {
+    margin-bottom: 1rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-hero h1 {
+    max-width: 10ch;
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(4rem, min(11vw, 15vh), 8.8rem);
+    font-weight: 600;
+    line-height: 0.82;
+    letter-spacing: -0.065em;
+  }
+
+  .cc-hero h1 em {
+    font-weight: 400;
+  }
+
+  .lead {
+    max-width: 31rem;
+    margin-top: clamp(1.4rem, 3.5vh, 2.2rem);
+    color: rgba(var(--ink-rgb), 0.68);
+    font-size: clamp(0.95rem, 1.4vw, 1.08rem);
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  /* a dica de rolar: um rótulo e um fio que pulsa. Só no palco — na versão
+     simples a página é uma lista e ninguém precisa ser convidado a rolar */
+  .cc-hint {
+    position: absolute;
+    left: 50%;
+    bottom: calc(1.6rem + env(safe-area-inset-bottom));
+    display: none;
+    justify-items: center;
+    gap: 0.7rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.64rem;
+    font-weight: 650;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transform: translateX(-50%);
+    transition: color var(--theme-fade);
+  }
+
+  :global(html[data-creations='stage']) .cc-hint {
+    display: grid;
+  }
+
+  .cc-hint::after {
+    content: '';
+    width: 1px;
+    height: 2.4rem;
+    background: currentColor;
+    animation: cc-hint-pulse 1.8s ease-in-out infinite alternate;
+  }
+
+  @keyframes cc-hint-pulse {
+    from { opacity: 0.25; transform: scaleY(0.6); transform-origin: top; }
+    to { opacity: 1; transform: scaleY(1); transform-origin: top; }
+  }
+
+  /* ——— as criações ——— */
+  .cc-slide {
+    position: relative;
+    min-height: var(--viewport-h);
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    align-items: center;
+    column-gap: clamp(2rem, 5vw, 5rem);
+    padding: clamp(4.5rem, 9vh, 6rem) clamp(1.5rem, 6vw, 6rem);
+  }
+
+  /* No palco as criações são camadas: mesma caixa, uma sobre a outra, e o
+     GSAP decide qual está visível. O `visibility: hidden` aqui é o estado
+     antes de o bundle rodar — sem ele, o quadro entre o script inline e o
+     módulo mostraria as oito empilhadas na mesma tela. O GSAP escreve
+     visibility inline (autoAlpha) e o inline ganha desta regra. */
+  :global(html[data-creations='stage']) .cc-slide {
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+    visibility: hidden;
+  }
+
+  /* A moldura tem a PROPORÇÃO da imagem (--ratio, escrita no build) e é
+     limitada por altura (--frame-h) e pela coluna. A largura sai da conta
+     explícita em vez de deixar o navegador transferir o max-height pela
+     aspect-ratio: dá o mesmo resultado, sem depender de como cada motor
+     resolve essa transferência. */
+  .cc-media {
+    --frame-h: min(72dvh, 46rem);
+    position: relative;
+    justify-self: end;
+    width: min(100%, calc(var(--frame-h) * var(--ratio)));
+    aspect-ratio: var(--ratio);
+    overflow: hidden;
+    background: rgba(var(--ink-rgb), 0.06);
+    transition: background-color var(--theme-fade);
+  }
+
+  .cc-media img {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    user-select: none;
+  }
+
+  /* as tiras do `pieces`: a moldura deixa de recortar (as tiras voam pra
+     fora dela ao entrar) e vira uma fileira; cada tira recorta a sua fatia */
+  .cc-media.is-pieces {
+    display: flex;
+    overflow: visible;
+    background: none;
+  }
+
+  .cc-piece {
+    position: relative;
+    flex: 1 0 0;
+    overflow: hidden;
+    background: rgba(var(--ink-rgb), 0.06);
+  }
+
+  .cc-piece img {
+    left: calc(var(--k) * -100%);
+    width: calc(var(--n) * 100%);
+    /* o preflight do Tailwind (global.css) dá `max-width: 100%` a toda <img>,
+       e aqui a imagem tem que ser N vezes mais larga que a tira que a
+       recorta — sem isto ela encolhe pra largura da tira e as tiras 2..N
+       ficam vazias (a imagem inteira, deslocada pra fora delas) */
+    max-width: none;
+  }
+
+  .cc-copy {
+    max-width: 30rem;
+  }
+
+  .cc-kicker {
+    margin-bottom: 1.1rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(2.4rem, 4.4vw, 4.6rem);
+    font-weight: 600;
+    line-height: 0.96;
+    letter-spacing: -0.04em;
+  }
+
+  .cc-desc {
+    margin-top: clamp(1.1rem, 2.4vh, 1.6rem);
+    color: rgba(var(--ink-rgb), 0.68);
+    font-size: clamp(0.95rem, 1.2vw, 1.08rem);
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-link {
+    display: inline-block;
+    margin-top: 1.6rem;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--ink-rgb), 0.25);
+    text-underline-offset: 3px;
+    transition: color var(--theme-fade), text-decoration-color 0.25s ease;
+  }
+
+  .cc-link:hover,
+  .cc-link:focus-visible {
+    text-decoration-color: currentColor;
+  }
+
+  /* o painel do `curtain`: tinta sobre a criação inteira. Só faz sentido com
+     o palco — empilhada, a criação tem que estar à vista */
+  .cc-curtain {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    background: var(--ink);
+    transform-origin: top center;
+    transition: background-color var(--theme-fade);
+  }
+
+  :global(html[data-creations='stage']) .cc-curtain {
+    display: block;
+  }
+
+  /* ——— o fechamento ——— */
+  .cc-closing {
+    min-height: var(--viewport-h);
+    display: grid;
+    place-items: center;
+    padding: clamp(5rem, 12vh, 8rem) clamp(1.5rem, 6vw, 6rem);
+    text-align: center;
+  }
+
+  .cc-closing-inner {
+    display: grid;
+    justify-items: center;
+  }
+
+  .cc-closing h2 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(2.6rem, 6vw, 5.4rem);
+    font-weight: 600;
+    line-height: 0.92;
+    letter-spacing: -0.05em;
+  }
+
+  .cc-closing .lead {
+    max-width: 28rem;
+  }
+
+  .cc-closing nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.25rem;
+    margin-top: clamp(2rem, 5vh, 3rem);
+    font-size: 0.85rem;
+  }
+
+  .cc-closing nav a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--ink-rgb), 0.25);
+    text-underline-offset: 3px;
+    transition: color var(--theme-fade), text-decoration-color 0.25s ease;
+  }
+
+  .cc-closing nav a:hover,
+  .cc-closing nav a:focus-visible {
+    text-decoration-color: currentColor;
+  }
+
+  /* ——— o indicador ———
+     A opacidade sai de uma variável: no palco o GSAP a anima de 0 a 1 junto
+     com a saída da abertura, e a classe `is-done` (fim da sequência) apaga
+     por cima sem disputar a propriedade. Na versão simples a variável não
+     existe e vale 1. */
+  .cc-nav {
+    position: fixed;
+    top: 50%;
+    right: calc(1.5rem + var(--viewport-right));
+    z-index: 6;
+    display: grid;
+    justify-items: end;
+    gap: 1rem;
+    opacity: var(--nav-alpha, 1);
+    transition: opacity 0.3s ease;
+  }
+
+  :global(html[data-creations='stage']) .cc-nav {
+    --nav-alpha: 0;
+  }
+
+  .cc-nav.is-done {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .cc-nav-count {
+    color: rgba(var(--ink-rgb), 0.55);
+    font-size: 0.68rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.12em;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-nav-sep {
+    margin: 0 0.3em;
+    opacity: 0.5;
+  }
+
+  .cc-nav ol {
+    display: grid;
+    gap: 0.55rem;
+    justify-items: end;
+    list-style: none;
+  }
+
+  .cc-nav a {
+    --p: 0;
+    display: grid;
+    grid-auto-flow: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.2rem 0;
+    color: rgba(var(--ink-rgb), 0.5);
+    text-decoration: none;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-nav-num {
+    font-size: 0.62rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.1em;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .cc-nav a:hover .cc-nav-num,
+  .cc-nav a:focus-visible .cc-nav-num,
+  .cc-nav a[aria-current] .cc-nav-num {
+    opacity: 1;
+  }
+
+  /* o traço: um trilho fino, e por cima o preenchimento (--p) que o script
+     escreve a cada quadro — o traço ativo é também a barra de progresso da
+     criação */
+  .cc-nav-mark {
+    position: relative;
+    width: 1.4rem;
+    height: 2px;
+    overflow: hidden;
+    background: rgba(var(--ink-rgb), 0.2);
+    transition: width 0.3s ease, background-color var(--theme-fade);
+  }
+
+  .cc-nav-mark::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--ink);
+    transform: scaleX(var(--p));
+    transform-origin: left center;
+    transition: background-color var(--theme-fade);
+  }
+
+  .cc-nav a[aria-current] .cc-nav-mark {
+    width: 2.6rem;
+  }
+
+  /* ——— o cromo fixo (o mesmo das outras páginas secundárias) ——— */
   .back {
     position: fixed;
     top: calc(1.5rem + env(safe-area-inset-top));
@@ -167,164 +758,80 @@ import Layout from '../layouts/Layout.astro';
     transform: none;
   }
 
-  .cc-page {
-    position: relative;
-    z-index: 1;
-    min-height: 100dvh;
-    padding: clamp(6.5rem, 13vh, 9rem) 2rem clamp(2.5rem, 6vh, 4rem);
-    color: var(--ink);
-    transition: color var(--theme-fade);
-  }
-
-  .cc-inner {
-    width: min(68rem, 100%);
-    min-height: calc(100dvh - clamp(9rem, 19vh, 13rem));
-    margin: 0 auto;
-    display: grid;
-    grid-template-rows: minmax(18rem, 1fr) auto auto;
-    align-items: end;
-  }
-
-  .eyebrow {
-    margin-bottom: 1rem;
-    color: rgba(var(--ink-rgb), 0.48);
-    font-size: 0.68rem;
-    font-weight: 650;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    transition: color var(--theme-fade);
-  }
-
-  .cc-head h1 {
-    max-width: 10ch;
-    font-family: "Playfair Display", Georgia, serif;
-    font-size: clamp(4rem, min(11vw, 15vh), 8.8rem);
-    font-weight: 600;
-    line-height: 0.82;
-    letter-spacing: -0.065em;
-  }
-
-  .cc-head h1 em {
-    font-weight: 400;
-  }
-
-  .lead {
-    max-width: 31rem;
-    margin-top: clamp(1.4rem, 3.5vh, 2.2rem);
-    color: rgba(var(--ink-rgb), 0.68);
-    font-size: clamp(0.95rem, 1.4vw, 1.08rem);
-    line-height: 1.62;
-    transition: color var(--theme-fade);
-  }
-
-  .cc-status {
-    display: grid;
-    grid-template-columns: minmax(8rem, 0.34fr) minmax(0, 1fr);
-    gap: 1.5rem;
-    margin-top: clamp(3rem, 8vh, 6rem);
-    padding: 1.45rem 0;
-    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
-    border-bottom: 1px solid rgba(var(--ink-rgb), 0.13);
-    transition: border-color var(--theme-fade);
-  }
-
-  .status-k {
-    padding-top: 0.24rem;
-    color: rgba(var(--ink-rgb), 0.42);
-    font-size: 0.66rem;
-    font-weight: 650;
-    letter-spacing: 0.17em;
-    text-transform: uppercase;
-    transition: color var(--theme-fade);
-  }
-
-  .status-copy {
-    display: grid;
-    grid-template-columns: minmax(9rem, 0.62fr) minmax(16rem, 1fr);
-    gap: 1.5rem;
-  }
-
-  .status-copy h2 {
-    font-family: "Playfair Display", Georgia, serif;
-    font-size: clamp(1.35rem, 2.5vw, 1.9rem);
-    font-weight: 600;
-    line-height: 1.05;
-    letter-spacing: -0.035em;
-  }
-
-  .status-copy p {
-    max-width: 30rem;
-    color: rgba(var(--ink-rgb), 0.62);
-    font-size: 0.88rem;
-    line-height: 1.62;
-    transition: color var(--theme-fade);
-  }
-
-  .cc-foot {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 2rem;
-    padding-top: 1.55rem;
-    color: rgba(var(--ink-rgb), 0.48);
-    font-size: 0.76rem;
-    transition: color var(--theme-fade);
-  }
-
-  .cc-foot nav {
-    display: flex;
-    gap: 1.25rem;
-  }
-
-  .cc-foot a {
-    color: var(--ink);
-    text-decoration: underline;
-    text-decoration-color: rgba(var(--ink-rgb), 0.25);
-    text-underline-offset: 3px;
-    transition: color var(--theme-fade), text-decoration-color 0.25s ease;
-  }
-
-  .cc-foot a:hover,
-  .cc-foot a:focus-visible {
-    text-decoration-color: currentColor;
-  }
-
+  /* ——— celular: moldura em cima, texto embaixo ———
+     O orçamento vertical aqui é o que define LAYOUT.MIN_STAGE_HEIGHT no
+     config: moldura de 36dvh + título de duas linhas + três frases + link
+     precisam caber numa tela presa. O padding direito maior é pro texto não
+     passar por baixo do indicador. */
   @media (max-width: 46rem) {
-    .cc-page {
-      padding: 6.5rem 1.35rem 2rem;
+    .cc-hero {
+      padding: 6.5rem 1.35rem 6rem;
     }
 
-    .cc-inner {
-      min-height: calc(100dvh - 8.5rem);
-      grid-template-rows: minmax(18rem, 1fr) auto auto;
+    .cc-hero h1 {
+      font-size: clamp(3.4rem, 17vw, 6.5rem);
     }
 
-    .cc-head h1 {
-      font-size: clamp(3.7rem, 18vw, 6.5rem);
-    }
-
-    .cc-status,
-    .status-copy {
+    .cc-slide {
       grid-template-columns: minmax(0, 1fr);
-      gap: 0.65rem;
+      grid-template-rows: auto auto;
+      align-content: center;
+      row-gap: 1.3rem;
+      padding: 4.5rem 2.9rem 2.5rem 1.35rem;
     }
 
-    .status-k {
-      padding-top: 0;
+    .cc-media {
+      --frame-h: 36dvh;
+      justify-self: start;
     }
 
-    .status-copy p {
-      max-width: 28rem;
+    .cc-kicker {
+      margin-bottom: 0.7rem;
+      font-size: 0.62rem;
     }
 
-    .cc-foot {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 0.8rem;
+    .cc-title {
+      font-size: clamp(1.9rem, 7.6vw, 2.5rem);
+    }
+
+    .cc-desc {
+      margin-top: 0.8rem;
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .cc-link {
+      margin-top: 1rem;
+      font-size: 0.8rem;
+    }
+
+    .cc-closing h2 {
+      font-size: clamp(2.4rem, 11vw, 4rem);
+    }
+
+    .cc-nav {
+      right: calc(0.9rem + var(--viewport-right));
+      gap: 0.7rem;
+    }
+
+    .cc-nav ol {
+      gap: 0.45rem;
+    }
+
+    .cc-nav-num {
+      display: none;
+    }
+
+    .cc-nav-mark {
+      width: 1rem;
+    }
+
+    .cc-nav a[aria-current] .cc-nav-mark {
+      width: 1.8rem;
     }
 
     .back {
-      left: 1.25rem;
+      left: 1.35rem;
     }
 
     .theme {
@@ -334,11 +841,66 @@ import Layout from '../layouts/Layout.astro';
     }
   }
 
+  /* celular baixo (iPhone SE e afins): ainda cabe, com tudo um pouco menor */
+  @media (max-width: 46rem) and (max-height: 700px) {
+    .cc-slide {
+      row-gap: 1rem;
+      padding-top: 4rem;
+    }
+
+    .cc-media {
+      --frame-h: 30dvh;
+    }
+
+    .cc-title {
+      font-size: clamp(1.7rem, 6.8vw, 2rem);
+    }
+
+    .cc-desc {
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+  }
+
+  /* janela larga e baixa (notebook com a janela encolhida) */
+  @media (max-height: 42rem) and (min-width: 46.01rem) {
+    .cc-hero h1 {
+      font-size: clamp(3.6rem, 12vh, 6rem);
+    }
+
+    .cc-media {
+      --frame-h: 66dvh;
+    }
+
+    .cc-title {
+      font-size: clamp(2rem, 3.8vw, 3.4rem);
+    }
+  }
+
+  /* baixa animação (a escolha do portão): a página já está na versão simples
+     pelo script do <head>; aqui só se cortam as transições de enfeite */
+  :global(html[data-motion='reduced']) .cc-hint::after,
+  :global(html[data-motion='reduced']) .cc-nav,
+  :global(html[data-motion='reduced']) .cc-nav-mark,
+  :global(html[data-motion='reduced']) .cc-nav-num,
+  :global(html[data-motion='reduced']) .theme svg,
+  :global(html[data-motion='reduced']) .back,
+  :global(html[data-motion='reduced']) .back::after,
+  :global(html[data-motion='reduced']) .theme {
+    animation: none;
+    transition: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
+    .cc-hint::after,
+    .cc-nav,
+    .cc-nav-mark,
+    .cc-nav-num,
     .theme svg,
     .back,
     .back::after,
     .theme {
+      animation: none;
       transition: none;
     }
   }

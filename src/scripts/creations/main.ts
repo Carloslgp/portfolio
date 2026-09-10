@@ -33,9 +33,9 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { Effect } from '../../data/creations';
 import { viewportSize } from '../viewport';
-import { CLOSING, OPENING, SCROLL, STATIC } from './config';
+import { CLOSING, OPENING, RIBBON, SCROLL, STATIC } from './config';
 import { DOCKING, slideTimeline, type Phases, type SlideParts } from './effects';
-import { createField } from './field';
+import { createField, type FieldDriver } from './field';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -223,6 +223,12 @@ export function initCreations() {
       });
     });
 
+    // A ENTRADA. Por último de propósito: ela é a última coisa a montar e a
+    // primeira a rodar, e precisa do palco já preso e das molduras já medidas
+    // — se rodasse antes, o pin do ScrollTrigger nasceria no meio dela e a
+    // página daria um salto no primeiro quadro.
+    if (driver) runIntro(driver, html);
+
     // O fechamento entra depois que o palco solta — o único trecho da página
     // que rola de verdade. O fade costura a última criação (que sai pra papel
     // vazio) com a página voltando ao normal, e como também é scrub, voltar
@@ -260,6 +266,56 @@ function partsOf(slide: HTMLElement): SlideParts & { frame: HTMLElement } {
     effect: slide.dataset.effect as Effect,
     from: slide.dataset.from === 'left' ? 'left' : 'right',
   };
+}
+
+/**
+ * A ENTRADA: a fita se monta, se junta e se espalha, e a página fica pronta.
+ *
+ * É a única animação da página que roda no relógio, e o motivo é que ela
+ * acontece ANTES de haver o que rolar — é o carregamento se mostrando, não um
+ * trecho da página. Quem desenha continua sendo o field.ts, que não sabe o que
+ * é um segundo: aqui só se empurra um número de 0 a 1 pra dentro dele.
+ *
+ * Duas saídas de emergência, e as duas importam mais que a animação:
+ *
+ *   • quem chega numa página já rolada (reload no meio, voltar do histórico)
+ *     não vê entrada nenhuma. Rodá-la ali seria uma abertura no meio do texto.
+ *   • qualquer sinal de impaciência — rolar, tocar, teclar, clicar — acelera a
+ *     entrada em vez de cortá-la. Cortar de um quadro pro outro é um piscão;
+ *     acelerar 5x chega no mesmo lugar em 0,2s e ainda se lê como movimento.
+ *     Ninguém fica preso esperando um enfeite acabar.
+ */
+function runIntro(driver: FieldDriver, html: HTMLElement) {
+  if (window.scrollY > 4) {
+    driver.setIntro(1);
+    return;
+  }
+
+  const state = { i: 0 };
+  driver.setIntro(0);
+  html.classList.add('is-intro');
+
+  const tween = gsap.to(state, {
+    i: 1,
+    duration: RIBBON.SECONDS,
+    ease: 'none',
+    onUpdate: () => {
+      driver.setIntro(state.i);
+      // o vão entre as linhas do título se fecha junto com o estouro: as fotos
+      // saem dali e o título se junta atrás delas, no mesmo gesto
+      if (state.i >= RIBBON.JUNTA) html.classList.add('is-intro-done');
+    },
+    onComplete: () => {
+      driver.setIntro(1);
+      html.classList.remove('is-intro');
+      html.classList.add('is-intro-done');
+      sinais.forEach((s) => window.removeEventListener(s, apressar));
+    },
+  });
+
+  const apressar = () => tween.timeScale(5);
+  const sinais = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
+  sinais.forEach((s) => window.addEventListener(s, apressar, { passive: true, once: true }));
 }
 
 /** A saída da abertura, em HERO_SCREENS alturas de tela. Cada peça some na

@@ -531,6 +531,19 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
 
   :global(html[data-creations='stage']) .cc-ribbon-slot {
     height: min(38dvh, 24rem);
+    transition: height 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* O vão se fecha quando a fita estoura: as fotos saem dali e o título se
+     junta atrás delas, no mesmo gesto. Depois disso a abertura é a que sempre
+     foi — rótulo, título em duas linhas coladas, parágrafo, dica — e a
+     rolagem começa numa página montada.
+
+     Fechar por altura, e não por transform, porque o que tem que acontecer é
+     o título REFLUIR: as duas linhas se aproximando de verdade. Um transform
+     deixaria o buraco no lugar e só disfarçaria. */
+  :global(html.is-intro-done) .cc-ribbon-slot {
+    height: 0;
   }
 
   .lead {

@@ -128,15 +128,18 @@ export const LAYOUT = {
 export const OPENING = {
   /** Em que ordem as peças da abertura somem, em frações do trecho dela
    *  (SCROLL.HERO_SCREENS). A dica de rolar some primeiro — ela já cumpriu o
-   *  papel no instante em que a pessoa rolou. O resto agora ESPERA a fita: o
-   *  título é metade da composição (a curva corre entre as duas linhas dele),
-   *  então ele tem que estar inteiro enquanto ela se aperta, e só sair quando
-   *  ela estourar. Somem antes disso e o aperto acontece numa tela vazia, que
-   *  é o gesto sem o motivo. Daí o rótulo e o parágrafo saírem em RIBBON.
-   *  GATHER (0.28) e o título logo atrás. Cada par é [início, duração]. */
-  HINT: [0, 0.22],
-  SOFT: [0.3, 0.38],
-  TITLE: [0.38, 0.46],
+   *  papel no instante em que a pessoa rolou; o rótulo e o parágrafo vão em
+   *  seguida; o título fica por último, crescendo um pouco enquanto esmaece,
+   *  como se a câmera passasse por ele.
+   *
+   *  Estes números voltaram ao que eram quando a fita passou a ser ENTRADA e
+   *  não trecho de rolagem: enquanto ela vivia aqui, o texto tinha que esperar
+   *  o estouro pra não deixar o gesto acontecer numa tela vazia. Agora quando
+   *  a rolagem começa a fita já acabou, e a saída da abertura volta a ser só
+   *  ela mesma. Cada par é [início, duração]. */
+  HINT: [0, 0.25],
+  SOFT: [0.1, 0.5],
+  TITLE: [0.2, 0.7],
   /** o próprio bloco da abertura sai de cena (visibility) no fim do trecho,
    *  pra não ficar por baixo das criações recebendo clique */
   BLOCK: [0.92, 0.08],
@@ -152,10 +155,17 @@ export const OPENING = {
 
 // ——— a fita da abertura ———
 //
-// A página abre com as fotos reunidas numa curva em S entre as duas linhas do
-// título — ela aperta, estoura e se espalha, e o que sobra espalhado JÁ É o
-// canva de fundo. A referência é a mesma que deu origem ao canva, a "Tracing
-// Art" do Getty.
+// A ENTRADA da página, e a única coisa nela que não é dirigida pelo scroll.
+// Roda sozinha ao carregar: as fotos se montam numa curva em S entre as duas
+// linhas do título, a curva se junta, e então elas se soltam e se espalham
+// pela tela — e o que sobra espalhado JÁ É o canva de fundo. Quando termina, a
+// página está montada e pronta pra rolar. A referência é a mesma que deu
+// origem ao canva, a "Tracing Art" do Getty.
+//
+// Por que aqui o relógio manda, se a página inteira jura que o scroll é a
+// linha do tempo: porque isto acontece ANTES de haver o que rolar. É o
+// carregamento se mostrando, não um trecho da página — quem chega não pediu
+// nada ainda. Passada a entrada, o relógio some e não volta.
 //
 // A ideia que faz isto valer a pena: a fita não é uma animação de entrada
 // separada que some pra dar lugar à página. Ela é o canva em outra pose. As
@@ -208,13 +218,41 @@ export const RIBBON = {
    *  travado em no máximo 1x o tamanho de canva, porque o caminho até lá é
    *  uma ampliação e ampliar além do natural é perder nitidez — a mesma lição
    *  que a foto das criações já tinha ensinado. */
-  CARD: 0.13,
+  CARD: 0.11,
 
-  /** O aperto, antes do estouro: a fração da abertura em que a fita se
-   *  comprime, e quanto ela encolhe em amplitude, comprimento e tamanho.
-   *  Existe porque sem ele o estouro não tem de onde partir — a fita precisa
-   *  se fechar pra que abrir signifique alguma coisa. */
-  GATHER: 0.28,
+  /** ——— o relógio da entrada ———
+   *  Quanto dura a coisa toda, em segundos, e onde ficam as emendas das três
+   *  fases (frações do total):
+   *
+   *    0 → MONTA      as fotos chegam e formam a curva, que cresce de um
+   *                   toco (SEED) até o S inteiro
+   *    MONTA → JUNTA  a curva se fecha e as fotos incham: é o instante em que
+   *                   ela parece uma coisa só, prestes a arrebentar
+   *    JUNTA → 1      elas se soltam e vão pro lugar delas no canva
+   *
+   *  2.6s é o teto do que se pede a alguém que acabou de abrir uma página: dá
+   *  pra ler as três fases sem que a espera vire fila. Quem não quiser esperar
+   *  interrompe — qualquer toque, tecla ou rolagem corta pro fim (ver main.ts).
+   */
+  SECONDS: 2.6,
+  MONTA: 0.44,
+  JUNTA: 0.64,
+
+  /** Do que a curva parte, no primeiro quadro: fração do tamanho final. Não é
+   *  zero de propósito — de zero as fotos nasceriam de um ponto, e o que se
+   *  quer é uma fita pequena que CRESCE. */
+  SEED: 0.34,
+
+  /** Fração da montagem gasta escalonando a entrada das fotos, de cima da
+   *  curva pra baixo. Em 0 todas aparecem juntas e o efeito é uma fita
+   *  piscando; escalonado, ela se DESENHA. */
+  STAGGER: 0.55,
+
+  /** O aperto: quanto a curva encolhe em amplitude e comprimento, e quanto as
+   *  fotos INCHAM (maior que 1) ao se juntarem. Elas crescerem é o que faz a
+   *  fita parecer carregada logo antes de estourar — e o crescimento é seguro
+   *  porque o tamanho na curva é uma fração do tamanho de canva, então mesmo
+   *  inchadas elas não passam do tamanho natural do elemento (ver field.ts). */
 
   /** A curva do estouro. Maior que 1 é queda: começa devagar e acelera, que é
    *  o que "cai" quer dizer. Começou em 3 e estava errado — com expoente 3,
@@ -222,9 +260,9 @@ export const RIBBON = {
    *  era uma fita parada por meia tela e um borrão no fim. Em 1.6 o movimento
    *  se distribui pela rolagem e ainda chega acelerando. */
   FALL: 1.6,
-  TIGHT_AMP: 0.34,
-  TIGHT_SPAN: 0.55,
-  TIGHT_SIZE: 0.74,
+  TIGHT_AMP: 0.5,
+  TIGHT_SPAN: 0.72,
+  TIGHT_SIZE: 1.5,
 } as const;
 
 export const CLOSING = {

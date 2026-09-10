@@ -57,6 +57,9 @@ export interface FieldDriver {
   measure(): void;
   /** escreve o canva do instante t (tempo da mestra, em alturas de tela) */
   apply(t: number): void;
+  /** avança a animação de ENTRADA, de 0 a 1 (ver RIBBON no config). Em 1 ela
+   *  acabou e o canva volta a ser função só da rolagem. */
+  setIntro(i: number): void;
 }
 
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
@@ -206,32 +209,41 @@ export function createField(input: FieldInput): FieldDriver {
     item.el.classList.toggle('is-off', off);
   };
 
-  // ——— a fita da abertura ———
+  // ——— a fita da entrada ———
   //
-  // Três funções puras de t, como todo o resto deste arquivo. A abertura
-  // inteira acontece em t ∈ [0, H]; depois disso `open` devolve 1 e nada aqui
-  // custa nada.
+  // Único trecho da página que NÃO é função do scroll: a entrada roda no
+  // relógio, porque acontece antes de haver o que rolar (ver RIBBON no
+  // config). Quem manda nela é `p`, escrito de fora por setIntro; em p = 1 a
+  // entrada acabou e nada abaixo custa nada pelo resto da vida da página.
   //
-  // O tempo se parte em dois: o APERTO (até GATHER), em que a curva se fecha —
-  // encolhe em amplitude, em comprimento e em tamanho de foto — e o ESTOURO,
-  // em que cada foto vai da curva até o lugar dela no canva. O aperto existe
-  // pra dar de onde partir: sem ele o estouro é só um espalhar, com ele é uma
-  // coisa que se soltou.
-  //
-  // O estouro é uma potência, não uma reta: começa devagar (a fita ainda
-  // parece inteira, o olho tem tempo de ver que ela É a página) e termina
-  // rápido, com as fotas de fora indo embora depressa.
+  // Três fases, nesta ordem:
+  //   MONTA   as fotos chegam escalonadas e a curva cresce de um toco até o S
+  //   JUNTA   a curva se fecha e as fotos incham — carregada, prestes a soltar
+  //   ESTOURA cada uma vai da curva ao lugar dela no canva, acelerando
 
-  /** Quanto da abertura já passou, 0 a 1. */
-  const openAt = (t: number) => clamp(t / H);
+  /** 1 = entrada terminada. Começa em 1 pra que uma página sem entrada (versão
+   *  simples, movimento reduzido, ou reload no meio) já nasça montada. */
+  let intro = 1;
+  let lastT = 0;
 
-  /** O aperto: 0 no início, 1 no instante em que o estouro começa. */
-  const gatherAt = (p: number) => clamp(p / RIBBON.GATHER);
+  /** A montagem: 0 no primeiro quadro, 1 quando a curva está inteira. */
+  const montaAt = () => clamp(intro / RIBBON.MONTA);
 
-  /** O estouro: 0 enquanto ainda aperta, 1 quando a foto chegou ao canva. */
-  const burstAt = (p: number) => {
-    const u = clamp((p - RIBBON.GATHER) / (1 - RIBBON.GATHER));
+  /** O aperto: 0 até a curva ficar pronta, 1 quando o estouro começa. */
+  const juntaAt = () => clamp((intro - RIBBON.MONTA) / (RIBBON.JUNTA - RIBBON.MONTA));
+
+  /** O estouro: 0 enquanto junta, 1 quando a foto chegou ao canva. */
+  const estouroAt = () => {
+    const u = clamp((intro - RIBBON.JUNTA) / (1 - RIBBON.JUNTA));
     return Math.pow(u, RIBBON.FALL); // parte devagar, chega acelerando
+  };
+
+  /** Quando a foto de posto `rank` entra, durante a montagem: as de cima da
+   *  curva primeiro, escalonadas por STAGGER. É o que faz a fita se DESENHAR
+   *  em vez de piscar inteira. */
+  const chegadaAt = (rank: number, monta: number) => {
+    const inicio = ranks > 1 ? (rank / (ranks - 1)) * RIBBON.STAGGER : 0;
+    return clamp((monta - inicio) / (1 - RIBBON.STAGGER));
   };
 
   /** Onde a foto de posto `rank` está na curva, já apertada por `k`.
@@ -243,20 +255,25 @@ export function createField(input: FieldInput): FieldDriver {
    *  O aperto encolhe o COMPRIMENTO em volta do meio (por isso `us`, e não
    *  `u`, na altura) mas mantém a onda em `u`: a curva se fecha como uma mola,
    *  sem perder as voltas. */
-  const ribbonAt = (rank: number, w: number, k: number) => {
+  const ribbonAt = (rank: number, w: number, k: number, cresce: number) => {
     const u = ranks > 1 ? rank / (ranks - 1) : 0.5;
     // recuado dentro do vão (PAD) porque a conta dá o CENTRO da foto: sem
     // isso metade da primeira e da última sobra pra fora, sobre o título
     const inset = RIBBON.PAD + u * (1 - 2 * RIBBON.PAD);
-    const us = 0.5 + (inset - 0.5) * lerp(1, RIBBON.TIGHT_SPAN, k);
+    // `cresce` é a montagem: a curva sai de um toco (SEED) e se abre até o S
+    // inteiro. Multiplica as três medidas juntas pra ela crescer sem se
+    // deformar — uma fita pequena virando grande, não uma fita esticando.
+    const g = lerp(RIBBON.SEED, 1, cresce);
+    const us = 0.5 + (inset - 0.5) * lerp(1, RIBBON.TIGHT_SPAN, k) * g;
     // as duas medidas saem da ALTURA da faixa, pra curva ter a mesma forma em
     // qualquer tela (ver AMPLITUDE e CARD no config); a largura só entra como
     // freio, pra janela estreita
     const amp =
-      Math.min(RIBBON.AMPLITUDE * band.h, RIBBON.MAX_W * W) * lerp(1, RIBBON.TIGHT_AMP, k);
+      Math.min(RIBBON.AMPLITUDE * band.h, RIBBON.MAX_W * W) * lerp(1, RIBBON.TIGHT_AMP, k) * g;
     // o tamanho relativo entre as fotos se mantém: cada uma é o tamanho-base
     // vezes o quanto ela é maior ou menor que a foto média do canva
-    const alvo = RIBBON.CARD * band.h * lerp(1, RIBBON.TIGHT_SIZE, k) * (w / FIELD.SIZES_VMIN[1]);
+    const alvo =
+      RIBBON.CARD * band.h * lerp(1, RIBBON.TIGHT_SIZE, k) * g * (w / FIELD.SIZES_VMIN[1]);
     return {
       cx: band.x + band.w / 2 - amp * Math.sin(Math.PI * 2 * u),
       cy: band.y + band.h * us,
@@ -301,6 +318,7 @@ export function createField(input: FieldInput): FieldDriver {
 
   const apply = (t: number) => {
     if (!W) measure();
+    lastT = t;
     const breath = breathAt(t);
     field.style.setProperty('--breath', breath.toFixed(4));
 
@@ -334,11 +352,11 @@ export function createField(input: FieldInput): FieldDriver {
       else delete root.dataset.overPhoto;
     }
 
-    // a abertura: enquanto ela corre, as fotos da fita mandam na cena
-    const p = openAt(t);
-    const aberta = p >= 1;
-    const gather = aberta ? 1 : gatherAt(p);
-    const burst = aberta ? 1 : burstAt(p);
+    // a entrada: enquanto ela corre, as fotos da fita mandam na cena
+    const pronta = intro >= 1;
+    const monta = pronta ? 1 : montaAt();
+    const junta = pronta ? 1 : juntaAt();
+    const estouro = pronta ? 1 : estouroAt();
 
     for (const c of common) {
       const h = c.px / c.ratio;
@@ -356,18 +374,20 @@ export function createField(input: FieldInput): FieldDriver {
       // tamanho de canva, e a fita é ele desenhado menor (SCALE < 1). Reduzir
       // é nítido; o contrário custaria a qualidade que a foto das criações já
       // ensinou a não perder.
-      if (!aberta && c.rank >= 0) {
-        const r = ribbonAt(c.rank, c.w, gather);
-        cx = lerp(r.cx, cx, burst);
-        cy = lerp(r.cy, cy, burst);
-        scale = lerp(r.scale, 1, burst);
-        fita = 1 - burst;
+      if (!pronta && c.rank >= 0) {
+        const r = ribbonAt(c.rank, c.w, junta, monta);
+        cx = lerp(r.cx, cx, estouro);
+        cy = lerp(r.cy, cy, estouro);
+        scale = lerp(r.scale, 1, estouro);
+        // some ao chegar (a foto ainda não entrou na curva) e some de novo ao
+        // estourar (aí quem manda é o nível normal do canva)
+        fita = chegadaAt(c.rank, monta) * (1 - estouro);
       }
 
       // as que não estão na fita só entram quando ela já se desfez: durante a
-      // abertura a cena é a curva, e um canva normal por baixo dela seria
+      // entrada a cena é a curva, e um canva normal por baixo dela seria
       // ruído competindo com o gesto
-      const hidden = !aberta && c.rank < 0;
+      const hidden = !pronta && c.rank < 0;
       const meia = h * scale;
       if (hidden || cy + meia / 2 < -cull || cy - meia / 2 > VH + cull) {
         setOff(c, true);
@@ -380,7 +400,12 @@ export function createField(input: FieldInput): FieldDriver {
 
       const hero = c.lit && c.heroOk ? FIELD.LIT : FIELD.GHOST;
       const stage = c.lit && c.stageOk ? FIELD.LIT : FIELD.GHOST;
-      c.el.style.setProperty('--level', lerp(hero, stage, mix).toFixed(4));
+      // durante a entrada o nível de canva é segurado em 0 e só volta com o
+      // estouro: senão a foto que ainda não chegou na curva já estaria lá em
+      // 10% de fantasma, e a fita se desenharia por cima de uma cópia pálida
+      // dela mesma
+      const nivel = lerp(hero, stage, mix);
+      c.el.style.setProperty('--level', (pronta ? nivel : nivel * estouro).toFixed(4));
       // na fita ela é a página inteira, então acesa por cima de qualquer
       // regra do canva — inclusive do teto do celular (ver o CSS do .cc-card)
       c.el.style.setProperty('--ribbon-a', fita.toFixed(4));
@@ -435,5 +460,13 @@ export function createField(input: FieldInput): FieldDriver {
     }
   };
 
-  return { measure, apply };
+  /** Move o relógio da ENTRADA (0 a 1) e redesenha no mesmo tempo de rolagem.
+   *  É a única porta pra ela: o main.ts roda um tween de 0 a 1 aqui e o resto
+   *  do arquivo continua sem saber o que é um segundo. */
+  const setIntro = (i: number) => {
+    intro = clamp(i);
+    apply(lastT);
+  };
+
+  return { measure, apply, setIntro };
 }

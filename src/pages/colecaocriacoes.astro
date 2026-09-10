@@ -22,7 +22,7 @@ import Layout from '../layouts/Layout.astro';
 import {
   CLOSING, CREATIONS, EFFECT_NAMES, FIELD_PHOTOS, KIND_LABEL, OPENING, UI,
 } from '../data/creations';
-import { EFFECTS, FIELD, FIELD_IMAGE, IMAGE, LAYOUT } from '../scripts/creations/config';
+import { EFFECTS, FIELD, FIELD_IMAGE, IMAGE, LAYOUT, STAGE } from '../scripts/creations/config';
 import { layoutField } from '../scripts/creations/fieldLayout';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -81,6 +81,10 @@ const slides = await Promise.all(
       srcset: img.srcSet.attribute,
       ratio: creation.image.width / creation.image.height,
       from: creation.from ?? 'right',
+      // onde esta criação se arruma no palco: o ciclo de STAGE.PLACEMENTS
+      // percorrido pela ordem da lista (ver config.ts). O motor de encaixe
+      // não lê nada disto — ele mede a moldura já posicionada.
+      place: STAGE.PLACEMENTS[index % STAGE.PLACEMENTS.length],
     };
   }),
 );
@@ -242,8 +246,9 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
           data-cc-slide
           data-effect={s.effect}
           data-from={s.from}
+          data-side={s.place.side}
           aria-labelledby={`${s.anchor}-titulo`}
-          style={`--ratio:${s.ratio.toFixed(4)}`}
+          style={`--ratio:${s.ratio.toFixed(4)};--shift:${(s.place.shift * 100).toFixed(2)}dvh;--scale:${s.place.scale}`}
         >
           {/* A moldura. No palco é só o LUGAR: a foto que se vê é a do canva,
               que vem se encaixar aqui (o motor mede esta caixa). A <img>
@@ -546,7 +551,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
      aspect-ratio: dá o mesmo resultado, sem depender de como cada motor
      resolve essa transferência. */
   .cc-media {
-    --frame-h: min(72dvh, 46rem);
+    --frame-h: calc(min(72dvh, 46rem) * var(--scale, 1));
     position: relative;
     justify-self: end;
     width: min(100%, calc(var(--frame-h) * var(--ratio)));
@@ -564,6 +569,39 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     height: 100%;
     object-fit: cover;
     user-select: none;
+  }
+
+  /* ——— o lugar da moldura, por criação (ver STAGE.PLACEMENTS) ———
+     Só na largura em que existem duas colunas: abaixo de 46rem a página é
+     uma coluna só, e trocar de lado ali não quer dizer nada.
+
+     O deslocamento é `top` com position: relative, e o tamanho vem do
+     --scale dentro do --frame-h: os dois mudam a caixa que o
+     getBoundingClientRect devolve, que é como o motor descobre pra onde
+     levar a foto. Um transform: scale faria a foto encaixar no lugar certo
+     com o tamanho errado, porque a largura medida seria a de antes. */
+  @media (min-width: 46.01rem) {
+    .cc-media {
+      top: var(--shift, 0);
+    }
+
+    /* o espelho: a moldura vai pra segunda coluna e o texto pra primeira. A
+       proporção das colunas troca junto, senão a moldura da direita nasce
+       menor que a da esquerda só por estar do outro lado. */
+    .cc-slide[data-side='right'] {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    }
+
+    .cc-slide[data-side='right'] .cc-media {
+      grid-column: 2;
+      justify-self: start;
+    }
+
+    .cc-slide[data-side='right'] .cc-copy {
+      grid-column: 1;
+      grid-row: 1;
+      justify-self: end;
+    }
   }
 
   /* no palco a moldura é só o lugar medido pelo motor: transparente, com a
@@ -974,8 +1012,13 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
       font-size: clamp(3.6rem, 12vh, 6rem);
     }
 
+    /* o --scale continua valendo aqui: esta janela é larga, então ela ainda
+       tem as duas colunas e o resto do ritmo de STAGE.PLACEMENTS (lado e
+       deslocamento) está ativo — só o teto de altura é que encolhe. No
+       empilhado do celular é o contrário: lá o teto é chapado de propósito,
+       porque uma coluna só não comporta variação de posição. */
     .cc-media {
-      --frame-h: 66dvh;
+      --frame-h: calc(66dvh * var(--scale, 1));
     }
 
     .cc-title {

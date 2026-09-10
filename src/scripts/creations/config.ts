@@ -16,9 +16,11 @@ export const SCROLL = {
   /** Quanto se rola pra atravessar UMA criação, em alturas de tela. É o
    *  botão de "velocidade" da página inteira: mais alto = a mesma animação
    *  espalhada por mais rolagem, portanto mais lenta pra um mesmo gesto. Com
-   *  1.6, uma criação são uns 14 dentes de roda de mouse no Chrome — dá pra
-   *  parar no meio de propósito, e ainda não cansa quem quer só passar. */
-  SCREENS_PER_CREATION: 1.6,
+   *  2.6, uma criação são uns 23 dentes de roda de mouse no Chrome. Começou
+   *  em 1.6 (uns 14) e subiu porque a foto chegava à moldura antes de o olho
+   *  acompanhar o caminho dela — e o caminho é o ponto desta página, não o
+   *  quadro final. */
+  SCREENS_PER_CREATION: 2.6,
 
   /** A abertura (título da página) sai de cena ao longo desta rolagem, também
    *  em alturas de tela. Menos que uma criação: ela não tem nada pra ler além
@@ -33,8 +35,13 @@ export const SCROLL = {
    *    exit  — a saída, até sobrar papel vazio pra próxima entrar
    *  A pausa é a fase mais importante e a menor: quem quer ler PARA de rolar
    *  (a animação para junto), então ela não precisa ser longa — precisa só
-   *  existir, pra criação não começar a sair antes de ter chegado inteira. */
-  PHASES: { enter: 0.36, hold: 0.28, exit: 0.36 },
+   *  existir, pra criação não começar a sair antes de ter chegado inteira.
+   *
+   *  `enter` é o maior dos três porque é a fase que se VÊ: é nela que a foto
+   *  sai do canva e faz o caminho até a moldura. Junto com o
+   *  SCREENS_PER_CREATION acima, a entrada passou de 0.58 pra 1.20 alturas de
+   *  tela — o dobro de rolagem pro mesmo percurso. */
+  PHASES: { enter: 0.46, hold: 0.24, exit: 0.3 },
 
   /** Fração da entrada (e da saída) gasta no fade do bloco inteiro. Sem isto,
    *  o primeiro quadro de uma criação seria um corte seco — imagem já com 20%
@@ -66,6 +73,42 @@ export const SCROLL = {
    *  não começou a sair, então quem pulou pra lá vê a criação, não uma
    *  animação pela metade — e tem folga pros dois lados. */
   JUMP_INTO_HOLD: 0.5,
+};
+
+// ——— onde a criação se arruma no palco ———
+//
+// O efeito diz COMO a foto chega; isto diz ONDE ela para. Sem a segunda
+// metade, seis efeitos diferentes terminavam todos no mesmo retângulo, no
+// mesmo lugar da tela — e o que se lia era uma foto piscando no centro, com
+// a animação como enfeite. Variar o destino é o que faz cada criação parecer
+// um quadro próprio.
+//
+// A lista abaixo é um CICLO percorrido pela ordem das criações (a de índice i
+// usa PLACEMENTS[i % tamanho]), então reordenar a lista de criações
+// reembaralha o ritmo sem ninguém precisar manter nada em sincronia. São
+// seis posições pra oito criações de propósito: nenhuma vizinha se repete e o
+// ciclo não fecha dentro da página.
+//
+// Nada disto é lido pelo motor de encaixe. O field.ts MEDE a moldura na tela
+// (getBoundingClientRect) e leva a foto até onde ela estiver — mover a
+// moldura por CSS já leva a foto junto, seja qual for o efeito.
+export const STAGE = {
+  /** side  — em que coluna a moldura cai; o texto vai pra outra
+   *  shift  — quanto ela sobe (negativo) ou desce, em alturas de tela
+   *  scale  — o tamanho dela, como fator do teto normal (--frame-h)
+   *
+   *  Os desvios são pequenos de propósito: a página é uma coleção, não um
+   *  colateral: o olho tem que reconhecer o mesmo palco a cada criação e
+   *  ainda assim não prever onde a próxima vai parar. Acima de ~8vh de shift
+   *  a moldura começa a encostar no topo em janela baixa. */
+  PLACEMENTS: [
+    { side: 'left', shift: 0, scale: 1 },
+    { side: 'right', shift: -0.06, scale: 0.88 },
+    { side: 'left', shift: 0.05, scale: 0.95 },
+    { side: 'right', shift: 0, scale: 1.03 },
+    { side: 'left', shift: -0.05, scale: 0.9 },
+    { side: 'right', shift: 0.06, scale: 0.97 },
+  ] as const satisfies readonly { side: 'left' | 'right'; shift: number; scale: number }[],
 };
 
 // ——— quando o palco existe ———
@@ -204,8 +247,14 @@ export const FIELD = {
    *  acende: na abertura, o lado do título; nas criações, moldura + texto.
    *  Só x, porque o canva rola: toda foto passa por todo y. Fantasmas podem
    *  estar em qualquer lugar — a 10% ninguém atrapalha leitura. Medido no
-   *  desktop; no celular a regra é MOBILE. */
-  SAFE_X: { hero: [0, 0.55], stage: [0.2, 0.92] },
+   *  desktop; no celular a regra é MOBILE.
+   *
+   *  A faixa das criações começa em 0.08, e não nos 0.2 de antes, porque a
+   *  moldura passou a trocar de lado (ver STAGE.PLACEMENTS): quando ela está
+   *  à direita, o texto ocupa a borda esquerda que antes sobrava. Como o lado
+   *  varia por criação e isto é decidido no BUILD, a faixa cobre os dois
+   *  arranjos — o preço é alguma foto acesa a menos por tela. */
+  SAFE_X: { hero: [0, 0.55], stage: [0.08, 0.92] },
 
   /** Até quantas alturas de tela além das bordas uma foto ainda é
    *  posicionada. Fora disso ela fica escondida e não custa nada. */

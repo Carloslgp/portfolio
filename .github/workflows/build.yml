@@ -1,0 +1,32 @@
+# Build a cada push e pull request.
+#
+# O build já confere as rotas travadas (ver scripts/rotas-travadas.mjs), então
+# rodá-lo aqui fecha o caminho que passa por fora da máquina de quem editou:
+# quem commita sem buildar, quem contorna o hook local com --no-verify, quem
+# edita direto pela interface do GitHub. Se um endereço travado sumir, o commit
+# fica marcado em vermelho no repositório.
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # rápido e com mensagem clara: falha aqui é rota fora do lugar, e não
+      # um erro de compilação qualquer mais adiante no build
+      - name: rotas travadas
+        run: node scripts/checar-rotas-travadas.mjs
+
+      - run: npm run build

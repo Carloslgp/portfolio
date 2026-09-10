@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 import tailwindcss from '@tailwindcss/vite';
 
+import { ROTAS_TRAVADAS } from './scripts/rotas-travadas.mjs';
+
 const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.tif', '.tiff', '.avif', '.webp']);
 const TEXT_EXT = new Set(['.html', '.js', '.mjs', '.css', '.json', '.xml', '.txt', '.svg']);
 
@@ -79,39 +81,17 @@ function prunarImagensOrfas() {
   };
 }
 
-/* ——— ROTAS TRAVADAS ———
- *
- * Endereços que já foram entregues a alguém de fora e por isso deixaram de
- * ser detalhe de implementação: viraram compromisso. Um link que já saiu não
- * volta — não dá pra avisar quem o recebeu que o caminho mudou.
- *
- * Cada entrada é um caminho público e o arquivo que o produz. No Astro o
- * NOME DO ARQUIVO É A URL, então renomear src/pages/x.astro é publicar um
- * endereço diferente — uma refatoração que parece inofensiva ("padronizar
- * nomes de página", "usar kebab-case", "agrupar em pasta") derruba o link
- * sem erro nenhum: o build passa, o site sobe, e só quem clica descobre.
- *
- * Daí este guarda existir no BUILD e não num comentário. Comentário depende
- * de alguém ler; isto falha alto, antes do deploy, e diz o que consertar.
- */
-const ROTAS_TRAVADAS = [
-  {
-    caminho: '/colecaocriacoes',
-    arquivo: 'src/pages/colecaocriacoes.astro',
-    // Enviado a avaliador de processo seletivo em setembro de 2026. Esta
-    // URL não pode mudar enquanto o processo estiver de pé.
-    porque: 'link enviado a avaliador de processo seletivo',
-  },
-];
-
 /**
  * Confere, depois do build, que toda rota travada saiu no dist.
+ *
+ * A lista e o motivo dela estão em scripts/rotas-travadas.mjs.
  *
  * O teste é o arquivo que o visitante realmente baixa (dist/<rota>/index.html),
  * não a lista de rotas do Astro: é o resultado que importa, e é ele que estará
  * no ar. Se faltar, o build MORRE — porque um deploy com a rota trocada é
- * exatamente o estrago que este arquivo existe pra impedir, e um aviso no log
- * passaria batido no CI.
+ * exatamente o estrago que isto existe pra impedir, e um aviso no log passaria
+ * batido. Vale notar que o deploy roda este mesmo build: uma rota derrubada
+ * não chega ao ar, e a versão anterior continua servindo o endereço.
  */
 function travarRotasPublicas() {
   return {
@@ -143,11 +123,11 @@ function travarRotasPublicas() {
 
           throw new Error(
             `\n\nROTA TRAVADA SUMIU DO BUILD\n\n${detalhe}\n\n` +
-              `Estes endereços já foram entregues a pessoas de fora e não podem mudar.\n` +
+              `Estes endereços já foram divulgados fora do site e não podem mudar.\n` +
               `Se um arquivo de página foi renomeado ou movido, DESFAÇA — o nome do\n` +
-              `arquivo é a URL. Se a rota está sendo aposentada de propósito, quem\n` +
-              `decide isso é o dono do site, não o build: tire a entrada de\n` +
-              `ROTAS_TRAVADAS no mesmo commit, explicando por quê.\n`,
+              `arquivo é a URL. Aposentar uma rota é decisão do dono do site, não do\n` +
+              `build: editar scripts/rotas-travadas.mjs pra calar este erro é\n` +
+              `justamente o que ele existe pra impedir.\n`,
           );
         }
       },

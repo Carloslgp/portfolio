@@ -1,0 +1,18 @@
+#!/bin/sh
+# Barra o commit que tira do lugar a página de uma rota travada.
+#
+# Roda antes do build e antes do push, que é onde um rename ainda custa
+# um `git mv` pra desfazer. Ver scripts/rotas-travadas.mjs.
+#
+# Instalado por `npm install` (script `prepare` do package.json aponta o
+# core.hooksPath pra esta pasta), porque .git/hooks não é versionado.
+
+if ! command -v node >/dev/null 2>&1; then
+  exit 0
+fi
+
+node scripts/checar-rotas-travadas.mjs --index --silencioso || {
+  echo ""
+  echo "commit barrado. para ignorar conscientemente: git commit --no-verify"
+  exit 1
+}

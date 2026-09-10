@@ -5,16 +5,19 @@
 //
 // Esta página não conhece nenhuma frase: tudo que aparece vem de
 // src/data/creations.ts (com o guia src/data/creations.md ao lado). Os
-// números da rolagem e dos efeitos vêm de src/scripts/creations/config.ts, e
-// o motor é src/scripts/creations/. Aqui só há markup, CSS e a checagem do
-// build logo abaixo.
+// números da rolagem, dos efeitos e do campo de fotos ao fundo vêm de
+// src/scripts/creations/config.ts, e o motor é src/scripts/creations/. Aqui
+// só há markup, CSS e a checagem do build logo abaixo.
 //
 // Sem a cena 3D nem a transição de água do craft, de propósito: o vocabulário
 // é o clássico do site (papel/tinta + botão de tema).
 import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
-import { CLOSING, CREATIONS, EFFECT_NAMES, KIND_LABEL, OPENING, UI } from '../data/creations';
-import { EFFECTS, IMAGE, LAYOUT } from '../scripts/creations/config';
+import {
+  CLOSING, CREATIONS, EFFECT_NAMES, FIELD_PHOTOS, KIND_LABEL, OPENING, UI,
+} from '../data/creations';
+import { EFFECTS, FIELD, FIELD_IMAGE, IMAGE, LAYOUT } from '../scripts/creations/config';
+import { layoutField } from '../scripts/creations/fieldLayout';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -78,6 +81,18 @@ const slides = await Promise.all(
 
 const total = pad(CREATIONS.length);
 const pieceIndexes = Array.from({ length: EFFECTS.PIECES.COUNT }, (_, k) => k);
+
+// O campo de fotos ao fundo: posições, tamanhos, deriva e constelações vêm
+// prontos do build (ver scripts/creations/fieldLayout.ts) — um trecho pra
+// abertura e um pra cada criação. A proporção de cada foto viaja como
+// variável CSS pelo mesmo motivo das molduras.
+const fieldCards = await Promise.all(
+  layoutField(FIELD_PHOTOS.length ? FIELD.COUNT : 0, CREATIONS.length + 1).map(async (card) => {
+    const photo = FIELD_PHOTOS[card.index % FIELD_PHOTOS.length];
+    const img = await getImage({ src: photo, ...FIELD_IMAGE });
+    return { ...card, src: img.src, ratio: photo.width / photo.height };
+  }),
+);
 ---
 
 <Layout lang="pt">
@@ -151,6 +166,29 @@ const pieceIndexes = Array.from({ length: EFFECTS.PIECES.COUNT }, (_, k) => k);
         versão simples é só um contêiner, e as mesmas peças viram blocos de
         uma tela cada. Mesmo HTML, dois CSS. */}
     <div class="cc-stage" data-cc-stage>
+      {/* O campo de fotos: atrás de tudo, decorativo (sem alt, fora da árvore
+          de acessibilidade) e só no palco. As que passam de FIELD.MOBILE.COUNT
+          levam uma classe que o CSS esconde no celular. */}
+      <div
+        class="cc-field"
+        data-cc-field
+        aria-hidden="true"
+        style={`--lit-cap-mobile:${FIELD.MOBILE.LIT_CAP}`}
+      >
+        {fieldCards.map((c) => (
+          <figure
+            class:list={['cc-card', { 'is-wide-only': c.index >= FIELD.MOBILE.COUNT }]}
+            data-cc-card
+            data-dx={c.dx.toFixed(2)}
+            data-dy={c.dy.toFixed(2)}
+            data-levels={c.levels.join(',')}
+            style={`--x:${c.x.toFixed(2)};--y:${c.y.toFixed(2)};--w:${c.w};--ratio:${c.ratio.toFixed(4)}`}
+          >
+            <img src={c.src} alt="" loading="lazy" decoding="async" draggable="false" />
+          </figure>
+        ))}
+      </div>
+
       <header class="cc-hero" data-cc-hero>
         <p class="eyebrow" data-cc-hero-kicker>{OPENING.kicker}</p>
         <h1 data-cc-hero-title>{OPENING.title.line1}<br /><em>{OPENING.title.line2}</em></h1>
@@ -308,6 +346,56 @@ const pieceIndexes = Array.from({ length: EFFECTS.PIECES.COUNT }, (_, k) => k);
   :global(html[data-creations='stage']) .cc-stage {
     height: var(--viewport-h);
     overflow: hidden;
+  }
+
+  /* ——— o campo de fotos ao fundo ———
+     Só existe no palco: empilhada, a página é uma lista e um fundo de fotos
+     posicionado em % de um contêiner de nove telas não faria sentido.
+
+     A opacidade de cada foto é o PRODUTO de duas variáveis que o GSAP anima
+     separadamente (ver field.ts): --level, o nível dela no trecho atual, e
+     --breath, a respiração do campo inteiro. --lit-cap é o teto do celular. */
+  .cc-field {
+    --breath: 1;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: none;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  :global(html[data-creations='stage']) .cc-field {
+    display: block;
+  }
+
+  /* --x/--y são o CENTRO da foto em % do palco e --w a largura em vmin; o
+     canto sai da conta aqui, sem transform, porque o transform é do GSAP (a
+     deriva) e um translate de centralização no CSS seria sobrescrito. */
+  .cc-card {
+    --level: 0;
+    position: absolute;
+    left: calc(var(--x) * 1% - var(--w) * 0.5vmin);
+    top: calc(var(--y) * 1% - var(--w) * 0.5vmin / var(--ratio));
+    width: calc(var(--w) * 1vmin);
+    aspect-ratio: var(--ratio);
+    margin: 0;
+    opacity: calc(min(var(--level), var(--lit-cap, 1)) * var(--breath));
+    will-change: transform, opacity;
+  }
+
+  .cc-card img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    user-select: none;
+  }
+
+  /* a abertura e as criações ficam por cima do campo */
+  :global(html[data-creations='stage']) .cc-hero,
+  :global(html[data-creations='stage']) .cc-slide {
+    z-index: 1;
   }
 
   /* ——— a abertura ——— */
@@ -807,6 +895,17 @@ const pieceIndexes = Array.from({ length: EFFECTS.PIECES.COUNT }, (_, k) => k);
 
     .cc-closing h2 {
       font-size: clamp(2.4rem, 11vw, 4rem);
+    }
+
+    /* sem margem onde acender no celular: o campo vira textura, com menos
+       fotos e sem passar do teto — o número vem do config (FIELD.MOBILE),
+       escrito inline pelo build, pra não morar em dois lugares */
+    .cc-field {
+      --lit-cap: var(--lit-cap-mobile);
+    }
+
+    .cc-card.is-wide-only {
+      display: none;
     }
 
     .cc-nav {

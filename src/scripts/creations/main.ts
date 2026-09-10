@@ -15,6 +15,9 @@
 //     trigger sai direto da duração. Todos os números moram em config.ts.
 //   • Cada criação termina invisível e a seguinte começa invisível (ver
 //     effects.ts): entre duas há um respiro de papel, nunca as duas juntas.
+//   • Atrás de tudo, o campo de fotos (field.ts) anda na mesma timeline: deriva
+//     contínua, troca de constelação a cada fronteira e escurece durante a
+//     leitura — é fundo, e se comporta como fundo.
 //
 // A decisão "palco ou versão simples" NÃO é tomada aqui: é do script inline
 // no <head> da página, antes do primeiro paint (ele lê a escolha do portão de
@@ -31,6 +34,7 @@ import type { Effect } from '../../data/creations';
 import { viewportSize } from '../viewport';
 import { CLOSING, OPENING, SCROLL, STATIC } from './config';
 import { BUILDERS, type Phases, type SlideParts } from './effects';
+import { createField } from './field';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -139,6 +143,18 @@ export function initCreations() {
       if (!build) throw new Error(`unknown effect "${effect}" on creation ${pad(i + 1)}`);
       master.add(build(partsOf(slide), phases), H + i * SPC);
     });
+    // O campo de fotos ao fundo (ver field.ts): a deriva entra na mestra como
+    // tween; as luzes são função do tempo dela, recalculadas a cada render —
+    // pela própria mestra, e não pelo onUpdate do trigger, pra seguirem o
+    // MESMO relógio do resto quando SCRUB tem inércia.
+    const field = stage.querySelector<HTMLElement>('[data-cc-field]');
+    const cards = [...stage.querySelectorAll<HTMLElement>('[data-cc-card]')];
+    if (field && cards.length) {
+      const driver = createField(field, cards, N, phases, total);
+      master.add(driver.timeline, 0);
+      master.eventCallback('onUpdate', () => driver.apply(master.time()));
+      driver.apply(0);
+    }
     master.set({}, {}, total);
 
     // Qual criação está ativa, a partir do progresso do trigger. Antes da

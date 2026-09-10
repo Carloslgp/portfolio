@@ -23,6 +23,7 @@
 //                           no build — NÃO precisa de `npm run images`, isso é
 //                           só pro public/.
 //   • tirar uma criação   → apagar (ou comentar) o objeto
+//   • fotos do fundo      → a lista FIELD_PHOTOS logo abaixo (só os imports)
 //
 // Velocidade, duração das fases e o ajuste fino de cada efeito NÃO ficam
 // aqui: ver src/scripts/creations/config.ts.
@@ -40,6 +41,38 @@ import mock05 from '../assets/photos/pantheon-oculus.webp';
 import mock06 from '../assets/photos/glacier-valley.webp';
 import mock07 from '../assets/photos/neon-dance.webp';
 import mock08 from '../assets/photos/chapel-ceiling.webp';
+
+// ——— as fotos do campo de fundo ———
+// TROCAR à vontade: são fotos do mural que não estão nas criações. A ordem
+// não importa (a posição de cada uma é sorteada no build) e pode haver mais
+// ou menos que FIELD.COUNT (config) — com menos, a lista repete; com mais,
+// sobram. Quantas aparecem, o tamanho, o movimento e as luzes ficam em
+// scripts/creations/config.ts → FIELD.
+import field01 from '../assets/photos/florence-duomo-marble.webp';
+import field02 from '../assets/photos/dinosaur-skeleton.webp';
+import field03 from '../assets/photos/primavera-graces.webp';
+import field04 from '../assets/photos/mclaren-cobblestones.webp';
+import field05 from '../assets/photos/dome-ring-of-lights.webp';
+import field06 from '../assets/photos/snow-texture.webp';
+import field07 from '../assets/photos/alpine-lake.webp';
+import field08 from '../assets/photos/cat-in-doorway.webp';
+import field09 from '../assets/photos/michelangelo-david.webp';
+import field10 from '../assets/photos/milan-duomo.webp';
+import field11 from '../assets/photos/lone-tree-bw.webp';
+import field12 from '../assets/photos/waterfall-bw.webp';
+import field13 from '../assets/photos/clouds-at-dusk.webp';
+import field14 from '../assets/photos/fresco-ceiling.webp';
+import field15 from '../assets/photos/sea-sparkle.webp';
+import field16 from '../assets/photos/train-window-fields.webp';
+import field17 from '../assets/photos/bare-tree-blossoms.webp';
+import field18 from '../assets/photos/vertical-forest-tower.webp';
+
+/** As fotos espalhadas ao fundo do palco. Decorativas: não têm alt nem
+ *  legenda, e a versão simples da página não as mostra. */
+export const FIELD_PHOTOS: ImageMetadata[] = [
+  field01, field02, field03, field04, field05, field06, field07, field08, field09,
+  field10, field11, field12, field13, field14, field15, field16, field17, field18,
+];
 
 /** Os efeitos disponíveis. Cada um é uma animação de entrada E de saída (a
  *  saída é o espelho da entrada):

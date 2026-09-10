@@ -96,6 +96,19 @@ Efeito com nome errado também é recusado — o editor já autocompleta a lista
   `rel="noreferrer"` automaticamente (é o que faz a home rodar a abertura
   inteira ao voltar).
 
+## As fotos do fundo
+
+Atrás da abertura e das criações há um campo de fotos espalhadas, quase todas
+apagadas e algumas acesas, que se desloca e troca de constelação conforme se
+rola. Quais fotos entram é a lista **`FIELD_PHOTOS`** em `creations.ts`: só os
+imports, na ordem que quiser (a posição de cada uma é sorteada no build, sempre
+igual). Pode ter mais ou menos fotos que `FIELD.COUNT` (config): com menos, a
+lista repete; com mais, sobram.
+
+O campo é decorativo (sem alt), não existe na versão simples e no celular fica
+com menos fotos e mais fraco. Quantas aparecem, o tamanho, quanto se movem, o
+quanto acendem e a semente do sorteio ficam em `config.ts` → `FIELD`.
+
 ## Velocidade, duração e ajuste fino
 
 Não ficam no arquivo de conteúdo. Tudo está em
@@ -109,7 +122,10 @@ Não ficam no arquivo de conteúdo. Tudo está em
 - `EFFECTS.*` — o ajuste de cada efeito (tamanho inicial do grow, número de
   tiras do pieces, ângulo do flip…);
 - `LAYOUT.MIN_STAGE_HEIGHT` — abaixo desta altura de tela a página mostra a
-  versão simples (empilhada).
+  versão simples (empilhada);
+- `FIELD.*` — o campo de fotos do fundo: `COUNT`, `SEED` (trocar sorteia
+  outro arranjo), `DRIFT_VH` (quanto se move), `GHOST`/`LIT`/`BREATH_MIN`
+  (quanto aparece), `LIT_PER`/`OFF_PER` (quantas acendem e somem por trecho).
 
 ## Quando a página mostra a versão simples
 

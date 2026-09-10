@@ -226,17 +226,24 @@ export function createField(input: FieldInput): FieldDriver {
   let intro = 1;
   let lastT = 0;
 
+  // As três curvas são smoothstep, e não retas nem potências, pelo mesmo
+  // motivo em todas: elas saem do repouso e VOLTAM ao repouso. Uma reta chega
+  // ao fim na mesma velocidade em que andou e para de vez; uma potência chega
+  // ainda acelerando e para pior. Nos dois casos o olho vê a animação ser
+  // interrompida em vez de terminar — que é literalmente o defeito que a
+  // primeira versão tinha no espalhar.
+
   /** A montagem: 0 no primeiro quadro, 1 quando a curva está inteira. */
-  const montaAt = () => clamp(intro / RIBBON.MONTA);
+  const montaAt = () => smooth(clamp(intro / RIBBON.MONTA));
 
-  /** O aperto: 0 até a curva ficar pronta, 1 quando o estouro começa. */
-  const juntaAt = () => clamp((intro - RIBBON.MONTA) / (RIBBON.JUNTA - RIBBON.MONTA));
+  /** O aperto. Note que ele só começa em PARADA, e não quando a montagem
+   *  termina: entre as duas há a pausa em que o S fica parado, inteiro. É a
+   *  única fase da entrada em que nada acontece, e é ali que a curva existe —
+   *  sem ela a fita mal se desenha e já começa a se desfazer. */
+  const juntaAt = () => smooth(clamp((intro - RIBBON.PARADA) / (RIBBON.JUNTA - RIBBON.PARADA)));
 
-  /** O estouro: 0 enquanto junta, 1 quando a foto chegou ao canva. */
-  const estouroAt = () => {
-    const u = clamp((intro - RIBBON.JUNTA) / (1 - RIBBON.JUNTA));
-    return Math.pow(u, RIBBON.FALL); // parte devagar, chega acelerando
-  };
+  /** O espalhar: 0 enquanto junta, 1 quando a foto assentou no canva. */
+  const estouroAt = () => smooth(clamp((intro - RIBBON.JUNTA) / (1 - RIBBON.JUNTA)));
 
   /** Quando a foto de posto `rank` entra, durante a montagem: as de cima da
    *  curva primeiro, escalonadas por STAGGER. É o que faz a fita se DESENHAR
@@ -380,8 +387,14 @@ export function createField(input: FieldInput): FieldDriver {
         cy = lerp(r.cy, cy, estouro);
         scale = lerp(r.scale, 1, estouro);
         // some ao chegar (a foto ainda não entrou na curva) e some de novo ao
-        // estourar (aí quem manda é o nível normal do canva)
-        fita = chegadaAt(c.rank, monta) * (1 - estouro);
+        // se espalhar (aí quem manda é o nível normal do canva).
+        //
+        // O quadrado no espalhar faz a presença ATRASAR em relação ao
+        // movimento: linear, a foto já estava quase apagada na metade do
+        // caminho e o espalhar acontecia com quase nada na tela. Assim ela
+        // continua inteira enquanto viaja e só se dissolve no fim, que é o
+        // que se vê na referência.
+        fita = chegadaAt(c.rank, monta) * (1 - estouro * estouro);
       }
 
       // as que não estão na fita só entram quando ela já se desfez: durante a

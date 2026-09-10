@@ -221,22 +221,28 @@ export const RIBBON = {
   CARD: 0.11,
 
   /** ——— o relógio da entrada ———
-   *  Quanto dura a coisa toda, em segundos, e onde ficam as emendas das três
-   *  fases (frações do total):
+   *  Quanto dura a coisa toda, em segundos, e onde ficam as emendas das
+   *  QUATRO fases (frações do total):
    *
-   *    0 → MONTA      as fotos chegam e formam a curva, que cresce de um
-   *                   toco (SEED) até o S inteiro
-   *    MONTA → JUNTA  a curva se fecha e as fotos incham: é o instante em que
-   *                   ela parece uma coisa só, prestes a arrebentar
-   *    JUNTA → 1      elas se soltam e vão pro lugar delas no canva
+   *    0 → MONTA         as fotos chegam e a curva cresce de um toco (SEED)
+   *                      até o S inteiro
+   *    MONTA → PARADA    o S fica PARADO, inteiro. Nada se mexe
+   *    PARADA → JUNTA    a curva se fecha e as fotos incham: uma coisa só,
+   *                      prestes a arrebentar
+   *    JUNTA → 1         elas se soltam, se espalham e assentam no canva
    *
-   *  2.6s é o teto do que se pede a alguém que acabou de abrir uma página: dá
-   *  pra ler as três fases sem que a espera vire fila. Quem não quiser esperar
-   *  interrompe — qualquer toque, tecla ou rolagem corta pro fim (ver main.ts).
-   */
-  SECONDS: 2.6,
-  MONTA: 0.44,
-  JUNTA: 0.64,
+   *  A PARADA é a fase que eu não tinha e que faz a diferença. Sem ela a fita
+   *  mal termina de se desenhar e já começa a se desfazer — o desenho nunca é
+   *  VISTO, só atravessado. Ela é o único momento da entrada em que nada
+   *  acontece, e é por isso que ele conta: é ali que a curva existe.
+   *
+   *  4s é mais do que se pede a quem abriu uma página, e é deliberado: as
+   *  quatro fases precisam de ar, e quem não quiser esperar interrompe —
+   *  qualquer toque, tecla ou rolagem acelera 5x (ver main.ts). */
+  SECONDS: 4,
+  MONTA: 0.32,
+  PARADA: 0.5,
+  JUNTA: 0.62,
 
   /** Do que a curva parte, no primeiro quadro: fração do tamanho final. Não é
    *  zero de propósito — de zero as fotos nasceriam de um ponto, e o que se
@@ -254,12 +260,12 @@ export const RIBBON = {
    *  porque o tamanho na curva é uma fração do tamanho de canva, então mesmo
    *  inchadas elas não passam do tamanho natural do elemento (ver field.ts). */
 
-  /** A curva do estouro. Maior que 1 é queda: começa devagar e acelera, que é
-   *  o que "cai" quer dizer. Começou em 3 e estava errado — com expoente 3,
-   *  na metade da abertura só 1% do caminho tinha sido feito, e o que se via
-   *  era uma fita parada por meia tela e um borrão no fim. Em 1.6 o movimento
-   *  se distribui pela rolagem e ainda chega acelerando. */
-  FALL: 1.6,
+  /* A curva do espalhar não é mais um número daqui: é a smoothstep que o
+     effects.ts já usava pro encaixe (ver field.ts). Era uma potência, e
+     potência é a forma errada pra isto — ela acelera até o ÚLTIMO quadro e
+     então para de vez, sem desacelerar. Assistindo, o que se via era as fotos
+     se espalhando e parando do nada, no meio do gesto. A smoothstep sai do
+     repouso e volta ao repouso: elas se soltam, correm e assentam. */
   TIGHT_AMP: 0.5,
   TIGHT_SPAN: 0.72,
   TIGHT_SIZE: 1.5,

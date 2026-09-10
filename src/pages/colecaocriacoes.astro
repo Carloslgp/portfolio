@@ -81,10 +81,11 @@ const slides = await Promise.all(
       srcset: img.srcSet.attribute,
       ratio: creation.image.width / creation.image.height,
       from: creation.from ?? 'right',
-      // onde esta criação se arruma no palco: o ciclo de STAGE.PLACEMENTS
-      // percorrido pela ordem da lista (ver config.ts). O motor de encaixe
-      // não lê nada disto — ele mede a moldura já posicionada.
-      place: STAGE.PLACEMENTS[index % STAGE.PLACEMENTS.length],
+      // que forma esta criação toma no palco: o que a criação pediu, ou o
+      // ciclo de STAGE.CYCLE percorrido pela ordem da lista (ver config.ts).
+      // Vira um data-attribute e acaba aí — quem desenha é o CSS, e o motor
+      // de encaixe só mede a moldura que sair disso.
+      layout: creation.layout ?? STAGE.CYCLE[index % STAGE.CYCLE.length],
     };
   }),
 );
@@ -246,9 +247,9 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
           data-cc-slide
           data-effect={s.effect}
           data-from={s.from}
-          data-side={s.place.side}
+          data-layout={s.layout}
           aria-labelledby={`${s.anchor}-titulo`}
-          style={`--ratio:${s.ratio.toFixed(4)};--shift:${(s.place.shift * 100).toFixed(2)}dvh;--scale:${s.place.scale}`}
+          style={`--ratio:${s.ratio.toFixed(4)}`}
         >
           {/* A moldura. No palco é só o LUGAR: a foto que se vê é a do canva,
               que vem se encaixar aqui (o motor mede esta caixa). A <img>
@@ -551,10 +552,11 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
      aspect-ratio: dá o mesmo resultado, sem depender de como cada motor
      resolve essa transferência. */
   .cc-media {
-    --frame-h: calc(min(72dvh, 46rem) * var(--scale, 1));
+    --frame-h: min(72dvh, 46rem);
+    --frame-cap: 100%;
     position: relative;
     justify-self: end;
-    width: min(100%, calc(var(--frame-h) * var(--ratio)));
+    width: min(var(--frame-cap), calc(var(--frame-h) * var(--ratio)));
     aspect-ratio: var(--ratio);
     overflow: hidden;
     background: rgba(var(--ink-rgb), 0.06);
@@ -571,37 +573,188 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     user-select: none;
   }
 
-  /* ——— o lugar da moldura, por criação (ver STAGE.PLACEMENTS) ———
-     Só na largura em que existem duas colunas: abaixo de 46rem a página é
-     uma coluna só, e trocar de lado ali não quer dizer nada.
+  /* ═══ AS COMPOSIÇÕES ═══════════════════════════════════════════════════
+     A forma que cada criação toma no palco. Os nomes e o que cada um quer
+     dizer estão em data/creations.ts → LAYOUT_NAMES; a ordem em que aparecem
+     está em scripts/creations/config.ts → STAGE.CYCLE. Aqui é a geometria.
 
-     O deslocamento é `top` com position: relative, e o tamanho vem do
-     --scale dentro do --frame-h: os dois mudam a caixa que o
-     getBoundingClientRect devolve, que é como o motor descobre pra onde
-     levar a foto. Um transform: scale faria a foto encaixar no lugar certo
-     com o tamanho errado, porque a largura medida seria a de antes. */
+     Tudo isto é layout puro, e mesmo assim é o que mais muda a animação: o
+     motor de encaixe MEDE a moldura (getBoundingClientRect) e leva a foto até
+     ela, do tamanho que ela for. Uma moldura que cobre a tela é uma foto que
+     cresce até cobrir a tela — e o mesmo `grow` que era um crescimentozinho
+     no centro vira um zoom de tela cheia, sem uma linha de JS.
+
+     Duas regras que valem pra todas:
+       • a caixa tem SEMPRE a proporção da foto (--ratio), e o tamanho sai de
+         uma altura-alvo (--frame-h) com um teto de largura (--frame-cap).
+         Assim uma foto deitada não estoura a composição pensada pra uma em
+         pé: o teto entra e a altura cede.
+       • só no palco. Na versão simples (tela baixa, baixa animação) a página
+         é uma pilha comum, e composição ali seria enfeite sobre um fallback.
+
+     A moldura pode passar da tela de propósito (tower, edge, full). Quem
+     corta é o .cc-field, que tem overflow: hidden no tamanho do viewport — e
+     o getBoundingClientRect ignora corte de ancestral, então o motor continua
+     enxergando a caixa inteira e mandando a foto pro lugar certo. */
+  :global(html[data-creations='stage']) .cc-slide {
+    /* uma moldura que sangra não pode virar barra de rolagem horizontal */
+    overflow: hidden;
+  }
+
   @media (min-width: 46.01rem) {
-    .cc-media {
-      top: var(--shift, 0);
-    }
-
-    /* o espelho: a moldura vai pra segunda coluna e o texto pra primeira. A
-       proporção das colunas troca junto, senão a moldura da direita nasce
+    /* ——— flip: o duet espelhado ———
+       A proporção das colunas troca junto, senão a moldura da direita nasce
        menor que a da esquerda só por estar do outro lado. */
-    .cc-slide[data-side='right'] {
+    :global(html[data-creations='stage']) .cc-slide[data-layout='flip'] {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
     }
-
-    .cc-slide[data-side='right'] .cc-media {
+    :global(html[data-creations='stage']) [data-layout='flip'] .cc-media {
       grid-column: 2;
       justify-self: start;
     }
-
-    .cc-slide[data-side='right'] .cc-copy {
+    :global(html[data-creations='stage']) [data-layout='flip'] .cc-copy {
       grid-column: 1;
       grid-row: 1;
       justify-self: end;
     }
+
+    /* ——— tower: mais alta que a tela, estreita, encostada na borda ———
+       116dvh é o ponto em que ela sangra em cima E embaixo o bastante pra se
+       ler como "não cabe", sem que o assunto da foto (que costuma estar no
+       meio) saia junto. O teto de 52vw é o que segura uma foto deitada: nela
+       a altura cede e o resultado é uma faixa larga, que é a forma que uma
+       deitada tem quando quer ser grande. */
+    /* A folga do indicador. Ele é fixo à direita e ocupa uns 65px de largura
+       contra os 86 de padding do slide — só que ele não fica DENTRO desse
+       padding: medido, ele começa 3px antes da borda do conteúdo. Nunca deu
+       problema porque nada encostava ali. Estas duas encostam, então param
+       antes. As outras nem chegam perto e não precisam da regra. */
+    :global(html[data-creations='stage']) [data-layout='tower'] .cc-media,
+    :global(html[data-creations='stage']) [data-layout='quiet'] .cc-media {
+      margin-right: 1.6rem;
+    }
+
+    /* Ela sangra em cima e embaixo, e SÓ. Sangrar pela direita também era o
+       primeiro desenho, e estava errado: o indicador lateral é fixo no meio
+       da altura, exatamente onde esta moldura passa, e uma foto escura por
+       baixo dele o apaga. Conteúdo não passa por cima de navegação
+       permanente — e o gesto não perde nada, porque o que faz a tower é a
+       altura que não cabe, não a borda lateral. */
+    :global(html[data-creations='stage']) [data-layout='tower'] .cc-media {
+      --frame-h: 116dvh;
+      --frame-cap: 52vw;
+      grid-column: 2;
+      justify-self: end;
+    }
+    :global(html[data-creations='stage']) [data-layout='tower'] .cc-copy {
+      grid-column: 1;
+      grid-row: 1;
+      max-width: 26rem;
+    }
+
+    /* ——— quiet: pequena num canto, texto no oposto ———
+       A única em que a foto NÃO é o assunto principal da tela: ela vira um
+       selo no alto e quem manda é o título. Depois de uma full, é o silêncio
+       que faz a próxima cheia valer. */
+    :global(html[data-creations='stage']) [data-layout='quiet'] .cc-media {
+      --frame-h: 38dvh;
+      --frame-cap: 24vw;
+      grid-column: 2;
+      justify-self: end;
+      align-self: start;
+    }
+    :global(html[data-creations='stage']) [data-layout='quiet'] .cc-copy {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: end;
+      max-width: 34rem;
+    }
+    :global(html[data-creations='stage']) [data-layout='quiet'] .cc-title {
+      font-size: clamp(3rem, 6vw, 6rem);
+    }
+
+    /* ——— edge: grande, jogada pra fora da borda esquerda ———
+       Uns 16vw ficam de fora. É o gesto mais arriscado da página e depende de
+       uma coisa: o texto do outro lado tem que estar inteiro na tela, senão
+       vira só uma foto mal posicionada. */
+    :global(html[data-creations='stage']) .cc-slide[data-layout='edge'] {
+      /* a primeira coluna encolhe porque boa parte dela está fora da tela:
+         com as colunas normais o texto começava a 770px e sobrava um vazio
+         de 470 entre ele e a foto — ar demais vira desleixo, não composição */
+      grid-template-columns: minmax(0, 0.62fr) minmax(0, 1fr);
+    }
+    :global(html[data-creations='stage']) [data-layout='edge'] .cc-media {
+      --frame-h: 88dvh;
+      --frame-cap: 62vw;
+      grid-column: 1;
+      justify-self: start;
+      margin-left: -16vw;
+    }
+  }
+
+  /* ——— full: a foto ocupa a página inteira ———
+     Vale em toda largura, inclusive no celular: é a composição que menos
+     depende de haver duas colunas, e a que mais rende em tela pequena.
+
+     A moldura é a MENOR caixa com a proporção da foto que ainda cobre o
+     viewport: max(largura da tela, altura da tela x proporção). Com o
+     aspect-ratio junto, o que sobra em uma direção sangra pra fora e o
+     .cc-field corta. É o que faz qualquer foto — em pé, deitada, quadrada —
+     cobrir a tela inteira sem deformar e sem faixa preta.
+
+     O padding do slide vai a zero pra caixa nascer do canto do viewport, e
+     volta no texto: aqui ele flutua sobre a foto, não divide espaço com ela. */
+  :global(html[data-creations='stage']) .cc-slide[data-layout='full'] {
+    padding: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :global(html[data-creations='stage']) [data-layout='full'] .cc-media {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: max(100%, calc(var(--viewport-h) * var(--ratio)));
+    max-width: none;
+  }
+
+  /* O véu. Escurece só o pé da tela, onde o texto está — o alto da foto fica
+     como é. A opacidade segue o --dock que o field.ts publica (o quanto a
+     foto já chegou), e não a linha do tempo do texto: sem isso a página
+     escureceria inteira no primeiro quadro da entrada, com a foto ainda
+     miniatura do outro lado da tela. O 1.4 adianta o véu em relação à foto,
+     porque o texto branco começa a aparecer antes de ela ter chegado. */
+  :global(html[data-creations='stage']) [data-layout='full']::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: clamp(0, calc(var(--dock, 0) * 1.4), 1);
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.82) 0%,
+      rgba(0, 0, 0, 0.55) 26%,
+      rgba(0, 0, 0, 0.12) 55%,
+      rgba(0, 0, 0, 0) 78%
+    );
+  }
+
+  /* O texto por cima do véu. Trocar --ink e --ink-rgb aqui vira todas as
+     linhas de uma vez (rótulo, título, descrição, link já se descrevem em
+     função deles) — e continua branco nos dois temas, porque quem manda no
+     contraste agora é a foto, não o tema da página. */
+  :global(html[data-creations='stage']) [data-layout='full'] .cc-copy {
+    --ink: #fff;
+    --ink-rgb: 255, 255, 255;
+    position: absolute;
+    z-index: 1;
+    left: 0;
+    bottom: 0;
+    padding: clamp(1.6rem, 5vw, 5rem);
+    padding-right: clamp(3.2rem, 8vw, 7rem);
+    max-width: min(42rem, 100%);
+    color: #fff;
+    text-shadow: 0 1px 24px rgba(0, 0, 0, 0.4);
   }
 
   /* no palco a moldura é só o lugar medido pelo motor: transparente, com a
@@ -811,17 +964,71 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
   }
 
   /* ——— o cromo fixo (o mesmo das outras páginas secundárias) ——— */
+  /* ——— o cromo sobre foto ———
+     "‹ Voltar", o botão de tema e o indicador lateral são tinta escura no
+     tema claro. Uma composição que cobre a tela de foto os apaga: a página
+     fica linda e sem navegação visível.
+
+     O motor mede quanto da tela a foto encaixada está cobrindo e marca
+     data-over-photo na raiz quando passa da metade (ver field.ts). Aqui o
+     cromo só vira claro — o mesmo que ele já é no tema escuro, então é
+     redefinir --ink e --ink-rgb e todas as regras existentes seguem, sem
+     nenhuma precisar saber deste caso.
+
+     Vira sem piscar porque cada uma dessas regras já tem transition de cor
+     (era pra troca de tema); a mudança de variável entra por ela. */
+  :global(html[data-over-photo]) .back,
+  :global(html[data-over-photo]) .theme,
+  :global(html[data-over-photo]) .cc-nav {
+    --ink: #fff;
+    --ink-rgb: 255, 255, 255;
+  }
+
+  /* Branco não basta, e foi preciso ver pra saber: a primeira foto full tem
+     céu claro justamente no alto, onde o "‹ Voltar" e o botão de tema ficam,
+     e o texto branco sumiu no branco. Escurecer o topo da foto inteira
+     resolveria e custaria a foto; então o que ganha fundo é o CONTROLE, não a
+     imagem — uma pastilha escura atrás de cada um, do tamanho dele.
+
+     A pastilha é opaca o bastante pra dar contraste de verdade sobre céu
+     branco (0.5 sobre branco dá cinza ~115, contra branco é ~4:1), e o
+     desfoque atrás dela a costura na foto em vez de recortá-la.
+
+     O padding e o recuo negativo do .back moram na regra normal, com fundo
+     transparente: assim a pastilha só ACENDE aqui, sem mexer no lugar do
+     texto — trocar padding junto empurraria o rótulo no meio da transição. */
+  :global(html[data-over-photo]) .back,
+  :global(html[data-over-photo]) .theme {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-color: rgba(255, 255, 255, 0.24);
+  }
+
+  /* o indicador são traços de 2px: pastilha ficaria maior que o conteúdo, e
+     uma sombra própria já dá a eles a borda escura que falta no claro */
+  :global(html[data-over-photo]) .cc-nav {
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.75));
+  }
+
   .back {
     position: fixed;
     top: calc(1.5rem + env(safe-area-inset-top));
     left: 2rem;
     z-index: 6;
-    padding: 0.35rem 0;
+    /* o recuo cancela o padding lateral: a pastilha de over-photo cresce em
+       volta do rótulo sem tirá-lo do lugar em que ele sempre esteve */
+    padding: 0.35rem 0.75rem;
+    margin-left: -0.75rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
     color: var(--ink);
     font-size: 0.85rem;
     font-weight: 500;
     text-decoration: none;
-    transition: color var(--theme-fade);
+    transition: color var(--theme-fade), background-color 0.25s ease,
+      border-color var(--theme-fade);
   }
 
   .back::after {
@@ -913,30 +1120,70 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
       padding: 4.5rem 2.9rem 2.5rem 1.35rem;
     }
 
-    /* Uma coluna só não tem "outro lado" pra moldura ir, mas tem FOLGA: a
-       moldura ocupa pouco mais da metade da largura, então encostá-la à
-       direita em vez de à esquerda é um deslocamento de uns 150px, e é bem
-       visível. Isso mais o tamanho dá o mesmo ritmo do desktop com os meios
-       que o empilhado tem.
+    /* ——— as composições no celular ———
+       Uma coluna só não tem "outro lado", mas as composições não eram sobre
+       lado: eram sobre QUANTO da tela a foto toma e de onde ela sai. Isso o
+       empilhado tem, e a régua aqui é vertical — foto e texto dividem a
+       altura, então cada composição é uma fatia diferente dela.
 
-       O deslocamento VERTICAL (--shift) fica de fora aqui, e de propósito:
-       `top` não reflui, então descer a moldura num layout que já é apertado
-       a jogaria por cima do título. No desktop ela tem a coluna inteira e
-       nada embaixo, então lá o mesmo recurso é seguro. */
+       --phone-frame é a fatia normal, e cada composição é um fator dela. Um
+       knob só: o celular baixo (iPhone SE, mais abaixo) muda a base e todas
+       as composições encolhem junto, na proporção. O teto de cada uma foi
+       escolhido pelo pior caso — foto + rótulo + título de 2 linhas +
+       descrição de 3 frases + link cabendo SEM rolar, porque a tela está
+       presa. */
     .cc-media {
-      --frame-h: calc(36dvh * var(--scale, 1));
+      --phone-frame: 36dvh;
+      --frame-h: var(--phone-frame);
       justify-self: start;
     }
 
-    /* Ela para antes da borda do conteúdo porque o indicador lateral é mais
-       largo que o padding direito do slide: o contador "02 / 08" avança uns
-       13px sobre a área de conteúdo. Isso nunca importou — nada encostava
-       ali, e o texto que chega perto passa por baixo dele em outra altura.
-       A moldura da direita é alta e cruza o meio da tela, que é justamente
-       onde o indicador vive; sem esta folga o nav (z 6) atravessa a foto. */
-    .cc-slide[data-side='right'] .cc-media {
+    /* flip: encosta na direita. A moldura ocupa pouco mais da metade da
+       largura, então a travessia é de uns 150px — bem visível.
+
+       Ela para antes da borda porque o indicador lateral é fixo, vive no meio
+       da altura e é mais largo que o padding direito do slide: o contador
+       "02 / 08" avança uns 13px sobre a área de conteúdo. Nunca importou
+       (nada encostava ali, e o texto que chega perto passa em outra altura),
+       mas a moldura da direita cruza justamente o meio, e sem esta folga o
+       nav (z 6) atravessa a foto. */
+    /* Todas escopadas ao palco, como as do desktop. Sem isto elas vazam pra
+       versão simples (data-creations="static"), que é uma pilha comum sem
+       canva nem tela presa — e ali o -8vw do edge não teria quem o cortasse
+       (o overflow: hidden do slide também é do palco), virando rolagem
+       horizontal numa página que não deveria ter nenhuma. */
+    :global(html[data-creations='stage']) [data-layout='flip'] .cc-media {
+      --frame-h: calc(var(--phone-frame) * 0.94);
       justify-self: end;
       margin-right: 1.4rem;
+    }
+
+    /* tower: come metade da tela e sobra o justo pro texto */
+    :global(html[data-creations='stage']) [data-layout='tower'] .cc-media {
+      --frame-h: calc(var(--phone-frame) * 1.28);
+      --frame-cap: 62vw;
+      justify-self: end;
+      margin-right: 1.4rem;
+    }
+
+    /* quiet: o selo pequeno. Aqui o título é que cresce e manda na tela */
+    :global(html[data-creations='stage']) [data-layout='quiet'] .cc-media {
+      --frame-h: calc(var(--phone-frame) * 0.66);
+      justify-self: end;
+      margin-right: 1.4rem;
+    }
+    :global(html[data-creations='stage']) [data-layout='quiet'] .cc-title {
+      font-size: clamp(2.2rem, 9.5vw, 3.2rem);
+    }
+
+    /* edge: sangra pra fora da esquerda. No celular a saída é menor (8vw
+       contra 16 do desktop) porque a largura toda é menor: o mesmo 16vw aqui
+       levaria junto o assunto da foto, não só a borda dela */
+    :global(html[data-creations='stage']) [data-layout='edge'] .cc-media {
+      --frame-h: calc(var(--phone-frame) * 1.15);
+      --frame-cap: 92vw;
+      justify-self: start;
+      margin-left: -8vw;
     }
 
     .cc-kicker {
@@ -1013,8 +1260,10 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
       padding-top: 4rem;
     }
 
+    /* o knob único: baixar a base encolhe TODAS as composições na proporção,
+       porque cada uma se descreve como um fator dela (ver --phone-frame) */
     .cc-media {
-      --frame-h: calc(30dvh * var(--scale, 1));
+      --phone-frame: 30dvh;
     }
 
     .cc-title {
@@ -1033,13 +1282,10 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
       font-size: clamp(3.6rem, 12vh, 6rem);
     }
 
-    /* o --scale continua valendo aqui: esta janela é larga, então ela ainda
-       tem as duas colunas e o resto do ritmo de STAGE.PLACEMENTS (lado e
-       deslocamento) está ativo — só o teto de altura é que encolhe. No
-       empilhado do celular é o contrário: lá o teto é chapado de propósito,
-       porque uma coluna só não comporta variação de posição. */
+    /* só o duet/flip encolhem: as outras composições já se medem em dvh e
+       cedem sozinhas numa janela baixa (o --frame-cap entra e a altura cai) */
     .cc-media {
-      --frame-h: calc(66dvh * var(--scale, 1));
+      --frame-h: 66dvh;
     }
 
     .cc-title {

@@ -100,6 +100,35 @@ export function createField(input: FieldInput): FieldDriver {
     off: false,
   }));
 
+  // A criação a que cada moldura pertence, e o último --dock escrito nela.
+  //
+  // --dock é o quanto a foto JÁ CHEGOU (0 no canva, 1 encaixada), publicado
+  // no elemento da criação pro CSS poder reagir. Existe por causa do véu da
+  // composição `full`: ele escurece a tela pro texto branco ser legível sobre
+  // a foto, e sem isto estaria em força total desde o primeiro quadro da
+  // entrada — uma cortina preta sobre a página com a foto ainda a caminho,
+  // longe dali. Amarrado ao peso, o véu só existe na medida em que a foto
+  // existe, e desmancha na saída junto com ela.
+  //
+  // É a ÚNICA coisa que este arquivo sabe sobre composição: ele não lê qual
+  // é, não trata `full` diferente de `duet`. Publica um número; o CSS decide
+  // se usa.
+  const hosts = frames.map((f) => f.closest<HTMLElement>('[data-cc-slide]'));
+  const docked = hosts.map(() => -1);
+
+  // Quanto da TELA a moldura de cada criação ocupa quando a foto está
+  // encaixada (0 a 1), medido junto com o resto em measure().
+  //
+  // Isto não é saber qual composição é qual — é uma conta sobre a caixa que
+  // este arquivo já mede de qualquer jeito. Vezes o encaixe, dá quanto da
+  // tela está coberto de foto AGORA, e é o que a página precisa saber pra
+  // decidir a cor do "‹ Voltar", do botão de tema e do indicador lateral:
+  // eles são escuros, e uma foto ocupando a tela inteira os apaga. Sem isto a
+  // composição `full` sairia bonita e sem navegação visível.
+  const covers = frames.map(() => 0);
+  let lastOver = false;
+  const root = document.documentElement;
+
   let W = 0;
   let VH = 0;
   let vmin = 0;
@@ -113,8 +142,14 @@ export function createField(input: FieldInput): FieldDriver {
       c.px = c.w * vmin;
       c.el.style.width = `${c.px.toFixed(2)}px`;
     });
-    const boxes = frames.map((frame) => {
+    const boxes = frames.map((frame, i) => {
       const r = frame.getBoundingClientRect();
+      // a parte da moldura que cai DENTRO da tela, sobre a área da tela: uma
+      // moldura que sangra pra fora (tower, edge, full) conta só o que se vê
+      const dentro =
+        Math.max(0, Math.min(r.right, rect.right) - Math.max(r.left, rect.left)) *
+        Math.max(0, Math.min(r.bottom, rect.bottom) - Math.max(r.top, rect.top));
+      covers[i] = W && VH ? Math.min(1, dentro / (W * VH)) : 0;
       return { cx: r.left - rect.left + r.width / 2, cy: r.top - rect.top + r.height / 2, w: r.width };
     });
     stars.forEach((s) => {
@@ -180,6 +215,30 @@ export function createField(input: FieldInput): FieldDriver {
     const mix = clamp((t - (H - FIELD.SWAP / 2)) / FIELD.SWAP);
     const shift = FIELD.RATE * t * VH;
     const cull = FIELD.CULL_VH * VH;
+
+    // o quanto cada criação está encaixada, pro CSS da composição (ver hosts).
+    // Só escreve quando o valor MUDA: as criações paradas são a maioria a
+    // cada quadro, e escrever o mesmo número nelas é recálculo de estilo à toa
+    let cover = 0;
+    for (let k = 0; k < hosts.length; k++) {
+      const d = Math.round(smooth(rawWeight(k, t)) * 1000) / 1000;
+      if (d * covers[k] > cover) cover = d * covers[k];
+      const host = hosts[k];
+      if (!host || d === docked[k]) continue;
+      docked[k] = d;
+      host.style.setProperty('--dock', String(d));
+    }
+
+    // a foto tomou mais da metade da tela? então é ela que manda no
+    // contraste do cromo da página, não o tema (ver covers). Marca, e não
+    // número, porque o CSS só precisa do sim/não: a suavização vem das
+    // transições de cor que o cromo já tinha pra troca de tema.
+    const over = cover > 0.5;
+    if (over !== lastOver) {
+      lastOver = over;
+      if (over) root.dataset.overPhoto = '';
+      else delete root.dataset.overPhoto;
+    }
 
     for (const c of common) {
       const h = c.px / c.ratio;

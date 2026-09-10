@@ -103,6 +103,32 @@ export const FIELD_PHOTOS: ImageMetadata[] = [
 export const EFFECT_NAMES = ['grow', 'slide', 'tilt', 'pieces', 'iris', 'flip'] as const;
 export type Effect = (typeof EFFECT_NAMES)[number];
 
+/** A COMPOSIÇÃO é a outra metade: o efeito diz como a foto chega, a
+ *  composição diz que forma ela toma quando chega — e é ela que faz uma
+ *  criação não parecer a anterior. Seis efeitos terminando no mesmo retângulo
+ *  no mesmo lugar se leem como uma foto piscando; a mesma foto ocupando a
+ *  tela inteira, depois virando uma coluna que sangra pra fora, depois um
+ *  selo pequeno num canto, se lê como uma coleção.
+ *
+ *    duet   — foto de um lado, texto do outro. O repouso: é preciso ter pra
+ *             onde voltar, senão o resto não surpreende
+ *    flip   — o mesmo, espelhado
+ *    full   — a foto ocupa a página inteira, sangrando nas quatro bordas; o
+ *             texto entra por cima, sobre um véu que escurece só o pé
+ *    tower  — mais alta que a tela, estreita, encostada na borda: sangra em
+ *             cima e embaixo e o texto divide o resto
+ *    quiet  — pequena num canto, com muito ar em volta e o texto no canto
+ *             oposto. O silêncio entre duas cheias
+ *    edge   — grande e deslocada pra fora da borda lateral: metade do
+ *             assunto fica de fora, e é isso que faz olhar
+ *
+ *  Qual criação usa qual não precisa ser dito: o config sorteia um ciclo
+ *  (STAGE.CYCLE) pela ordem da lista. `layout` abaixo é só pra quando uma
+ *  criação específica PEDE uma forma — uma panorâmica que só funciona em
+ *  full, por exemplo. */
+export const LAYOUT_NAMES = ['duet', 'flip', 'full', 'tower', 'quiet', 'edge'] as const;
+export type Layout = (typeof LAYOUT_NAMES)[number];
+
 /** O que a criação é. Vira o rótulo do meio na linha de cima do texto
  *  ("Criação 03 · Projeto · 2024"). */
 export type Kind = 'photo' | 'project' | 'repo' | 'other';
@@ -134,6 +160,10 @@ export interface Creation {
   effect: Effect;
   /** só pro `slide`: de que lado ele vem. Padrão 'right' */
   from?: 'left' | 'right';
+  /** a forma que a criação toma no palco (ver LAYOUT_NAMES). Deixar vazio é
+   *  o normal: sem isto ela pega a do ciclo, que já garante que nenhuma
+   *  vizinha se repete. Preencher é pra quando ESTA foto pede uma forma. */
+  layout?: Layout;
 }
 
 /** Textos fixos da interface. */

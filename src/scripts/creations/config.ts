@@ -10,6 +10,7 @@
 //
 // O CONTEÚDO (textos, imagens, qual efeito cada criação usa) não mora aqui:
 // ver src/data/creations.ts e o guia src/data/creations.md.
+import type { Layout } from '../../data/creations';
 
 // ——— a rolagem ———
 export const SCROLL = {
@@ -75,40 +76,36 @@ export const SCROLL = {
   JUMP_INTO_HOLD: 0.5,
 };
 
-// ——— onde a criação se arruma no palco ———
+// ——— que forma a criação toma no palco ———
 //
-// O efeito diz COMO a foto chega; isto diz ONDE ela para. Sem a segunda
-// metade, seis efeitos diferentes terminavam todos no mesmo retângulo, no
-// mesmo lugar da tela — e o que se lia era uma foto piscando no centro, com
-// a animação como enfeite. Variar o destino é o que faz cada criação parecer
-// um quadro próprio.
+// O efeito diz COMO a foto chega; a composição diz QUE FORMA ela toma quando
+// chega. Sem a segunda metade, seis efeitos diferentes terminavam todos no
+// mesmo retângulo, no mesmo lugar — e o que se lia era uma foto piscando no
+// centro, com a animação de enfeite.
 //
-// A lista abaixo é um CICLO percorrido pela ordem das criações (a de índice i
-// usa PLACEMENTS[i % tamanho]), então reordenar a lista de criações
-// reembaralha o ritmo sem ninguém precisar manter nada em sincronia. São
-// seis posições pra oito criações de propósito: nenhuma vizinha se repete e o
-// ciclo não fecha dentro da página.
-//
-// Nada disto é lido pelo motor de encaixe. O field.ts MEDE a moldura na tela
-// (getBoundingClientRect) e leva a foto até onde ela estiver — mover a
-// moldura por CSS já leva a foto junto, seja qual for o efeito.
+// Nada disto é lido pelo motor de encaixe, e é o que torna a coisa possível:
+// o field.ts MEDE a moldura na tela (getBoundingClientRect) e leva a foto até
+// onde ela estiver, do tamanho que ela for. Uma moldura que o CSS faz cobrir
+// a tela inteira é uma foto que cresce até cobrir a tela inteira, de graça,
+// em qualquer um dos seis efeitos. O motor só precisou aprender UMA coisa
+// nova: publicar o quanto a foto já chegou (--dock), pro véu do `full` não
+// escurecer a tela antes de haver foto.
 export const STAGE = {
-  /** side  — em que coluna a moldura cai; o texto vai pra outra
-   *  shift  — quanto ela sobe (negativo) ou desce, em alturas de tela
-   *  scale  — o tamanho dela, como fator do teto normal (--frame-h)
+  /** O ciclo de composições, percorrido pela ordem das criações (a de índice
+   *  i usa CYCLE[i % tamanho]). O que cada nome é está em data/creations.ts →
+   *  LAYOUT_NAMES; a geometria de cada um está no CSS da página, porque é
+   *  layout e não número de animação.
    *
-   *  Os desvios são pequenos de propósito: a página é uma coleção, não um
-   *  colateral: o olho tem que reconhecer o mesmo palco a cada criação e
-   *  ainda assim não prever onde a próxima vai parar. Acima de ~8vh de shift
-   *  a moldura começa a encostar no topo em janela baixa. */
-  PLACEMENTS: [
-    { side: 'left', shift: 0, scale: 1 },
-    { side: 'right', shift: -0.06, scale: 0.88 },
-    { side: 'left', shift: 0.05, scale: 0.95 },
-    { side: 'right', shift: 0, scale: 1.03 },
-    { side: 'left', shift: -0.05, scale: 0.9 },
-    { side: 'right', shift: 0.06, scale: 0.97 },
-  ] as const satisfies readonly { side: 'left' | 'right'; shift: number; scale: number }[],
+   *  A ORDEM aqui é a composição da página inteira, e é o que essa lista
+   *  decide: `full` ocupa a tela toda e não pode vir duas vezes seguidas nem
+   *  ficar pro fim (quem não rolar até lá nunca vê a página fazer isso), e
+   *  `quiet` só significa alguma coisa depois de uma cheia — o silêncio
+   *  precisa de barulho antes. Daí a segunda ser full e a quinta ser quiet.
+   *
+   *  Seis pra oito criações: nenhuma vizinha se repete, o ciclo não fecha
+   *  dentro da página, e a sétima e a oitava voltam ao duet e ao full — que
+   *  é uma boa última impressão. */
+  CYCLE: ['duet', 'full', 'tower', 'flip', 'quiet', 'edge'] as const satisfies readonly Layout[],
 };
 
 // ——— quando o palco existe ———

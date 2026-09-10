@@ -183,7 +183,7 @@ export const RIBBON = {
    *  cinco telas de canva reunidas num lugar só — e é dessa densidade que vem
    *  a leitura de "fita", com as fotos se encavalando. Menos que isso vira uma
    *  fileira de fotos soltas. */
-  COUNT: 56,
+  COUNT: 60,
 
   /** O S. A curva é `x = meio - AMPLITUDE * sen(2π·u)` com u indo de 0 no topo
    *  a 1 na base: um período completo, que é exatamente um S — sai do meio,
@@ -199,13 +199,13 @@ export const RIBBON = {
    *  MAX_W é o freio pra tela estreita: numa janela fina, 0.3 da altura da
    *  faixa passaria da largura disponível. */
   AMPLITUDE: 0.3,
-  MAX_W: 0.22,
+  MAX_W: 0.17,
 
   /** Recuo da curva dentro do vão, em fração da altura dele. A conta põe o
    *  CENTRO da foto na curva, então sem recuo metade da primeira e da última
    *  ficam pra fora do vão — encostando nas linhas do título, que é
    *  exatamente o que a composição não pode ter. */
-  PAD: 0.14,
+  PAD: 0.08,
 
   /** Tamanho de uma foto na fita, em fração da altura da faixa — pelo mesmo
    *  motivo da amplitude. Em vmin (que é como o canva mede) a mesma foto sai
@@ -218,7 +218,7 @@ export const RIBBON = {
    *  travado em no máximo 1x o tamanho de canva, porque o caminho até lá é
    *  uma ampliação e ampliar além do natural é perder nitidez — a mesma lição
    *  que a foto das criações já tinha ensinado. */
-  CARD: 0.11,
+  CARD: 0.09,
 
   /** ——— o relógio da entrada ———
    *  Quanto dura a coisa toda, em segundos, e onde ficam as emendas das
@@ -266,9 +266,20 @@ export const RIBBON = {
      então para de vez, sem desacelerar. Assistindo, o que se via era as fotos
      se espalhando e parando do nada, no meio do gesto. A smoothstep sai do
      repouso e volta ao repouso: elas se soltam, correm e assentam. */
-  TIGHT_AMP: 0.5,
-  TIGHT_SPAN: 0.72,
-  TIGHT_SIZE: 1.5,
+  TIGHT_AMP: 0.62,
+  TIGHT_SPAN: 0.66,
+  TIGHT_SIZE: 1.65,
+
+  /** O LEQUE do espalhar: quanto cada foto é empurrada pra FORA do centro no
+   *  meio do caminho, em fração da largura da tela.
+   *
+   *  Sem ele o espalhar não abre. O lugar de cada foto no canva está quase
+   *  todo ABAIXO da tela, então elas saíam quase em linha reta pra baixo e o
+   *  aglomerado nunca passava de 57% da largura — medido — enquanto na
+   *  referência ele chega a 99%. O leque é um arco: no meio do trajeto cada
+   *  uma está no máximo pra fora, e no fim já voltou pro lugar dela. As fotos
+   *  abrem a tela inteira e depois assentam, em vez de escorrerem pelo pé. */
+  FAN: 0.26,
 } as const;
 
 export const CLOSING = {

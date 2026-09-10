@@ -86,6 +86,10 @@ export function createField(input: FieldInput): FieldDriver {
     /** lugar na fita da abertura; -1 não participa (ver fieldLayout.ts) */
     rank: num(el.dataset.rank, -1),
     px: 0,
+    /** escala em que ela fica no CANVA. É 1 pras fotos comuns; nas da fita é
+     *  menor que 1, porque elas são deitadas no tamanho do inchaço (ver
+     *  measure) e o canva é uma redução disso. */
+    base: 1,
     off: false,
   }));
 
@@ -157,7 +161,19 @@ export function createField(input: FieldInput): FieldDriver {
       ? { x: slot.left - rect.left, y: slot.top - rect.top, w: slot.width, h: slot.height }
       : { x: 0, y: VH * 0.3, w: W, h: VH * 0.4 };
     common.forEach((c) => {
-      c.px = c.w * vmin;
+      const canva = c.w * vmin;
+      // A foto da fita é deitada no MAIOR tamanho que vai ter — o do inchaço —
+      // e não no tamanho de canva. Sem isto o inchaço batia num teto invisível:
+      // o elemento media 47px, a fita queria 58, e ampliar o elemento além do
+      // layout é rasterizar pequeno e esticar (a lição que a foto das criações
+      // já tinha custado). Deitada no maior, todo o resto do caminho é
+      // redução — sempre nítida — e o inchaço acontece de verdade.
+      const inchada =
+        c.rank >= 0
+          ? RIBBON.CARD * band.h * RIBBON.TIGHT_SIZE * (c.w / FIELD.SIZES_VMIN[1])
+          : 0;
+      c.px = Math.max(canva, inchada);
+      c.base = canva / c.px;
       c.el.style.width = `${c.px.toFixed(2)}px`;
     });
     const boxes = frames.map((frame, i) => {
@@ -284,9 +300,9 @@ export function createField(input: FieldInput): FieldDriver {
     return {
       cx: band.x + band.w / 2 - amp * Math.sin(Math.PI * 2 * u),
       cy: band.y + band.h * us,
-      // nunca acima de 1: o caminho até o canva é uma ampliação, e passar do
-      // tamanho natural do elemento custaria nitidez
-      scale: Math.min(1, alvo / (w * vmin)),
+      // a largura ALVO em px; quem a transforma em escala é o chamador, que
+      // conhece o tamanho de layout do elemento
+      px: alvo,
     };
   };
 
@@ -369,7 +385,7 @@ export function createField(input: FieldInput): FieldDriver {
       const h = c.px / c.ratio;
       let cx = c.x * W;
       let cy = c.yc * VH - shift;
-      let scale = 1;
+      let scale = c.base;
       let fita = 0;
 
       // Na fita, a foto é levada da curva até o lugar dela no canva. O
@@ -383,9 +399,15 @@ export function createField(input: FieldInput): FieldDriver {
       // ensinou a não perder.
       if (!pronta && c.rank >= 0) {
         const r = ribbonAt(c.rank, c.w, junta, monta);
+        const destino = cx;
         cx = lerp(r.cx, cx, estouro);
         cy = lerp(r.cy, cy, estouro);
-        scale = lerp(r.scale, 1, estouro);
+        // o leque: um arco pra fora do centro, máximo no meio do trajeto e
+        // zero nas duas pontas (ver FAN no config). É o que faz as fotos
+        // abrirem a tela em vez de escorrerem pelo pé dela
+        const lado = destino >= W / 2 ? 1 : -1;
+        cx += lado * RIBBON.FAN * W * Math.sin(Math.PI * estouro);
+        scale = lerp(r.px / c.px, c.base, estouro);
         // some ao chegar (a foto ainda não entrou na curva) e some de novo ao
         // se espalhar (aí quem manda é o nível normal do canva).
         //
@@ -397,10 +419,13 @@ export function createField(input: FieldInput): FieldDriver {
         fita = chegadaAt(c.rank, monta) * (1 - estouro * estouro);
       }
 
-      // as que não estão na fita só entram quando ela já se desfez: durante a
-      // entrada a cena é a curva, e um canva normal por baixo dela seria
-      // ruído competindo com o gesto
-      const hidden = !pronta && c.rank < 0;
+      // As que não estão na fita ficam fora enquanto a curva se desenha, se
+      // aguenta e se junta — ali a cena é a curva, e um canva normal por baixo
+      // seria ruído competindo com o gesto. Mas elas entram JUNTO com o
+      // espalhar, acendendo com ele (o nível é multiplicado por `estouro` mais
+      // abaixo), e não de uma vez no último quadro: antes disso a tela ficava
+      // vazia no fim da entrada e o canva aparecia de estalo.
+      const hidden = !pronta && c.rank < 0 && estouro <= 0;
       const meia = h * scale;
       if (hidden || cy + meia / 2 < -cull || cy - meia / 2 > VH + cull) {
         setOff(c, true);

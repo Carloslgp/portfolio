@@ -188,6 +188,18 @@ export function initCreations() {
       nav?.classList.toggle('is-done', progress >= 1);
     };
 
+    // ——— a rolagem só é LIGADA depois da entrada ———
+    //
+    // Antes o ScrollTrigger nascia junto com o resto e a entrada rodava por
+    // cima dele. Não funcionava, e a razão é boa de saber: o ScrollTrigger faz
+    // um refresh no `load`, o refresh re-renderiza a mestra no tempo 0, e a
+    // mestra no tempo 0 escreve a abertura inteira visível — apagando o que a
+    // entrada tinha acabado de esconder. Dois donos da mesma propriedade.
+    //
+    // Ligando depois, não há disputa: durante a entrada a mestra não existe
+    // pra ninguém, e a página nem tem altura pra rolar (o pin é que a cria),
+    // o que de quebra trava a rolagem no único momento em que ela atrapalha.
+    const ligarRolagem = () => {
     const trigger = ScrollTrigger.create({
       trigger: stage,
       start: 'top top',
@@ -223,12 +235,6 @@ export function initCreations() {
       });
     });
 
-    // A ENTRADA. Por último de propósito: ela é a última coisa a montar e a
-    // primeira a rodar, e precisa do palco já preso e das molduras já medidas
-    // — se rodasse antes, o pin do ScrollTrigger nasceria no meio dela e a
-    // página daria um salto no primeiro quadro.
-    if (driver) runIntro(driver, html);
-
     // O fechamento entra depois que o palco solta — o único trecho da página
     // que rola de verdade. O fade costura a última criação (que sai pra papel
     // vazio) com a página voltando ao normal, e como também é scrub, voltar
@@ -250,6 +256,12 @@ export function initCreations() {
         },
       );
     }
+    };
+
+    // A ENTRADA roda primeiro e a rolagem entra atrás dela. Sem entrada
+    // (chegou numa página já rolada, ou não há canva), liga na hora.
+    if (driver) runIntro(driver, html, hero, ligarRolagem);
+    else ligarRolagem();
   }
 }
 
@@ -285,33 +297,70 @@ function partsOf(slide: HTMLElement): SlideParts & { frame: HTMLElement } {
  *     acelerar 5x chega no mesmo lugar em 0,2s e ainda se lê como movimento.
  *     Ninguém fica preso esperando um enfeite acabar.
  */
-function runIntro(driver: FieldDriver, html: HTMLElement) {
+function runIntro(
+  driver: FieldDriver,
+  html: HTMLElement,
+  hero: HTMLElement,
+  aoTerminar: () => void,
+) {
   if (window.scrollY > 4) {
     driver.setIntro(1);
+    aoTerminar();
     return;
   }
 
+  // A tela da entrada tem DUAS coisas: o título e a fita. Mais nada.
+  //
+  // O rótulo, o parágrafo de abertura e a dica de rolagem entram só no fim,
+  // quando as fotos já se espalharam. Não é preciosismo: com os três na tela a
+  // curva divide atenção com três blocos de texto e deixa de ser o assunto —
+  // e a dica convidando a rolar enquanto a entrada roda é um convite pra
+  // perder justamente o que ela está mostrando. Vazia, a tela tem uma coisa
+  // pra olhar, que é o ponto.
+  const q = (sel: string) => hero.querySelector<HTMLElement>(sel);
+  const titulo = q('[data-cc-hero-title]');
+  const resto = [q('[data-cc-hero-kicker]'), q('[data-cc-hero-lead]'), q('[data-cc-hero-hint]')]
+    .filter((el): el is HTMLElement => Boolean(el));
+
+  const D = RIBBON.SECONDS;
   const state = { i: 0 };
   driver.setIntro(0);
   html.classList.add('is-intro');
+  gsap.set(resto, { opacity: 0 });
+  if (titulo) gsap.set(titulo, { opacity: 0 });
 
-  const tween = gsap.to(state, {
-    i: 1,
-    duration: RIBBON.SECONDS,
-    ease: 'none',
-    onUpdate: () => {
-      driver.setIntro(state.i);
-      // o vão entre as linhas do título se fecha junto com o estouro: as fotos
-      // saem dali e o título se junta atrás delas, no mesmo gesto
-      if (state.i >= RIBBON.JUNTA) html.classList.add('is-intro-done');
-    },
+  const tween = gsap.timeline({
     onComplete: () => {
       driver.setIntro(1);
       html.classList.remove('is-intro');
       html.classList.add('is-intro-done');
       sinais.forEach((s) => window.removeEventListener(s, apressar));
+      aoTerminar();
     },
   });
+
+  tween.to(
+    state,
+    {
+      i: 1,
+      duration: D,
+      ease: 'none',
+      onUpdate: () => {
+        driver.setIntro(state.i);
+        // o vão entre as linhas do título se fecha junto com o estouro: as
+        // fotos saem dali e o título se junta atrás delas, no mesmo gesto
+        if (state.i >= RIBBON.JUNTA) html.classList.add('is-intro-done');
+      },
+    },
+    0,
+  );
+
+  // o título aparece junto com as primeiras fotos, não antes: ele e a curva
+  // nascem na mesma hora, como na referência
+  if (titulo) tween.to(titulo, { opacity: 1, duration: D * 0.24, ease: 'power1.out' }, 0);
+
+  // e o resto da abertura entra quando as fotos saem do caminho
+  tween.to(resto, { opacity: 1, duration: D * 0.3, ease: 'power1.out' }, D * RIBBON.JUNTA);
 
   const apressar = () => tween.timeScale(5);
   const sinais = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;

@@ -6,16 +6,109 @@
 // sala — mora em src/data/craftCode.ts. A casca (papel, voltar, tema,
 // cabeçalho, rodapé) é o CraftRoom.astro.
 //
-// O QUADRO de cada projeto é o ponto desta página: ele já tem o tamanho final
-// e mostra o monograma enquanto a foto não chega. Pôr a foto é um campo no
-// arquivo de dados — nada aqui muda, e nada na página muda de lugar.
+// A LINHA de cada projeto tem duas formas, e quem escolhe é o conteúdo:
+//
+//   • com captura  → faixa larga. A imagem fica com mais da metade da linha e
+//                    troca de lado a cada projeto que tem captura.
+//   • sem captura  → linha compacta, com o monograma num campo de cor, que é
+//                    como a sala inteira era antes das primeiras capturas.
+//
+// A mistura é o ponto: dar o palco a todos deixaria metade da lista como
+// retângulo vazio do tamanho de um palco. Pôr uma captura é um campo no
+// arquivo de dados — nada aqui muda.
 import CraftRoom from '../../components/CraftRoom.astro';
 import BrandMark from '../../components/BrandMark.astro';
+import { getImage } from 'astro:assets';
 import { CODE_PROJECTS, CODE_ROOM, markHue } from '../../data/craftCode';
 
 /** "01", "02"… A numeração sai da POSIÇÃO na lista e não de um campo: um
  *  número escrito à mão vira mentira no dia em que alguém reordena. */
 const numero = (index: number) => String(index + 1).padStart(2, '0');
+
+/** A partir de que proporção (largura ÷ altura) uma captura conta como
+ *  DEITADA — e é isso, e só isso, que decide o arranjo de um par.
+ *
+ *  Duas deitadas EMPILHAM: lado a lado, cada uma ficaria com metade do bloco,
+ *  e uma janela de navegador a ~17rem é textura, não captura. Quadradas ou em
+ *  pé ficam LADO A LADO: empilhadas, o par passaria de 50rem de altura e o
+ *  texto do projeto sumiria num canto da linha.
+ *
+ *  1.5 e não 16/9: as capturas de janela cheia chegam aqui em 2:1, e as de
+ *  app recortado em ~4:3 (1.33). O corte no meio desses dois grupos é o que
+ *  separa "cabe inteira numa faixa" de "precisa de altura pra se ler". */
+const PAR_DEITADO = 1.5;
+
+/** As variantes de cada captura, e a conta de quanta fonte elas pedem.
+ *
+ *  O bloco de imagem tem no máximo ~38rem (608px) numa sala de 68rem, e cada
+ *  metade de um par lado a lado fica com ~21rem (336px). Os 1120 são esses
+ *  608 em tela densa; os 420 e 560 servem o celular, onde o bloco é a largura
+ *  da página. O sharp não amplia, então pedir 1120 de uma captura de 917px
+ *  devolve os 917 — o teto é teto, não alvo.
+ *
+ *  `sizes` é o que o navegador lê ANTES de qualquer script, então precisa
+ *  repetir em vw o que o CSS faz em grid: por isso são duas, uma pra imagem
+ *  que ocupa o bloco inteiro e outra pra que divide o bloco com a irmã. As
+ *  duas crescem quando o par deixa de ser lado a lado (abaixo de 62rem ele
+ *  empilha e passa a ocupar o bloco inteiro): uma `sizes` que continuasse
+ *  prometendo 31vw ali entregaria metade dos pixels necessários — borrão que
+ *  só apareceria na tela dos outros. */
+const SHOT = {
+  WIDTHS: [420, 560, 840, 1120],
+  FORMAT: 'webp' as const,
+  QUALITY: 78,
+  SIZES_FULL: '(max-width: 46rem) 92vw, min(38rem, 56vw)',
+  SIZES_HALF: '(max-width: 46rem) 92vw, (max-width: 62rem) 56vw, min(21rem, 31vw)',
+};
+
+/** Quantas linhas com captura já passaram. É esse contador — e não a posição
+ *  na lista — que alterna o lado: as linhas compactas não entram no rodízio,
+ *  senão dois projetos com foto separados por um sem foto sairiam do mesmo
+ *  lado e a alternância viraria coincidência. */
+let comCaptura = 0;
+
+const rows = await Promise.all(
+  CODE_PROJECTS.map(async (project, index) => {
+    const photos = project.photos ?? [];
+
+    const arranjo =
+      photos.length < 2
+        ? 'solo'
+        : photos.every((photo) => photo.src.width / photo.src.height >= PAR_DEITADO)
+          ? 'stack'
+          : 'pair';
+
+    const shots = await Promise.all(
+      photos.map(async (photo) => {
+        const img = await getImage({
+          src: photo.src,
+          widths: SHOT.WIDTHS,
+          format: SHOT.FORMAT,
+          quality: SHOT.QUALITY,
+        });
+
+        // A proporção viaja como variável CSS porque é ela que dimensiona a
+        // imagem: a largura sai de min(bloco, teto de altura × proporção),
+        // que é o "cabe inteira nos dois limites" sem corte nenhum e sem
+        // tarja preta. Medida na FONTE, que é onde ela é exata.
+        return {
+          src: img.src,
+          srcset: img.srcSet.attribute,
+          ratio: photo.src.width / photo.src.height,
+          alt: photo.alt,
+        };
+      }),
+    );
+
+    return {
+      project,
+      index,
+      arranjo,
+      shots,
+      side: shots.length ? (comCaptura++ % 2 ? 'right' : 'left') : null,
+    };
+  }),
+);
 ---
 
 <CraftRoom
@@ -32,31 +125,36 @@ const numero = (index: number) => String(index + 1).padStart(2, '0');
   ]}
 >
   <ol class="code-list">
-    {CODE_PROJECTS.map((project, index) => (
-      <li class="code-item" id={`project-${project.id}`} data-craft-row>
-        {/* O quadro. Sem foto ele é decorativo inteiro — o monograma repete
-            em duas letras o nome que está escrito ao lado, e um leitor de
-            tela não ganha nada lendo "LF" antes de "Leitura Fácil". Com foto,
-            quem responde pela imagem é o alt dela. */}
-        <div
-          class:list={['code-frame', project.photo && 'has-photo']}
-          style={`--mark-hue:${markHue(index)}`}
-          aria-hidden={project.photo ? undefined : 'true'}
-        >
-          {project.photo ? (
-            <img
-              src={project.photo.src.src}
-              alt={project.photo.alt}
-              width={project.photo.src.width}
-              height={project.photo.src.height}
-              style={`--photo-position:${project.photo.position ?? 'center'}`}
-              loading={index < 2 ? 'eager' : 'lazy'}
-              decoding="async"
-            />
-          ) : (
+    {rows.map(({ project, index, arranjo, shots, side }) => (
+      <li
+        class:list={['code-item', shots.length && 'has-shots']}
+        id={`project-${project.id}`}
+        data-craft-row
+        data-shots={shots.length ? arranjo : null}
+        data-side={side}
+      >
+        {shots.length ? (
+          <div class="code-shots">
+            {shots.map((shot) => (
+              <img
+                src={shot.src}
+                srcset={shot.srcset}
+                sizes={arranjo === 'pair' ? SHOT.SIZES_HALF : SHOT.SIZES_FULL}
+                alt={shot.alt}
+                style={`--shot-ratio:${shot.ratio}`}
+                loading={index < 2 ? 'eager' : 'lazy'}
+                decoding="async"
+              />
+            ))}
+          </div>
+        ) : (
+          /* O quadro do monograma é decorativo inteiro: ele repete em duas
+             letras o nome que está escrito ao lado, e um leitor de tela não
+             ganha nada lendo "LX" antes de "Lynx Engine". */
+          <div class="code-frame" style={`--mark-hue:${markHue(index)}`} aria-hidden="true">
             <span class="code-mark">{project.mark}</span>
-          )}
-        </div>
+          </div>
+        )}
 
         <article class="code-main">
           <p class="code-number" aria-hidden="true">{numero(index)}</p>
@@ -103,9 +201,10 @@ const numero = (index: number) => String(index + 1).padStart(2, '0');
 
   .code-item {
     display: grid;
-    /* O quadro tem largura PRESA, e o texto fica com o resto. Uma fração pros
-       dois deixaria a moldura crescer junto com a tela, e doze molduras
-       enormes empurrariam a lista pra baixo sem acrescentar leitura. */
+    /* A linha COMPACTA (sem captura): o quadro do monograma tem largura presa
+       e o texto fica com o resto. Uma fração pros dois deixaria a moldura
+       crescer junto com a tela, e uma fila de molduras vazias enormes
+       empurraria a lista pra baixo sem acrescentar leitura. */
     grid-template-columns: clamp(7rem, 16vw, 11rem) minmax(0, 1fr);
     gap: clamp(1.4rem, 3vw, 2.4rem);
     padding: clamp(1.8rem, 4vh, 2.6rem) 0;
@@ -113,12 +212,140 @@ const numero = (index: number) => String(index + 1).padStart(2, '0');
     transition: border-color var(--theme-fade);
   }
 
+  /* --- a linha com captura ------------------------------------------------
+     Aqui a imagem é o assunto: ela fica com ~54% da linha e o texto lê ao
+     lado, numa medida de ~28rem que continua confortável. O lado alterna
+     (ver `comCaptura` no frontmatter) porque doze linhas com a foto sempre
+     na mesma margem viram uma tabela — e o que a alternância custa é nada:
+     o texto de um projeto não tem continuidade com o do projeto seguinte.
+
+     O texto fica CENTRADO na altura, e não no topo: ao lado de uma captura
+     de 30rem, um parágrafo de 14rem grudado em cima deixa um vão embaixo
+     que parece defeito de carregamento. */
+  .code-item.has-shots {
+    align-items: center;
+    gap: clamp(1.6rem, 3.4vw, 2.6rem);
+    padding: clamp(2.6rem, 6vh, 4rem) 0;
+  }
+
+  /* Quanto da linha é imagem. São dois números porque o par lado a lado
+     divide o bloco em dois: com a mesma fatia da imagem sozinha, cada metade
+     do par sairia MENOR que a miniatura antiga — o contrário do que a faixa
+     larga existe pra fazer. A linha de par empresta largura do texto (que cai
+     pra ~23rem, ainda umas 48 letras por linha) e devolve isso às imagens. */
+  .code-item.has-shots[data-side='left'] {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  }
+
+  .code-item.has-shots[data-side='right'] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  }
+
+  .code-item.has-shots[data-shots='pair'][data-side='left'] {
+    grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+  }
+
+  .code-item.has-shots[data-shots='pair'][data-side='right'] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr);
+  }
+
+  /* A troca de lado é POSIÇÃO no grid, não `order`: a ordem do documento
+     continua sendo captura → texto pros dois lados, então quem lê com leitor
+     de tela ouve a mesma sequência descendo a lista inteira. */
+  .code-item.has-shots[data-side='right'] .code-shots {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .code-item.has-shots[data-side='right'] .code-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
   /* A última linha NÃO ganha traço embaixo: quem fecha a lista é o traço do
      rodapé, que vem logo em seguida. Os dois juntos davam duas réguas quase
      paralelas separadas por um palmo de branco, e a de cima não fechava nada
      que a de baixo já não fechasse. */
 
-  /* --- o quadro (o lugar guardado pra foto) ------------------------------ */
+  /* --- as capturas -------------------------------------------------------
+     O TETO DE ALTURA de uma imagem, por arranjo. Ele existe porque largura
+     sozinha não governa: uma captura quase quadrada ocupando 35rem de largura
+     tem 35rem de altura, e uma linha dessas engole a tela inteira.
+
+     A parte em vh é o mesmo teto dito de outro jeito pra tela baixa — num
+     notebook 16:9 deitado, 30rem já passam da dobra. Quem valer menos manda. */
+  .code-shots {
+    --shot-cap: min(30rem, 62vh);
+    display: grid;
+    gap: clamp(0.6rem, 1.4vw, 0.9rem);
+  }
+
+  /* Duas deitadas, uma sobre a outra: o teto cai pra que o PAR caiba no lugar
+     onde uma sozinha caberia — 19 + 19 + gap ≈ o mesmo bloco.
+     19 e não 18 porque 19rem × 2 (a proporção de uma janela cheia) dá a
+     largura inteira do bloco: com 18 a imagem empilhada ficava 30px mais
+     estreita que a solo da linha de cima, e a diferença aparecia como
+     desalinho entre duas linhas vizinhas. */
+  .code-item[data-shots='stack'] .code-shots {
+    --shot-cap: min(19rem, 38vh);
+  }
+
+  /* Lado a lado, cada uma com metade do bloco: a largura já limita, e o teto
+     só entra pra segurar o par muito em pé. */
+  .code-item[data-shots='pair'] .code-shots {
+    --shot-cap: min(26rem, 54vh);
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  /* O lado a lado precisa de linha larga pra existir: ele divide o bloco em
+     dois e empresta largura do texto. Abaixo de 62rem as duas pontas perdem —
+     medido a 800px: imagens de 227px e texto de 32 letras por linha, que é
+     estreito demais pra parágrafo. Aí o par empilha, exatamente como faz no
+     celular, e volta a ter a largura inteira do bloco.
+
+     Ou seja: o arranjo é a proporção da imagem VEZES a largura que a tela
+     tem pra dar. A proporção decide sozinha só onde há folga. */
+  @media (max-width: 62rem) {
+    .code-item.has-shots[data-shots='pair'][data-side='left'] {
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    }
+
+    .code-item.has-shots[data-shots='pair'][data-side='right'] {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+    }
+
+    .code-item[data-shots='pair'] .code-shots {
+      --shot-cap: min(18rem, 38vh);
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* A conta que faz a imagem caber INTEIRA nos dois limites: a largura é a
+     menor entre o bloco e a que o teto de altura permite pra esta proporção.
+     Com o aspect-ratio junto, a altura sai sozinha — sem corte (nada de
+     object-fit: cover), sem tarja (nada de contain) e sem pulo no
+     carregamento, porque a caixa já existe antes de o arquivo chegar. */
+  .code-shots img {
+    display: block;
+    width: min(100%, var(--shot-cap) * var(--shot-ratio));
+    height: auto;
+    aspect-ratio: var(--shot-ratio);
+    margin-inline: auto;
+    border: 1px solid rgba(var(--ink-rgb), 0.13);
+    border-radius: 0.7rem;
+    /* A sombra é o que segura uma captura de fundo claro: sem ela, a página
+       branca de dentro da imagem encosta no papel da sala e a borda vira o
+       único sinal de que ali tem uma tela. */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+    transition: border-color var(--theme-fade), box-shadow var(--theme-fade);
+  }
+
+  :global(html[data-theme='dark']) .code-shots img {
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.3);
+  }
+
+  /* --- o quadro do monograma (a linha sem captura) ------------------------ */
   .code-frame {
     /* A proporção é do QUADRO, não da foto: é ela que reserva o espaço, e é
        por isso que o dia em que a foto chegar nada desce nem sobe na página.
@@ -132,22 +359,6 @@ const numero = (index: number) => String(index + 1).padStart(2, '0');
     background: hsla(var(--mark-hue), 55%, 50%, 0.1);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     transition: background-color var(--theme-fade), border-color var(--theme-fade);
-  }
-
-  /* Com foto o quadro some atrás dela: o campo de cor era o substituto, e
-     deixá-lo aparecendo pelas bordas viraria uma moldura colorida em volta
-     de uma imagem que não pediu nenhuma. */
-  .code-frame.has-photo {
-    border-color: rgba(var(--ink-rgb), 0.13);
-    background: rgba(var(--ink-rgb), 0.04);
-  }
-
-  .code-frame img {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: cover;
-    object-position: var(--photo-position, center);
   }
 
   .code-mark {
@@ -258,12 +469,47 @@ const numero = (index: number) => String(index + 1).padStart(2, '0');
   }
 
   @media (max-width: 46rem) {
-    /* O quadro sobe pra cima do texto: a 360px de largura, um retângulo de
-       7rem ao lado de um parágrafo deixa o parágrafo com quatro palavras por
-       linha. Aqui ele vira uma faixa, e o texto ganha a largura inteira. */
-    .code-item {
+    /* Uma coluna só: a 360px de largura, qualquer imagem ao lado de um
+       parágrafo deixa o parágrafo com quatro palavras por linha. A captura
+       sobe pra cima do texto — que é a ordem em que ela já está no documento,
+       então a alternância de lado simplesmente deixa de existir aqui. */
+    /* Os quatro seletores repetidos não são zelo: as regras de lado lá em
+       cima carregam duas classes e dois atributos, e uma regra mais curta
+       aqui dentro perderia a disputa mesmo estando na media query. */
+    .code-item,
+    .code-item.has-shots[data-side='left'],
+    .code-item.has-shots[data-side='right'],
+    .code-item.has-shots[data-shots='pair'][data-side='left'],
+    .code-item.has-shots[data-shots='pair'][data-side='right'] {
       grid-template-columns: minmax(0, 1fr);
       gap: 1.1rem;
+      align-items: start;
+    }
+
+    .code-item.has-shots[data-side='right'] .code-shots,
+    .code-item.has-shots[data-side='right'] .code-main {
+      grid-column: 1;
+      grid-row: auto;
+    }
+
+    /* O teto de altura sobe: aqui a largura da tela já é o limite apertado, e
+       manter os 30rem do desktop só cortaria altura de uma imagem que já
+       chegou pequena. */
+    .code-shots {
+      --shot-cap: 70vh;
+    }
+
+    .code-item[data-shots='stack'] .code-shots {
+      --shot-cap: 34vh;
+    }
+
+    /* No celular o par EMPILHA, seja qual for a proporção: a regra de lado a
+       lado existe pra não desperdiçar uma linha larga, e aqui não há linha
+       larga pra desperdiçar — dividir 23rem em duas devolve as duas imagens
+       ao tamanho de miniatura de onde elas acabaram de sair. */
+    .code-item[data-shots='pair'] .code-shots {
+      --shot-cap: 38vh;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .code-frame {

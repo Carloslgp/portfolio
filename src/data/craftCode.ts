@@ -17,12 +17,20 @@
 //                          dela — não há campo pro número)
 //   • reordenar          → mover o objeto na lista
 //   • tirar um projeto   → apagar (ou comentar) o objeto
-//   • PÔR A FOTO         → ver o comentário de `photo` na interface abaixo
+//   • PÔR AS CAPTURAS    → ver o comentário de `photos` na interface abaixo
 //
 // O que esta página NÃO recebe: emprego, estágio, prêmio. Isso é /work. E
 // nada que não seja código — a sala ao lado (/craft/creativity) é que guarda
 // o resto.
 import type { ImageMetadata } from 'astro';
+
+import easyRead1 from '../assets/craft/easyRead_1.png';
+import easyRead2 from '../assets/craft/easyRead_2.png';
+import portfolio1 from '../assets/craft/portfolio_1.png';
+import grimoire1 from '../assets/craft/grimoire_1.png';
+import grimoire2 from '../assets/craft/grimoire_2.png';
+import ghosty1 from '../assets/craft/ghosty_1.png';
+import ghosty2 from '../assets/craft/ghosty_2.png';
 
 export interface CodeProject {
   /** chave estável, só letras/números/hífen. Vira a âncora #projeto-NN e, de
@@ -48,25 +56,37 @@ export interface CodeProject {
   /** opcional: onde o projeto está NO AR, quando está. Só três têm */
   live?: { label: string; href: string };
 
-  /** A FOTO — o lugar já está guardado, o campo é que ainda não existe.
+  /** AS CAPTURAS — uma ou duas.
    *
-   *  Enquanto este campo faltar, o quadro mostra o monograma (`mark`) num
-   *  campo de cor. O quadro já tem o TAMANHO final, então pôr a foto não
-   *  move nada de lugar na página: é uma troca de conteúdo dentro de uma
-   *  moldura que já está lá.
+   *  Elas mudam a FORMA da linha, e é de propósito: um projeto com captura
+   *  ganha a faixa larga, com a imagem ocupando mais da metade da linha e
+   *  trocando de lado a cada projeto; um projeto sem captura fica na linha
+   *  compacta, com o monograma (`mark`) num campo de cor. A alternativa era
+   *  dar o palco a todos e deixar metade da lista como retângulo vazio do
+   *  tamanho de um palco — pior que a mistura.
    *
    *  Pra pôr:
    *    1. o arquivo em src/assets/craft/ (o Astro gera as variantes no build
    *       — NÃO precisa de `npm run images`, isso é só pro public/);
-   *    2. o import no topo deste arquivo:
-   *         import easyRead from '../assets/craft/easy-read.webp';
+   *    2. o import no topo deste arquivo;
    *    3. o campo no objeto:
-   *         photo: { src: easyRead, alt: 'o que a foto mostra' }
+   *         photos: [{ src: easyRead1, alt: 'o que a captura mostra' }]
+   *
+   *  DUAS é o teto, e não um limite tímido: a terceira dividiria o bloco em
+   *  três colunas de ~11rem, e captura de tela a 11rem não se lê mais — vira
+   *  textura. Quem tem três telas boas escolhe as duas melhores.
+   *
+   *  O ARRANJO do par não se escolhe aqui: ele sai da proporção dos arquivos,
+   *  no build (ver PAR_DEITADO no topo de pages/craft/programming.astro).
+   *  Duas capturas deitadas empilham, quadradas ou em pé ficam lado a lado —
+   *  um campo "layout" aqui só daria uma segunda fonte da verdade pra uma
+   *  coisa que a própria imagem já sabe.
    *
    *  `alt` nunca vazio: é o que quem usa leitor de tela recebe no lugar da
-   *  imagem. `position` é o object-position (padrão 'center'), pro dia em que
-   *  o assunto de uma foto não estiver no meio dela. */
-  photo?: { src: ImageMetadata; alt: string; position?: string };
+   *  imagem, e captura de tela é justamente onde ele não tem como adivinhar.
+   *  Não há campo de enquadramento porque não há corte: a imagem entra
+   *  inteira, na proporção dela. */
+  photos?: { src: ImageMetadata; alt: string }[];
 }
 
 /** Os textos fixos da sala. Ficam aqui pelo mesmo motivo dos projetos: a
@@ -102,6 +122,20 @@ export const CODE_PROJECTS: CodeProject[] = [
       'decides their lives, and that problem is editorial, not cognitive. No ' +
       'sign-up, nothing stored, and it reads the result out loud.',
     repo: 'https://github.com/Carloslgp/EasyRead',
+    photos: [
+      {
+        src: easyRead1,
+        alt: 'The Easy Read page: an empty box for the original text on the ' +
+          'left, the simplified version on the right, and a reading-level ' +
+          'scale from very easy to legalese underneath.',
+      },
+      {
+        src: easyRead2,
+        alt: 'A dense court notice on the left and its rewrite on the right, ' +
+          'broken into short sentences and bullet points under the headings ' +
+          '“What you need to do” and “What can happen”.',
+      },
+    ],
   },
   {
     id: 'portfolio',
@@ -114,6 +148,13 @@ export const CODE_PROJECTS: CodeProject[] = [
       'in one document and put back together in the next. No UI framework, no ' +
       'client router — just the browser doing what it already knows.',
     repo: 'https://github.com/Carloslgp/portfolio',
+    photos: [
+      {
+        src: portfolio1,
+        alt: 'The home of this site: the word PORTFOLIO in large type behind ' +
+          'the 3D ring, stopped on the Craft face, reflected on the floor.',
+      },
+    ],
   },
   {
     id: 'grimoire',
@@ -127,6 +168,20 @@ export const CODE_PROJECTS: CodeProject[] = [
       'gets progressively more judgmental the more commands you get wrong.',
     repo: 'https://github.com/Carloslgp/grimoire',
     live: { label: 'Live', href: 'https://grimoire-hcj5.onrender.com/' },
+    photos: [
+      {
+        src: grimoire1,
+        alt: 'Grimoire booting in green phosphor type: “Getting the rinnegan…”, ' +
+          '“Loading Mjölnir…”, then a prompt offering to enter or create a ' +
+          'grimoire.',
+      },
+      {
+        src: grimoire2,
+        alt: 'A list of games returned by the listByCategory command, followed ' +
+          'by the grimoire growing ruder at every repeat of a command that ' +
+          'does not exist.',
+      },
+    ],
   },
   {
     id: 'meta-no-data',
@@ -165,6 +220,20 @@ export const CODE_PROJECTS: CodeProject[] = [
       'vault for anyone forcing you to unlock it. A red panic button already ' +
       'gives away the intent it’s supposed to hide — the disguise is the point.',
     repo: 'https://github.com/Carloslgp/Ghosty-App',
+    photos: [
+      {
+        src: ghosty1,
+        alt: 'Ghosty running in the Android emulator beside its Kotlin source: ' +
+          'the vault screen, with a red Emergency button that only answers if ' +
+          'held down.',
+      },
+      {
+        src: ghosty2,
+        alt: 'The same app showing what everyone else sees — a working ' +
+          'calculator — with the first-run hint that typing 1984 opens the ' +
+          'setup.',
+      },
+    ],
   },
   {
     id: 'lynx-engine',

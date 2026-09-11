@@ -1,9 +1,14 @@
 // src/scripts/craftRooms.ts — o comportamento das duas salas de /craft.
 //
-// É pouco, de propósito. As salas são texto: elas rolam com o scroll nativo
-// (nada de Lenis aqui — a home é que tem dono pra isso) e não têm emenda com
-// documento nenhum. O que sobra pro JavaScript é uma coisa só: acender cada
-// linha quando ela chega à vista.
+// É pouco, de propósito. As salas são texto: não têm emenda com documento
+// nenhum, e o que sobra pro JavaScript são duas coisas — acender cada linha
+// quando ela chega à vista, e amortecer a rolagem.
+//
+// A rolagem ficou muito tempo sendo a nativa, com o argumento de que uma
+// página de texto não precisa de Lenis. O argumento estava errado sobre QUEM
+// tem o defeito: o salto entre dentes de roda é do input, não da animação —
+// uma lista de capturas de tela pula tão feio quanto uma cena. Ver
+// smoothScroll.ts, que é onde mora a explicação inteira.
 //
 // Quem deixa as linhas apagadas é o CSS, a partir da marca html[data-craft-rows]
 // que o script inline do CraftRoom.astro escreve antes do primeiro paint. Aqui
@@ -11,6 +16,7 @@
 // acende todas de uma vez. É a ordem certa dos dois: a página nunca fica
 // devendo conteúdo por causa de um enfeite.
 import { storedMotionMode } from './motion';
+import { initSmoothScroll } from './smoothScroll';
 
 /** O intervalo entre duas linhas que entram no MESMO lote, em segundos.
  *
@@ -51,6 +57,10 @@ export function initCraftRoom() {
   if (mode) root.dataset.motion = mode;
   const reduced = mode === 'reduced' ||
     (!mode && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  // Antes do early return abaixo: a rolagem é da PÁGINA, e uma sala ainda sem
+  // linhas (a Creativity, enquanto se enche) rola igual.
+  initSmoothScroll(reduced);
 
   const rows = [...document.querySelectorAll<HTMLElement>('[data-craft-row]')];
   if (!rows.length) return;

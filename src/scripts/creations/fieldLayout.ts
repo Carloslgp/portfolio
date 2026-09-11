@@ -11,7 +11,8 @@
 // As fotos das CRIAÇÕES não passam por aqui: a posição delas no canva é
 // função da moldura em que vão se encaixar, que só se conhece na tela (ver
 // field.ts).
-import { FIELD, RIBBON, SCROLL } from './config';
+import { FIELD, RIBBON } from './config';
+import { timing } from './timing';
 
 export interface FieldCard {
   /** qual foto: posição em FIELD_PHOTOS */
@@ -22,6 +23,9 @@ export interface FieldCard {
   yc: number;
   /** largura em vmin */
   w: number;
+  /** o plano: 0 é o mais distante (a menor), 1 o mais próximo (a maior). Ver
+   *  FIELD.DEPTH — sai do mesmo sorteio do tamanho, sem sorteio novo */
+  depth: number;
   /** acende (fora das faixas protegidas) ou é sempre fantasma */
   lit: boolean;
   /** está fora da faixa protegida da abertura / das criações */
@@ -29,14 +33,11 @@ export interface FieldCard {
   stageOk: boolean;
   /** só entra em tela larga (ver FIELD.MOBILE.EVERY) */
   wideOnly: boolean;
-  /** posição na fita da abertura, 0 = topo da curva; -1 = não participa.
-   *  ONDE isso cai na tela é medido no cliente (ver field.ts) — aqui só se
-   *  decide QUEM entra e em que ordem. */
+  /** posição na fita da abertura, 0 = topo da curva; -1 = não participa */
   rank: number;
 }
 
-/** mulberry32 — o mesmo gerador determinístico do mural (photos/layout.ts):
- *  pequeno, suficiente pra sorteio de layout, e com semente inteira. */
+/** mulberry32 — o mesmo gerador determinístico do mural (photos/layout.ts). */
 function rng(seed: number) {
   let a = seed >>> 0;
   return () => {
@@ -57,11 +58,11 @@ function shuffle<T>(list: T[], next: () => number): T[] {
   return out;
 }
 
-/** Altura do canva em alturas de tela: o que ele percorre ao longo da página
- *  inteira (RATE vezes a rolagem) mais a tela que já está visível no fim. */
+/** Altura do canva em alturas de tela: o que o plano MAIS RÁPIDO percorre ao
+ *  longo da página inteira, mais a tela que já está visível no fim. O
+ *  andamento (warp) não muda a conta: ele termina onde começou. */
 export function canvasHeight(creations: number): number {
-  const total = SCROLL.HERO_SCREENS + creations * SCROLL.SCREENS_PER_CREATION;
-  return FIELD.RATE * total + 1;
+  return FIELD.RATE * (1 + FIELD.DEPTH) * timing(creations).total + 1;
 }
 
 /**
@@ -71,9 +72,9 @@ export function canvasHeight(creations: number): number {
 export function layoutField(photos: number, creations: number): FieldCard[] {
   if (!photos) return [];
   const next = rng(FIELD.SEED);
-  const rows = Math.ceil(canvasHeight(creations) / FIELD.ROW_VH);
+  const minRows = Math.ceil(canvasHeight(creations) / FIELD.ROW_VH);
   const sizes = FIELD.SIZES_VMIN;
-  const outside = (x: number, band: readonly [number, number]) => x < band[0] || x > band[1];
+  const outside = (x: number, band: readonly number[]) => x < band[0] || x > band[1];
 
   // as fotos saem em ciclos embaralhados da lista, pra mesma foto não se
   // repetir antes de todas as outras aparecerem — e nunca duas iguais em
@@ -92,42 +93,47 @@ export function layoutField(photos: number, creations: number): FieldCard[] {
     return last;
   };
 
+  // As linhas vão até cobrir o canva E até haver fotos elegíveis pra fita
+  // inteira. Com o fundo mais lento o canva encurtou, e a fita (60 fotos que
+  // aparecem em toda tela) quase não cabia nele. As linhas extras são só
+  // ACRESCENTADAS no fim: os sorteios das primeiras continuam os mesmos, e com
+  // eles a abertura e quem forma a fita. O teto é só uma trava contra laço
+  // infinito se FILL um dia for zero.
   const cards: FieldCard[] = [];
-  for (let r = 0; r < rows; r++) {
+  let eligible = 0;
+  for (let r = 0; (r < minRows || eligible < RIBBON.COUNT) && r < minRows + 400; r++) {
     for (let c = 0; c < FIELD.COLS; c++) {
       if (next() > FIELD.FILL) continue;
       const x = ((c + 0.5 + (next() * 2 - 1) * FIELD.JITTER) / FIELD.COLS) * 100;
       const yc = (r + 0.5 + (next() * 2 - 1) * FIELD.JITTER) * FIELD.ROW_VH;
-      const w = sizes[Math.floor(next() * sizes.length)];
+      const size = Math.floor(next() * sizes.length);
       const lit = next() < FIELD.LIT_SHARE;
+      const wideOnly = cards.length % FIELD.MOBILE.EVERY !== 0;
       cards.push({
         photo: nextPhoto(),
         x,
         yc,
-        w,
+        w: sizes[size],
+        depth: sizes.length > 1 ? size / (sizes.length - 1) : 0.5,
         lit,
         heroOk: outside(x / 100, FIELD.SAFE_X.hero),
         stageOk: outside(x / 100, FIELD.SAFE_X.stage),
-        wideOnly: cards.length % FIELD.MOBILE.EVERY !== 0,
+        wideOnly,
         rank: -1,
       });
+      if (!wideOnly) eligible++;
     }
   }
 
   // ——— quem forma a fita da abertura ———
   //
-  // As primeiras COUNT fotos do canva que aparecem em TODA tela. O filtro de
-  // wideOnly não é detalhe: no celular metade das fotos comuns é escondida por
-  // CSS, e uma fita montada sem olhar isso perderia metade dos membros
-  // justamente na tela em que ela é o primeiro que se vê.
-  //
-  // "As primeiras" porque a fita se desmancha PRA DENTRO do canva: cada foto
-  // vai da curva até o lugar dela, e as de cima do canva são as que terminam
-  // perto da tela. As outras seguem pra fora dela, que é o que faz o estouro
-  // parecer um espalhar e não um sumiço — elas não somem, elas vão embora.
-  //
-  // A ordem é a do canva (linha a linha, de cima pra baixo), e vira a ordem na
-  // curva: assim ninguém cruza o caminho de ninguém no estouro.
+  // As primeiras COUNT fotos do canva que aparecem em TODA tela (no celular
+  // metade das comuns sai por CSS, e uma fita montada sem olhar isso perderia
+  // metade dos membros justamente na tela em que ela é o primeiro que se vê).
+  // "As primeiras" porque a fita se desmancha PRA DENTRO do canva: as de cima
+  // terminam perto da tela, as outras vão embora por baixo — o estouro parece
+  // um espalhar, e não um sumiço. A ordem é a do canva, e vira a ordem na
+  // curva: ninguém cruza o caminho de ninguém no estouro.
   cards
     .filter((c) => !c.wideOnly)
     .slice(0, RIBBON.COUNT)

@@ -13,7 +13,7 @@
 // src/data/creations.ts (com o guia src/data/creations.md ao lado). Os
 // números da rolagem, dos efeitos e do canva de fotos ao fundo vêm de
 // src/scripts/creations/config.ts, e o motor é src/scripts/creations/. Aqui
-// só há markup, CSS e a checagem do build logo abaixo.
+// só há markup, CSS e as checagens do build logo abaixo.
 //
 // Sem a cena 3D nem a transição de água do craft, de propósito: o vocabulário
 // é o clássico do site (papel/tinta + botão de tema).
@@ -22,8 +22,9 @@ import Layout from '../layouts/Layout.astro';
 import {
   CLOSING, CREATIONS, EFFECT_NAMES, FIELD_PHOTOS, KIND_LABEL, OPENING, UI,
 } from '../data/creations';
-import { EFFECTS, FIELD, FIELD_IMAGE, IMAGE, LAYOUT, STAGE } from '../scripts/creations/config';
+import { EFFECTS, FIELD, FIELD_IMAGE, IMAGE, LAYOUT, RIBBON, STAGE } from '../scripts/creations/config';
 import { layoutField } from '../scripts/creations/fieldLayout';
+import { timing } from '../scripts/creations/timing';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -59,6 +60,27 @@ CREATIONS.forEach((creation, i) => {
     );
   }
 });
+
+// O andamento do canva (FIELD.TEMPO) desacelera o fundo na leitura e o
+// acelera nas passagens. Forte demais, a desaceleração passaria do zero e o
+// fundo andaria PRA TRÁS em algum trecho — rolar pra baixo e ver as fotos
+// descendo. Não é um erro que se veja olhando o número, então o build confere.
+{
+  const T = timing(CREATIONS.length);
+  const steps = 2000;
+  let before = T.warp(0);
+  for (let k = 1; k <= steps; k++) {
+    const now = T.warp((k / steps) * T.total);
+    if (now < before - 1e-9) {
+      throw new Error(
+        `Coleção de Criações: com FIELD.TEMPO = ${FIELD.TEMPO} o canva do fundo anda pra trás ` +
+          `em algum ponto da página. Baixe FIELD.TEMPO ou aumente FIELD.TEMPO_RAMP em ` +
+          `src/scripts/creations/config.ts.`,
+      );
+    }
+    before = now;
+  }
+}
 
 // As variantes de cada imagem saem do pipeline do Astro no build (ver IMAGE
 // no config). A proporção viaja como variável CSS: é ela que dimensiona a
@@ -105,14 +127,35 @@ const pieceIndexes = Array.from({ length: EFFECTS.PIECES.COUNT }, (_, k) => k);
 // também entram no canva — a posição delas é função da moldura, medida na
 // tela, então aqui só levam os dados da criação. Uma variante por foto da
 // lista, e não por lugar no canva: a lista repete.
+//
+// Desenhadas do plano mais DISTANTE pro mais próximo (FIELD.DEPTH): a pequena
+// e lenta nunca passa por cima da grande e rápida. Os data-attributes levam
+// tudo que o motor precisa, então a ordem no DOM é livre pra ser a de pintura.
 const fieldSources = await Promise.all(
   FIELD_PHOTOS.map((photo) => getImage({ src: photo, ...FIELD_IMAGE })),
 );
-const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card) => ({
-  ...card,
-  src: fieldSources[card.photo].src,
-  ratio: FIELD_PHOTOS[card.photo].width / FIELD_PHOTOS[card.photo].height,
-}));
+const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
+  .map((card) => ({
+    ...card,
+    src: fieldSources[card.photo].src,
+    ratio: FIELD_PHOTOS[card.photo].width / FIELD_PHOTOS[card.photo].height,
+  }))
+  .sort((a, b) => a.depth - b.depth);
+
+// A fita da abertura precisa de RIBBON.COUNT fotos que apareçam em toda tela.
+// O fieldLayout acrescenta linhas até ter; se mesmo assim faltar (trocaram a
+// semente, a densidade ou o COUNT), é melhor o build dizer do que a fita sair
+// banguela.
+{
+  const members = fieldCards.filter((card) => card.rank >= 0).length;
+  if (members < RIBBON.COUNT) {
+    throw new Error(
+      `Coleção de Criações: o canva tem só ${members} fotos que aparecem em toda tela, e a ` +
+        `fita da abertura pede ${RIBBON.COUNT}. Baixe RIBBON.COUNT ou aumente FIELD.FILL em ` +
+        `src/scripts/creations/config.ts.`,
+    );
+  }
+}
 ---
 
 <Layout lang="pt">
@@ -188,15 +231,20 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     <div class="cc-stage" data-cc-stage>
       {/* O canva de fotos: atrás de tudo, decorativo (sem alt, fora da árvore
           de acessibilidade) e só no palco. Primeiro as fotos comuns (a
-          posição vem do build); depois a foto de cada criação, que o motor
-          leva do canva até a moldura — no `pieces`, em N tiras, cada uma um
-          elemento próprio recortado à sua fatia. Metade das comuns leva uma
-          classe que o CSS esconde no celular. */}
+          posição vem do build), depois os fólios (o número de cada criação
+          num plano próprio, entre o canva e as fotos), depois a foto de cada
+          criação, que o motor leva do canva até a moldura — no `pieces`, em N
+          ripas, cada uma um elemento próprio recortado à sua fatia. Metade
+          das comuns leva uma classe que o CSS esconde no celular.
+
+          Nenhuma foto aqui é `lazy`: todas nascem no canto 0,0, dentro da
+          tela, e o lazy nunca adiou nada. Quem ordena a fila é a prioridade —
+          as fotos da fita primeiro, porque são a primeira coisa que se vê. */}
       <div
         class="cc-field"
         data-cc-field
         aria-hidden="true"
-        style={`--lit-cap-mobile:${FIELD.MOBILE.LIT_CAP}`}
+        style={`--bleed:${FIELD.INNER.BLEED}`}
       >
         {fieldCards.map((c) => (
           <figure
@@ -205,6 +253,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
             data-x={c.x.toFixed(2)}
             data-yc={c.yc.toFixed(3)}
             data-w={c.w}
+            data-depth={c.depth.toFixed(3)}
             data-ratio={c.ratio.toFixed(4)}
             data-lit={c.lit ? '1' : '0'}
             data-hero-ok={c.heroOk ? '1' : '0'}
@@ -212,8 +261,18 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
             data-rank={c.rank}
             style={`--ratio:${c.ratio.toFixed(4)}`}
           >
-            <img src={c.src} alt="" loading="lazy" decoding="async" draggable="false" />
+            <img
+              src={c.src}
+              alt=""
+              loading="eager"
+              fetchpriority={c.rank >= 0 ? 'high' : 'low'}
+              decoding="async"
+              draggable="false"
+            />
           </figure>
+        ))}
+        {slides.map((s) => (
+          <span class="cc-folio" data-cc-folio={s.index} data-layout={s.layout}>{s.number}</span>
         ))}
         {slides.map((s) =>
           (s.effect === 'pieces' ? pieceIndexes : [0]).map((k) => (
@@ -224,6 +283,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
               data-strips={s.effect === 'pieces' ? EFFECTS.PIECES.COUNT : 1}
               data-effect={s.effect}
               data-from={s.from}
+              data-layout={s.layout}
               data-ratio={s.ratio.toFixed(4)}
               style={`--ratio:${s.ratio.toFixed(4)};--k:${k};--n:${EFFECTS.PIECES.COUNT}`}
             >
@@ -232,7 +292,8 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
                 srcset={s.srcset}
                 sizes={s.sizes}
                 alt=""
-                loading={s.index === 0 ? 'eager' : 'lazy'}
+                loading="eager"
+                fetchpriority={s.index === 0 ? 'auto' : 'low'}
                 decoding="async"
                 draggable="false"
               />
@@ -245,17 +306,19 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
         <p class="eyebrow" data-cc-hero-kicker>{OPENING.kicker}</p>
         {/* O título parte em duas com um VÃO no meio: é ali que a fita da
             abertura corre (o canva reunido numa curva em S, ver RIBBON no
-            config). O vão é um span vazio e sem conteúdo de propósito — ele
-            existe pra ser MEDIDO pelo field.ts, do mesmo jeito que a moldura
-            de cada criação, e assim a curva cai entre as linhas em qualquer
-            tipografia e qualquer tela, sem que o motor saiba de fonte.
+            config). O vão é um span vazio de propósito — ele existe pra ser
+            MEDIDO pelo field.ts, do mesmo jeito que a moldura de cada
+            criação, e assim a curva cai entre as linhas em qualquer
+            tipografia e qualquer tela.
 
-            Continua um <h1> só: pro leitor de tela o texto segue sendo
-            "Coleção de criações.", em ordem, e o vão não diz nada. */}
+            Cada linha mora numa máscara: na saída da abertura as duas se
+            ABREM de novo, no mesmo vão, e cada uma escorrega pra fora da sua
+            (ver opening.ts). Continua um <h1> só: pro leitor de tela o texto
+            segue sendo "Coleção de criações.", em ordem. */}
         <h1 data-cc-hero-title>
-          <span class="cc-title-line">{OPENING.title.line1}</span>{' '}
+          <span class="cc-title-mask" data-cc-hero-mask><span class="cc-title-line" data-cc-hero-line>{OPENING.title.line1}</span></span>{' '}
           <span class="cc-ribbon-slot" data-cc-ribbon aria-hidden="true"></span>
-          <span class="cc-title-line"><em>{OPENING.title.line2}</em></span>
+          <span class="cc-title-mask" data-cc-hero-mask><span class="cc-title-line" data-cc-hero-line><em>{OPENING.title.line2}</em></span></span>
         </h1>
         <p class="lead" data-cc-hero-lead>{OPENING.lead}</p>
         <p class="cc-hint" data-cc-hero-hint aria-hidden="true"><span>{OPENING.hint}</span></p>
@@ -289,14 +352,18 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
             />
           </div>
 
-          <div class="cc-copy">
-            <p class="cc-kicker" data-cc-line>
+          {/* Cada peça do texto tem o próprio gancho, porque cada uma se revela
+              de um jeito (ver TYPE no config); o data-cc-line fica pra versão
+              simples. O título aceita foco (tabindex -1) pra quem salta pelo
+              indicador com o teclado aterrissar nele. */}
+          <div class="cc-copy" data-cc-copy>
+            <p class="cc-kicker" data-cc-line data-cc-kicker>
               {UI.item} {s.number} · {KIND_LABEL[s.kind]}{s.date && ` · ${s.date}`}
             </p>
-            <h2 class="cc-title" id={`${s.anchor}-titulo`} data-cc-line>{s.title}</h2>
-            <p class="cc-desc" data-cc-line>{s.description}</p>
+            <h2 class="cc-title" id={`${s.anchor}-titulo`} data-cc-line data-cc-title tabindex="-1">{s.title}</h2>
+            <p class="cc-desc" data-cc-line data-cc-desc>{s.description}</p>
             {s.link && (
-              <a class="cc-link" data-cc-line href={s.link.href} target="_blank" rel="noopener">
+              <a class="cc-link" data-cc-line data-cc-link href={s.link.href} target="_blank" rel="noopener">
                 {s.link.label} <span aria-hidden="true">{UI.linkMark}</span>
               </a>
             )}
@@ -322,10 +389,15 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
 
   {/* O indicador: um traço por criação e o contador. Os traços são âncoras de
       verdade — na versão simples o navegador as resolve sozinho, e no palco o
-      script troca o destino pela posição de scroll da criação. */}
+      script troca o destino pela posição de scroll da criação.
+
+      O contador tem duas camadas: o número que o leitor de tela anuncia
+      (escondido, e só muda quando a criação muda) e a coluna que se VÊ, que
+      rola de um número pro outro (ver nav.ts). */}
   <nav class="cc-nav" data-cc-nav aria-label={UI.nav}>
-    <p class="cc-nav-count" aria-live="polite">
-      <span data-cc-nav-current>—</span><span class="cc-nav-sep">/</span><span>{total}</span>
+    <p class="cc-nav-count">
+      <span class="cc-sr" data-cc-nav-current aria-live="polite">—</span>
+      <span class="cc-roll" aria-hidden="true"><span class="cc-roll-col" data-cc-roll>{['—', ...slides.map((s) => s.number)].map((label) => <span>{label}</span>)}</span></span><span class="cc-nav-sep" aria-hidden="true">/</span><span>{total}</span>
     </p>
     <ol>
       {slides.map((s) => (
@@ -342,6 +414,13 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
       ))}
     </ol>
   </nav>
+
+  {/* A folha de capítulo: o que cobre um salto LONGO pelo indicador (ver
+      main.ts → goTo). Papel, e o número da criação de destino. */}
+  <div class="cc-veil" data-cc-veil aria-hidden="true">
+    <span class="eyebrow">{UI.item}</span>
+    <span class="cc-veil-num" data-cc-veil-num></span>
+  </div>
 </Layout>
 
 <script>
@@ -372,6 +451,23 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     overflow: visible;
   }
 
+  /* Durante a ENTRADA a página já tem a altura inteira (o pin nasce antes
+     dela, ver intro.ts), então a rolagem é travada: no desktop pelo Lenis
+     parado, e aqui pro toque — mais específico que a regra acima, que
+     devolve o overflow. A barra de rolagem do site some junto: convidar a
+     rolar durante a entrada seria convidar a perdê-la. */
+  :global(html.is-intro:has(.cc-page)) {
+    overflow: hidden;
+  }
+
+  :global(html[data-creations='stage'] .liquid-scrollbar) {
+    transition: opacity 0.6s ease;
+  }
+
+  :global(html.is-intro .liquid-scrollbar) {
+    opacity: 0;
+  }
+
   .cc-page {
     position: relative;
     z-index: 1;
@@ -398,12 +494,11 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
      por trás dela não faria sentido. Toda foto é posicionada pelo motor
      (transform, a partir do canto 0,0), então o CSS só dá a forma.
 
-     A opacidade das fotos comuns é o PRODUTO de duas variáveis que o motor
-     escreve: --level, o nível dela no trecho atual, e --breath, a respiração
-     do canva inteiro. --lit-cap é o teto do celular. As fotos das criações
-     recebem a opacidade direto, porque encaixadas elas SÃO a criação. */
+     A opacidade de cada foto é escrita PRONTA pelo motor (field.ts) — o
+     nível dela, a respiração do canva e o teto do celular já multiplicados.
+     Eram variáveis herdadas daqui, e mudar a respiração recalculava o estilo
+     de todas as figuras a cada quadro. */
   .cc-field {
-    --breath: 1;
     position: absolute;
     inset: 0;
     z-index: 0;
@@ -422,14 +517,8 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     left: 0;
     margin: 0;
     aspect-ratio: var(--ratio);
-    /* O max(--ribbon-a, ...) é a fita da abertura passando por cima das
-       regras do canva. Lá ela não é fundo — é a página inteira — então acende
-       por inteiro, inclusive acima do teto do celular (--lit-cap), que existe
-       pra fundo não competir com texto e ali não há texto pra competir. Fora
-       da abertura --ribbon-a é 0 e a conta é a de sempre. */
-    opacity: calc(
-      max(var(--ribbon-a, 0), min(var(--level, 0), var(--lit-cap, 1))) * var(--breath)
-    );
+    /* apagada até o motor escrever a opacidade dela */
+    opacity: 0;
     transform-origin: center center;
     backface-visibility: hidden;
   }
@@ -449,18 +538,99 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     user-select: none;
   }
 
-  /* a foto de uma criação passa por cima das comuns — e por baixo do texto,
-     que está na criação (z-index 1, abaixo) */
+  /* a foto de uma criação passa por cima das comuns e dos fólios — e por
+     baixo do texto, que está na criação (z-index 1, acima do canva) */
   .cc-card.is-featured {
     z-index: 2;
+    overflow: hidden;
   }
 
-  /* as tiras do `pieces`: N cópias da foto no mesmo lugar, cada uma
-     recortada à sua fatia; o motor move cada tira por conta própria */
+  /* A foto anda DENTRO da moldura (ver FIELD.INNER): a imagem é deitada
+     --bleed maior em cima e embaixo, e o motor só a translada. A sobra fica
+     cortada pela figura. Janela, e não zoom — zoom re-rasterizaria a foto a
+     cada quadro. */
+  .cc-card.is-featured img {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    top: calc(var(--bleed, 0) * -100%);
+    height: calc(100% + var(--bleed, 0) * 200%);
+  }
+
+  /* as ripas do `pieces`: N cópias da foto no mesmo lugar, cada uma recortada
+     à sua fatia. --gap é o motor abrindo uma fresta entre elas no momento da
+     onda (ver EFFECTS.PIECES); em repouso é 0 e as fatias se encostam. */
   .cc-card.is-strip {
     clip-path: inset(
-      0 calc((var(--n) - 1 - var(--k)) / var(--n) * 100%) 0 calc(var(--k) / var(--n) * 100%)
+      0 calc((var(--n) - 1 - var(--k)) / var(--n) * 100% + var(--gap, 0) * 1px) 0
+        calc(var(--k) / var(--n) * 100% + var(--gap, 0) * 1px)
     );
+  }
+
+  /* O VÉU da composição `full` mora NA FOTO. Ele existe pro texto branco ler
+     sobre ela, então vai aonde ela for, encolhe com ela e é cortado por ela:
+     quando a foto sai, não sobra uma faixa escura sobre papel vazio (era o
+     defeito de quando ele morava na criação).
+
+     A caixa dele começa no alto da TELA dentro da foto no encaixe (a moldura
+     da `full` é centrada e nunca menor que o viewport — ver .cc-media da
+     full, os dois comentários apontam um pro outro), e vai até o PÉ DA FOTO:
+     o degradê termina escuro na altura da tela e continua escuro dali pra
+     baixo. Com a caixa do tamanho exato da tela, a borda de baixo dela
+     aparecia como uma linha dura atravessando a foto assim que ela encolhia
+     na saída. As paradas são em --viewport-h, e não em %, pelo mesmo motivo.
+
+     A opacidade segue --dock, o quanto a foto já chegou, e começa atrasada
+     (o -0.35): enquanto ela ainda é miniatura, véu nenhum. O will-change dá a
+     ele camada própria, pra o fade não repintar a foto. */
+  .cc-card.is-featured[data-layout='full']::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(50% - var(--viewport-h) / 2);
+    bottom: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) calc(var(--viewport-h) * 0.22),
+      rgba(0, 0, 0, 0.12) calc(var(--viewport-h) * 0.45),
+      rgba(0, 0, 0, 0.55) calc(var(--viewport-h) * 0.74),
+      rgba(0, 0, 0, 0.82) var(--viewport-h)
+    );
+    opacity: clamp(0, calc(var(--dock, 0) * 1.6 - 0.35), 1);
+    will-change: opacity;
+  }
+
+  /* ——— o fólio ———
+     O número da criação em itálico gigante, a 6% de tinta, num plano entre o
+     canva e as fotos. Ele atravessa a criação subindo mais devagar que tudo
+     (ver TYPE.FOLIO) e fica do lado do TEXTO de cada composição, onde há ar.
+     Some atrás da foto numa `full`, e nunca passa por cima de uma. */
+  .cc-folio {
+    position: absolute;
+    z-index: 1;
+    right: 6vw;
+    bottom: -4vh;
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(9rem, 30vw, 28rem);
+    font-style: italic;
+    font-weight: 400;
+    line-height: 0.8;
+    letter-spacing: -0.06em;
+    color: rgba(var(--ink-rgb), 0.06);
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    will-change: transform, opacity;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-folio[data-layout='flip'],
+  .cc-folio[data-layout='tower'],
+  .cc-folio[data-layout='quiet'] {
+    left: 6vw;
+    right: auto;
   }
 
   /* a abertura e as criações ficam por cima do canva */
@@ -516,6 +686,38 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     font-weight: 400;
   }
 
+  /* As linhas do título, cada uma na sua máscara. A máscara só corta no
+     palco (é lá que as linhas escorregam pra fora dela); o padding com
+     margem negativa dá espaço pro acento do "ç", pro til do "ã" e pra
+     cauda do itálico, sem mudar o lugar de nada. */
+  .cc-title-mask,
+  .cc-title-line {
+    display: block;
+  }
+
+  :global(html[data-creations='stage']) .cc-title-mask {
+    overflow: hidden;
+    padding: 0.14em 0.14em 0.24em;
+    margin: -0.14em -0.14em -0.24em;
+  }
+
+  /* A regra de dono da abertura (ver intro.ts e opening.ts): a opacidade
+     destas peças é da ENTRADA, pelas duas variáveis que ela escreve na raiz
+     da abertura. A saída nunca escreve opacidade aqui — ela move, recorta e
+     lava. O --exit-a só existe pro parágrafo em navegador sem mask-image. */
+  :global(html[data-creations='stage']) [data-cc-hero-title] {
+    opacity: var(--intro-title, 1);
+  }
+
+  :global(html[data-creations='stage']) [data-cc-hero-kicker],
+  :global(html[data-creations='stage']) [data-cc-hero-hint] {
+    opacity: var(--intro-rest, 1);
+  }
+
+  :global(html[data-creations='stage']) [data-cc-hero-lead] {
+    opacity: calc(var(--intro-rest, 1) * var(--exit-a, 1));
+  }
+
   /* O VÃO onde a fita corre. Não tem conteúdo e não desenha nada: é uma caixa
      pro field.ts MEDIR (getBoundingClientRect), do mesmo jeito que ele mede a
      moldura de cada criação. Por isso a curva cai entre as linhas em qualquer
@@ -535,13 +737,9 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
   }
 
   /* O vão se fecha quando a fita estoura: as fotos saem dali e o título se
-     junta atrás delas, no mesmo gesto. Depois disso a abertura é a que sempre
-     foi — rótulo, título em duas linhas coladas, parágrafo, dica — e a
-     rolagem começa numa página montada.
-
-     Fechar por altura, e não por transform, porque o que tem que acontecer é
-     o título REFLUIR: as duas linhas se aproximando de verdade. Um transform
-     deixaria o buraco no lugar e só disfarçaria. */
+     junta atrás delas, no mesmo gesto. Fechar por altura, e não por
+     transform, porque o que tem que acontecer é o título REFLUIR: as duas
+     linhas se aproximando de verdade. */
   :global(html.is-intro-done) .cc-ribbon-slot {
     height: 0;
   }
@@ -654,8 +852,6 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
      Duas regras que valem pra todas:
        • a caixa tem SEMPRE a proporção da foto (--ratio), e o tamanho sai de
          uma altura-alvo (--frame-h) com um teto de largura (--frame-cap).
-         Assim uma foto deitada não estoura a composição pensada pra uma em
-         pé: o teto entra e a altura cede.
        • só no palco. Na versão simples (tela baixa, baixa animação) a página
          é uma pilha comum, e composição ali seria enfeite sobre um fallback.
 
@@ -685,28 +881,19 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
       justify-self: end;
     }
 
-    /* ——— tower: mais alta que a tela, estreita, encostada na borda ———
-       116dvh é o ponto em que ela sangra em cima E embaixo o bastante pra se
-       ler como "não cabe", sem que o assunto da foto (que costuma estar no
-       meio) saia junto. O teto de 52vw é o que segura uma foto deitada: nela
-       a altura cede e o resultado é uma faixa larga, que é a forma que uma
-       deitada tem quando quer ser grande. */
     /* A folga do indicador. Ele é fixo à direita e ocupa uns 65px de largura
        contra os 86 de padding do slide — só que ele não fica DENTRO desse
-       padding: medido, ele começa 3px antes da borda do conteúdo. Nunca deu
-       problema porque nada encostava ali. Estas duas encostam, então param
-       antes. As outras nem chegam perto e não precisam da regra. */
+       padding: medido, ele começa 3px antes da borda do conteúdo. Estas duas
+       encostam ali, então param antes. */
     :global(html[data-creations='stage']) [data-layout='tower'] .cc-media,
     :global(html[data-creations='stage']) [data-layout='quiet'] .cc-media {
       margin-right: 1.6rem;
     }
 
-    /* Ela sangra em cima e embaixo, e SÓ. Sangrar pela direita também era o
-       primeiro desenho, e estava errado: o indicador lateral é fixo no meio
-       da altura, exatamente onde esta moldura passa, e uma foto escura por
-       baixo dele o apaga. Conteúdo não passa por cima de navegação
-       permanente — e o gesto não perde nada, porque o que faz a tower é a
-       altura que não cabe, não a borda lateral. */
+    /* ——— tower: mais alta que a tela, estreita, encostada na borda ———
+       Ela sangra em cima e embaixo, e SÓ: o indicador lateral é fixo no meio
+       da altura, exatamente onde uma borda direita sangrando passaria.
+       Conteúdo não passa por cima de navegação permanente. */
     :global(html[data-creations='stage']) [data-layout='tower'] .cc-media {
       --frame-h: 116dvh;
       --frame-cap: 52vw;
@@ -741,13 +928,10 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     }
 
     /* ——— edge: grande, jogada pra fora da borda esquerda ———
-       Uns 16vw ficam de fora. É o gesto mais arriscado da página e depende de
-       uma coisa: o texto do outro lado tem que estar inteiro na tela, senão
-       vira só uma foto mal posicionada. */
+       Uns 16vw ficam de fora. O texto do outro lado tem que estar inteiro na
+       tela, senão vira só uma foto mal posicionada. */
     :global(html[data-creations='stage']) .cc-slide[data-layout='edge'] {
-      /* a primeira coluna encolhe porque boa parte dela está fora da tela:
-         com as colunas normais o texto começava a 770px e sobrava um vazio
-         de 470 entre ele e a foto — ar demais vira desleixo, não composição */
+      /* a primeira coluna encolhe porque boa parte dela está fora da tela */
       grid-template-columns: minmax(0, 0.62fr) minmax(0, 1fr);
     }
     :global(html[data-creations='stage']) [data-layout='edge'] .cc-media {
@@ -760,14 +944,13 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
   }
 
   /* ——— full: a foto ocupa a página inteira ———
-     Vale em toda largura, inclusive no celular: é a composição que menos
-     depende de haver duas colunas, e a que mais rende em tela pequena.
+     Vale em toda largura, inclusive no celular.
 
      A moldura é a MENOR caixa com a proporção da foto que ainda cobre o
-     viewport: max(largura da tela, altura da tela x proporção). Com o
-     aspect-ratio junto, o que sobra em uma direção sangra pra fora e o
-     .cc-field corta. É o que faz qualquer foto — em pé, deitada, quadrada —
-     cobrir a tela inteira sem deformar e sem faixa preta.
+     viewport: max(largura da tela, altura da tela x proporção). O que sobra
+     em uma direção sangra pra fora e o .cc-field corta. O véu que escurece o
+     pé da tela mora na foto do canva, e conta com esta caixa ser centrada e
+     nunca menor que a tela (ver .cc-card.is-featured[data-layout='full']).
 
      O padding do slide vai a zero pra caixa nascer do canto do viewport, e
      volta no texto: aqui ele flutua sobre a foto, não divide espaço com ela. */
@@ -785,31 +968,9 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     max-width: none;
   }
 
-  /* O véu. Escurece só o pé da tela, onde o texto está — o alto da foto fica
-     como é. A opacidade segue o --dock que o field.ts publica (o quanto a
-     foto já chegou), e não a linha do tempo do texto: sem isso a página
-     escureceria inteira no primeiro quadro da entrada, com a foto ainda
-     miniatura do outro lado da tela. O 1.4 adianta o véu em relação à foto,
-     porque o texto branco começa a aparecer antes de ela ter chegado. */
-  :global(html[data-creations='stage']) [data-layout='full']::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: clamp(0, calc(var(--dock, 0) * 1.4), 1);
-    background: linear-gradient(
-      to top,
-      rgba(0, 0, 0, 0.82) 0%,
-      rgba(0, 0, 0, 0.55) 26%,
-      rgba(0, 0, 0, 0.12) 55%,
-      rgba(0, 0, 0, 0) 78%
-    );
-  }
-
   /* O texto por cima do véu. Trocar --ink e --ink-rgb aqui vira todas as
-     linhas de uma vez (rótulo, título, descrição, link já se descrevem em
-     função deles) — e continua branco nos dois temas, porque quem manda no
-     contraste agora é a foto, não o tema da página. */
+     linhas de uma vez — e continua branco nos dois temas, porque quem manda
+     no contraste agora é a foto, não o tema da página. */
   :global(html[data-creations='stage']) [data-layout='full'] .cc-copy {
     --ink: #fff;
     --ink-rgb: 255, 255, 255;
@@ -857,6 +1018,38 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     letter-spacing: -0.04em;
   }
 
+  /* o foco chega aqui por salto (ver main.ts → goTo): anel só pra teclado */
+  .cc-title:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* ——— as palavras mascaradas (ver type.ts) ———
+     O SplitText embrulha cada palavra do título numa máscara (.cc-wd-mask) e
+     a palavra sobe de dentro dela. overflow: hidden, e não o clip que ele
+     escreve inline: no iOS abaixo do 16 o clip inline é inválido e cai, e
+     esta regra fica no lugar. O padding com margem negativa guarda o acento
+     do "Tí", o "ç" e a cauda do itálico, que numa altura de linha de 0.96
+     seriam cortados. Na `full` a sobra é maior: a sombra do texto não pode
+     ser cortada. */
+  .cc-title :global(.cc-wd-mask),
+  .cc-closing h2 :global(.cc-wd-mask) {
+    display: inline-block;
+    overflow: hidden;
+    padding: 0.16em 0.1em 0.22em;
+    margin: -0.16em -0.1em -0.22em;
+    vertical-align: top;
+  }
+
+  .cc-title :global(.cc-wd),
+  .cc-closing h2 :global(.cc-wd) {
+    display: inline-block;
+  }
+
+  :global(html[data-creations='stage']) [data-layout='full'] .cc-title :global(.cc-wd-mask) {
+    padding: 0.3em 0.3em 0.4em;
+    margin: -0.3em -0.3em -0.4em;
+  }
+
   .cc-desc {
     margin-top: clamp(1.1rem, 2.4vh, 1.6rem);
     color: rgba(var(--ink-rgb), 0.68);
@@ -880,6 +1073,49 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
   .cc-link:hover,
   .cc-link:focus-visible {
     text-decoration-color: currentColor;
+  }
+
+  /* ——— a lavagem ———
+     A descrição e os parágrafos da abertura e do fechamento se revelam por
+     um degradê de MÁSCARA que desce por eles, levemente inclinado como uma
+     pincelada: --in empurra a borda de baixo (entrando), --out a de cima
+     (saindo, continuando pra baixo). Nada é dividido, então o texto continua
+     um parágrafo pro leitor de tela e reflui como qualquer parágrafo.
+
+     O repouso é VISÍVEL (--in 1, --out 0): o revert do refresh e a versão
+     simples caem aqui. A mesma pergunta do @supports é feita no JS (type.ts
+     → WASH); onde a resposta é não, o JS usa opacidade. */
+  @supports (mask-image: linear-gradient(#000 calc(1% + 1em), #000)) or (-webkit-mask-image: linear-gradient(#000 calc(1% + 1em), #000)) {
+    :global(html[data-creations='stage']) .cc-desc,
+    :global(html[data-creations='stage']) .cc-hero .lead,
+    :global(html[data-creations='stage']) .cc-closing .lead {
+      --in: 1;
+      --out: 0;
+      --f: 2.6em;
+      --a: calc(var(--out) * (100% + var(--f)) - var(--f));
+      --b: calc(var(--in) * (100% + var(--f)) - var(--f));
+      -webkit-mask-image: linear-gradient(
+        172deg,
+        transparent var(--a),
+        #000 calc(var(--a) + var(--f)),
+        #000 var(--b),
+        transparent calc(var(--b) + var(--f))
+      );
+      mask-image: linear-gradient(
+        172deg,
+        transparent var(--a),
+        #000 calc(var(--a) + var(--f)),
+        #000 var(--b),
+        transparent calc(var(--b) + var(--f))
+      );
+    }
+
+    /* na `full` a sombra do texto passa da caixa, e a máscara corta na
+       borda: a caixa cresce pra dentro da sombra sem sair do lugar */
+    :global(html[data-creations='stage']) [data-layout='full'] .cc-desc {
+      padding: 1.5rem;
+      margin: calc(clamp(1.1rem, 2.4vh, 1.6rem) - 1.5rem) -1.5rem -1.5rem;
+    }
   }
 
   /* ——— o fechamento ——— */
@@ -931,10 +1167,11 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
   }
 
   /* ——— o indicador ———
-     A opacidade sai de uma variável: no palco o GSAP a anima de 0 a 1 junto
-     com a saída da abertura, e a classe `is-done` (fim da sequência) apaga
-     por cima sem disputar a propriedade. Na versão simples a variável não
-     existe e vale 1. */
+     A opacidade sai de variáveis: --nav-alpha, que a saída da abertura leva
+     de 0 a 1, e --nav-out, que o fim da última criação leva de 1 a 0 (ver
+     main.ts). No palco nada aqui tem transição: tudo é função da rolagem, e
+     transição correria atrás dela. Na versão simples as variáveis não
+     existem e valem 1. */
   .cc-nav {
     position: fixed;
     top: 50%;
@@ -949,10 +1186,11 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
 
   :global(html[data-creations='stage']) .cc-nav {
     --nav-alpha: 0;
+    opacity: calc(var(--nav-alpha, 1) * var(--nav-out, 1));
+    transition: none;
   }
 
   .cc-nav.is-done {
-    opacity: 0;
     pointer-events: none;
   }
 
@@ -970,6 +1208,54 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     opacity: 0.5;
   }
 
+  /* o texto que só o leitor de tela lê (global.css não tem utilitário pra
+     isso, e só esta página precisa) */
+  .cc-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* O contador que rola: uma coluna com "—" e os números, numa janela de uma
+     linha com as bordas esfumadas. --roll é o índice (fracionário) do número
+     na janela: -1 é o traço, 0 é o "01". Em itálico serifado, como um fólio
+     de livro — é o único número grande do cromo. */
+  .cc-roll {
+    --rh: 1.15em;
+    display: inline-block;
+    height: var(--rh);
+    overflow: hidden;
+    vertical-align: -0.2em;
+    color: var(--ink);
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 1.35rem;
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: var(--rh);
+    -webkit-mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+    mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+    transition: color var(--theme-fade);
+  }
+
+  .cc-roll-col {
+    display: grid;
+    transform: translate3d(0, calc((var(--roll, -1) + 1) * -1 * var(--rh)), 0);
+  }
+
+  .cc-roll-col > span {
+    height: var(--rh);
+  }
+
+  /* na versão simples não há linha do tempo pra seguir: o número troca por
+     transição */
+  :global(html[data-creations='static']) .cc-roll-col {
+    transition: transform 0.6s cubic-bezier(0.33, 0, 0.12, 1);
+  }
+
   .cc-nav ol {
     display: grid;
     gap: 0.55rem;
@@ -979,6 +1265,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
 
   .cc-nav a {
     --p: 0;
+    --f: 0;
     display: grid;
     grid-auto-flow: column;
     align-items: center;
@@ -998,22 +1285,37 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     transition: opacity 0.25s ease;
   }
 
+  /* no palco o número acende com a lente (--f) */
+  :global(html[data-creations='stage']) .cc-nav-num {
+    opacity: var(--f, 0);
+    transition: none;
+  }
+
   .cc-nav a:hover .cc-nav-num,
   .cc-nav a:focus-visible .cc-nav-num,
   .cc-nav a[aria-current] .cc-nav-num {
     opacity: 1;
   }
 
-  /* o traço: um trilho fino, e por cima o preenchimento (--p) que o script
-     escreve a cada quadro — o traço ativo é também a barra de progresso da
-     criação */
+  /* O traço: um trilho fino, e por cima o preenchimento (--p) — quanto
+     daquela criação já passou. O traço cresce com a LENTE (--f) que desliza
+     pelos traços com a rolagem; em repouso ele tem --tick-min do tamanho
+     cheio (os 1.4rem de sempre, de 2.6). Cresce por scaleX a partir da
+     direita, e não por largura: largura é layout a cada quadro. */
   .cc-nav-mark {
+    --tick-min: 0.54;
     position: relative;
-    width: 1.4rem;
+    width: 2.6rem;
     height: 2px;
     overflow: hidden;
     background: rgba(var(--ink-rgb), 0.2);
-    transition: width 0.3s ease, background-color var(--theme-fade);
+    transform: scaleX(calc(var(--tick-min) + (1 - var(--tick-min)) * var(--f, 0)));
+    transform-origin: right center;
+    transition: transform 0.3s ease, background-color var(--theme-fade);
+  }
+
+  :global(html[data-creations='stage']) .cc-nav-mark {
+    transition: background-color var(--theme-fade);
   }
 
   .cc-nav-mark::after {
@@ -1026,24 +1328,48 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     transition: background-color var(--theme-fade);
   }
 
-  .cc-nav a[aria-current] .cc-nav-mark {
-    width: 2.6rem;
+  /* ——— a folha de capítulo (os saltos longos, ver main.ts → goTo) ———
+     Papel por cima da página e por baixo do cromo (z 5 contra 6), com o
+     número da criação de destino. Só no palco. */
+  .cc-veil {
+    display: none;
   }
 
-  /* ——— o cromo fixo (o mesmo das outras páginas secundárias) ——— */
+  :global(html[data-creations='stage']) .cc-veil {
+    position: fixed;
+    top: var(--viewport-top);
+    left: var(--viewport-left);
+    width: var(--viewport-w);
+    height: var(--viewport-h);
+    z-index: 5;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    background: var(--paper);
+    color: var(--ink);
+    visibility: hidden;
+    pointer-events: none;
+    transition: background-color var(--theme-fade), color var(--theme-fade);
+  }
+
+  .cc-veil-num {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(6rem, 18vw, 14rem);
+    font-style: italic;
+    font-weight: 400;
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+  }
+
   /* ——— o cromo sobre foto ———
      "‹ Voltar", o botão de tema e o indicador lateral são tinta escura no
-     tema claro. Uma composição que cobre a tela de foto os apaga: a página
-     fica linda e sem navegação visível.
+     tema claro. Uma composição que cobre a tela de foto os apaga.
 
      O motor mede quanto da tela a foto encaixada está cobrindo e marca
      data-over-photo na raiz quando passa da metade (ver field.ts). Aqui o
      cromo só vira claro — o mesmo que ele já é no tema escuro, então é
-     redefinir --ink e --ink-rgb e todas as regras existentes seguem, sem
-     nenhuma precisar saber deste caso.
-
-     Vira sem piscar porque cada uma dessas regras já tem transition de cor
-     (era pra troca de tema); a mudança de variável entra por ela. */
+     redefinir --ink e --ink-rgb e todas as regras existentes seguem.
+     Vira sem piscar porque cada uma dessas regras já tem transition de cor. */
   :global(html[data-over-photo]) .back,
   :global(html[data-over-photo]) .theme,
   :global(html[data-over-photo]) .cc-nav {
@@ -1051,19 +1377,12 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     --ink-rgb: 255, 255, 255;
   }
 
-  /* Branco não basta, e foi preciso ver pra saber: a primeira foto full tem
-     céu claro justamente no alto, onde o "‹ Voltar" e o botão de tema ficam,
-     e o texto branco sumiu no branco. Escurecer o topo da foto inteira
-     resolveria e custaria a foto; então o que ganha fundo é o CONTROLE, não a
-     imagem — uma pastilha escura atrás de cada um, do tamanho dele.
-
-     A pastilha é opaca o bastante pra dar contraste de verdade sobre céu
-     branco (0.5 sobre branco dá cinza ~115, contra branco é ~4:1), e o
-     desfoque atrás dela a costura na foto em vez de recortá-la.
-
-     O padding e o recuo negativo do .back moram na regra normal, com fundo
+  /* Branco não basta: a primeira foto full tem céu claro justamente no alto,
+     onde o "‹ Voltar" e o botão de tema ficam. Então o que ganha fundo é o
+     CONTROLE, não a imagem — uma pastilha escura atrás de cada um. O padding
+     e o recuo negativo do .back moram na regra normal, com fundo
      transparente: assim a pastilha só ACENDE aqui, sem mexer no lugar do
-     texto — trocar padding junto empurraria o rótulo no meio da transição. */
+     texto. */
   :global(html[data-over-photo]) .back,
   :global(html[data-over-photo]) .theme {
     background: rgba(0, 0, 0, 0.5);
@@ -1189,36 +1508,22 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
 
     /* ——— as composições no celular ———
        Uma coluna só não tem "outro lado", mas as composições não eram sobre
-       lado: eram sobre QUANTO da tela a foto toma e de onde ela sai. Isso o
-       empilhado tem, e a régua aqui é vertical — foto e texto dividem a
-       altura, então cada composição é uma fatia diferente dela.
+       lado: eram sobre QUANTO da tela a foto toma e de onde ela sai. A régua
+       aqui é vertical — foto e texto dividem a altura.
 
        --phone-frame é a fatia normal, e cada composição é um fator dela. Um
        knob só: o celular baixo (iPhone SE, mais abaixo) muda a base e todas
-       as composições encolhem junto, na proporção. O teto de cada uma foi
-       escolhido pelo pior caso — foto + rótulo + título de 2 linhas +
-       descrição de 3 frases + link cabendo SEM rolar, porque a tela está
-       presa. */
+       as composições encolhem junto. */
     .cc-media {
       --phone-frame: 36dvh;
       --frame-h: var(--phone-frame);
       justify-self: start;
     }
 
-    /* flip: encosta na direita. A moldura ocupa pouco mais da metade da
-       largura, então a travessia é de uns 150px — bem visível.
-
-       Ela para antes da borda porque o indicador lateral é fixo, vive no meio
-       da altura e é mais largo que o padding direito do slide: o contador
-       "02 / 08" avança uns 13px sobre a área de conteúdo. Nunca importou
-       (nada encostava ali, e o texto que chega perto passa em outra altura),
-       mas a moldura da direita cruza justamente o meio, e sem esta folga o
-       nav (z 6) atravessa a foto. */
     /* Todas escopadas ao palco, como as do desktop. Sem isto elas vazam pra
-       versão simples (data-creations="static"), que é uma pilha comum sem
-       canva nem tela presa — e ali o -8vw do edge não teria quem o cortasse
-       (o overflow: hidden do slide também é do palco), virando rolagem
-       horizontal numa página que não deveria ter nenhuma. */
+       versão simples, que é uma pilha comum sem canva nem tela presa — e ali
+       o -8vw do edge não teria quem o cortasse. As que encostam à direita
+       param antes: o indicador lateral é fixo no meio da altura. */
     :global(html[data-creations='stage']) [data-layout='flip'] .cc-media {
       --frame-h: calc(var(--phone-frame) * 0.94);
       justify-self: end;
@@ -1244,8 +1549,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     }
 
     /* edge: sangra pra fora da esquerda. No celular a saída é menor (8vw
-       contra 16 do desktop) porque a largura toda é menor: o mesmo 16vw aqui
-       levaria junto o assunto da foto, não só a borda dela */
+       contra 16 do desktop) porque a largura toda é menor */
     :global(html[data-creations='stage']) [data-layout='edge'] .cc-media {
       --frame-h: calc(var(--phone-frame) * 1.15);
       --frame-cap: 92vw;
@@ -1278,14 +1582,21 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     }
 
     /* sem margem onde acender no celular: o canva vira textura, com metade
-       das fotos e sem passar do teto — o número vem do config (FIELD.MOBILE),
-       escrito inline pelo build, pra não morar em dois lugares */
-    .cc-field {
-      --lit-cap: var(--lit-cap-mobile);
-    }
-
+       das fotos e um teto de luz — o teto é aplicado no JS (FIELD.MOBILE) */
     .cc-card.is-wide-only {
       display: none;
+    }
+
+    /* o fólio no alto, atrás da moldura: embaixo é onde o texto mora aqui */
+    .cc-folio,
+    .cc-folio[data-layout='flip'],
+    .cc-folio[data-layout='tower'],
+    .cc-folio[data-layout='quiet'] {
+      top: 10vh;
+      bottom: auto;
+      left: auto;
+      right: 4vw;
+      font-size: 44vw;
     }
 
     .cc-nav {
@@ -1302,11 +1613,12 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     }
 
     .cc-nav-mark {
-      width: 1rem;
+      --tick-min: 0.556;
+      width: 1.8rem;
     }
 
-    .cc-nav a[aria-current] .cc-nav-mark {
-      width: 1.8rem;
+    .cc-roll {
+      font-size: 1.1rem;
     }
 
     .back {
@@ -1366,6 +1678,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
   :global(html[data-motion='reduced']) .cc-nav,
   :global(html[data-motion='reduced']) .cc-nav-mark,
   :global(html[data-motion='reduced']) .cc-nav-num,
+  :global(html[data-motion='reduced']) .cc-roll-col,
   :global(html[data-motion='reduced']) .theme svg,
   :global(html[data-motion='reduced']) .back,
   :global(html[data-motion='reduced']) .back::after,
@@ -1379,6 +1692,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length).map((card)
     .cc-nav,
     .cc-nav-mark,
     .cc-nav-num,
+    .cc-roll-col,
     .theme svg,
     .back,
     .back::after,

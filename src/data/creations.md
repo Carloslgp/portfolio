@@ -66,14 +66,20 @@ canva e segue subindo. O efeito é **como** ela se encaixa:
 
 | `effect`   | como a miniatura chega à moldura                                    |
 |------------|----------------------------------------------------------------------|
-| `'grow'`   | sobe do canva crescendo até o tamanho da moldura                     |
-| `'slide'`  | vem de um lado da tela (`from`)                                      |
-| `'tilt'`   | sobe deitada pra trás e se levanta                                   |
-| `'pieces'` | se encaixa em tiras verticais, do centro pras bordas                 |
-| `'iris'`   | a miniatura é um recorte da foto, que se abre até a foto inteira     |
-| `'flip'`   | sobe girando ao redor do eixo vertical                               |
+| `'grow'`   | sobe do canva num arco, crescendo até o tamanho da moldura           |
+| `'slide'`  | vem de um lado da tela (`from`), numa curva larga por baixo do texto |
+| `'tilt'`   | sobe deitada pra trás e se levanta a partir da base                  |
+| `'pieces'` | uma foto só, fatiada em ripas que ondulam do centro pras bordas      |
+| `'iris'`   | a miniatura é uma lente redonda que se abre até a foto inteira       |
+| `'flip'`   | gira como uma porta, com a dobradiça na borda do lado do texto       |
 
-A saída é sempre o espelho da entrada.
+A saída é o espelho da entrada — só que o texto sai primeiro e a foto espera
+ele sair antes de se soltar da moldura.
+
+Em toda criação a foto nunca fica parada: durante a leitura a composição
+inteira deriva devagar e a foto anda dentro da própria moldura, como uma
+janela. E atrás de tudo, o número da criação em itálico gigante atravessa a
+tela bem clarinho (o "fólio").
 
 **Uma regra:** duas criações vizinhas não podem usar o mesmo efeito. Se
 acontecer (ao reordenar, por exemplo), o `astro build` / `astro dev` para com
@@ -124,11 +130,27 @@ semente do sorteio ficam em `config.ts` → `FIELD`.
 Não ficam no arquivo de conteúdo. Tudo está em
 **`src/scripts/creations/config.ts`**, comentado:
 
-- `SCROLL.SCREENS_PER_CREATION` — quanto se rola por criação (o botão de
-  velocidade geral);
+O topo do `config.ts` tem os quatro botões de "sensação", um por queixa:
+
+- **"ainda está rápido"** → `SMOOTH.WHEEL` (quanto cada dente da roda anda;
+  0.9 → 0.8 deixa tudo mais lento sem esticar a página);
+- **"está mole, flutuando"** → `SCROLL.SCRUB` (a inércia da animação atrás
+  da rolagem; 0.4 → 0.25);
+- **"o fundo está agitado"** → `FIELD.RATE` e `FIELD.TEMPO`;
+- **"a pausa está inquieta"** → `HOLD.CRUISE` e `FIELD.INNER.BLEED`.
+
+E os outros números:
+
+- `SCROLL.SCREENS_PER_CREATION` — quanto se rola por criação (hoje ~29 dentes
+  de roda em qualquer monitor);
 - `SCROLL.PHASES` — quanto da criação é entrada, pausa de leitura e saída;
-- `SCROLL.SCRUB` — `true` (colado no scroll) ou um número de segundos de
-  inércia, ex.: `0.3`;
+- `SMOOTH.LERP` — o quanto a rolagem desliza depois de cada dente (só no
+  computador; no celular a rolagem é a do próprio aparelho);
+- `DOCK.*` — o encaixe da foto: as curvas, o arco do caminho, a espera da
+  saída (`RELEASE`);
+- `TYPE.*` — quando e como cada linha do texto se escreve e sai;
+- `JUMP.*` — o clique no indicador: perto a página desliza até lá, longe uma
+  folha com o número da criação cobre a troca;
 - `LAYOUT.MIN_STAGE_HEIGHT` — abaixo desta altura de tela a página mostra a
   versão simples (empilhada);
 - `FIELD.*` — o canva de fotos do fundo: `RATE` (velocidade em relação à

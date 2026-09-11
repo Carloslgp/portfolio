@@ -154,6 +154,19 @@ export const CODE_PROJECTS: CodeProject[] = [
     repo: 'https://github.com/Carloslgp/Elder-Watch',
   },
   {
+    id: 'ghosty',
+    title: 'Ghosty',
+    mark: 'GH',
+    stack: ['Kotlin', 'Jetpack Compose', 'Android'],
+    description:
+      'A personal-safety app that looks and works like a real calculator, icon ' +
+      'included. A hidden code opens a vault or fires a silent alert with ' +
+      'location and recording; a second, duress code opens a convincing decoy ' +
+      'vault for anyone forcing you to unlock it. A red panic button already ' +
+      'gives away the intent it’s supposed to hide — the disguise is the point.',
+    repo: 'https://github.com/Carloslgp/Ghosty-App',
+  },
+  {
     id: 'lynx-engine',
     title: 'Lynx Engine',
     mark: 'LX',

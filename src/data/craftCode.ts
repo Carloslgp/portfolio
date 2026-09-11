@@ -92,7 +92,7 @@ export const CODE_ROOM = {
 export const CODE_PROJECTS: CodeProject[] = [
   {
     id: 'leitura-facil',
-    title: 'Leitura Fácil',
+    title: 'Easy Read',
     mark: 'LF',
     stack: ['React', 'TypeScript', 'Express', 'Claude API'],
     description:

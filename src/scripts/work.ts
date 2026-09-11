@@ -1,5 +1,6 @@
 import { storedMotionMode } from './motion';
 import { WORK_HOME_KEY, WORK_RETURN_KEY } from './workNavigation';
+import { claimRingEntry } from './ringEntry';
 import { viewportSize } from './viewport';
 
 /** Teto da espera pela thread livre, em ms (ver calmFrame). Escolhido pelo que
@@ -23,6 +24,10 @@ export function initWork() {
   const back = document.querySelector<HTMLAnchorElement>('[data-work-back]');
   const hint = document.querySelector<HTMLElement>('[data-work-hint]');
   let leaving = false;
+
+  // A home que abriu ESTA entrada do histórico (ver ringEntry.ts): decide se o
+  // Back volta pela história ou pelo href.
+  const home = claimRingEntry(WORK_HOME_KEY);
 
   const mode = storedMotionMode();
   if (mode) document.documentElement.dataset.motion = mode;
@@ -141,14 +146,15 @@ export function initWork() {
     event.preventDefault();
     leaving = true;
 
-    await closeIntoPainting();
-
-    let home: string | null = null;
-    try {
-      home = sessionStorage.getItem(WORK_HOME_KEY);
-      sessionStorage.setItem(WORK_RETURN_KEY, '1');
-      sessionStorage.removeItem(WORK_HOME_KEY);
-    } catch {}
+    // A volta costurada só existe pra quem já passou pelo portão da home nesta
+    // sessão — mesmo motivo do /craft (ver craft.ts): sem escolha guardada a
+    // home pergunta, e a pintura armada por cima da cortina taparia a pergunta.
+    if (mode) {
+      await closeIntoPainting();
+      try {
+        sessionStorage.setItem(WORK_RETURN_KEY, '1');
+      } catch {}
+    }
 
     // Quando a origem é o anel, voltar no histórico permite ao navegador
     // restaurar a cena Three.js viva pelo BFCache. Link direto continua tendo

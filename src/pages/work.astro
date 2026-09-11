@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import { ENTRIES, groups, range, type Entry } from '../data/work';
 import { WORK_SEAM } from '../scripts/workNavigation';
+import SocialLinks from '../components/SocialLinks.astro';
 
 /** A cor do selo é presa ao id, e não à posição na lista.
  *
@@ -154,6 +155,13 @@ function hasDetails(entry: Entry) {
       <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
     </svg>
   </button>
+
+  <!-- GitHub e LinkedIn, colados à esquerda do .theme: o canto de cima à
+       direita é o dos controles da página, e eles ficam fixos pelo mesmo
+       motivo do tema — quem procura os perfis não precisa voltar ao topo. -->
+  <nav class="social-corner" aria-label="Social profiles">
+    <SocialLinks />
+  </nav>
 
   <main class="work-page">
     <div class="work-inner">
@@ -799,6 +807,16 @@ function hasDetails(entry: Entry) {
   :global(html[data-theme='dark']) .theme .icon-sun {
     opacity: 1;
     transform: none;
+  }
+
+  /* O vão até o tema é maior que o vão dentro do par, pra que o tema não se
+     leia como um terceiro link. */
+  .social-corner {
+    position: fixed;
+    top: calc(1.3rem + env(safe-area-inset-top));
+    right: calc(1.5rem + 44px + 0.9rem);
+    z-index: 6;
+    display: flex;
   }
 
   .work-page {
@@ -1618,6 +1636,12 @@ function hasDetails(entry: Entry) {
       right: 1rem;
       width: 40px;
       height: 40px;
+    }
+
+    .social-corner {
+      --social-size: 40px;
+      --social-icon: 17px;
+      right: calc(1rem + 40px + 0.7rem);
     }
 
     .work-page {

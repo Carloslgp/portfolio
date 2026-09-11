@@ -16,6 +16,7 @@ import Portrait from '../components/about/Portrait.astro';
 import PortraitCollage from '../components/about/PortraitCollage.astro';
 import Reel from '../components/about/Reel.astro';
 import Songs from '../components/about/Songs.astro';
+import SocialLinks from '../components/SocialLinks.astro';
 
 const first = SECTIONS[0];
 
@@ -169,6 +170,10 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     <!-- o aria-label fixa o nome acessível: o hover (e o Tab) trocam o texto por
          ruído por meio segundo, e sem ele um leitor de tela leria o ruído -->
     <a href="#about" class="name" data-scramble aria-label="Carlos Leonardo">Carlos Leonardo</a> is a developer from Brazil.
+    <!-- as marcas do GitHub e do LinkedIn, só no celular: lá o topo é todo
+         desta linha, e o pé da tela já está cheio (card, tema e modo). No
+         desktop elas moram na quina de baixo, na .social-dock. -->
+    <span class="intro-social"><SocialLinks variant="bare" /></span>
   </p>
 
   <!-- Os dois cantos do topo. Ficam fora do .overlay pelo mesmo motivo do
@@ -209,6 +214,13 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
         <path d="M3 21v-5h5" />
       </svg>
     </button>
+
+    <!-- GitHub e LinkedIn na quina de baixo à esquerda, espelhando o .theme da
+         direita e com o mesmo vidro do .mode. Dentro do .overlay de propósito:
+         somem junto com o resto da UI do carrossel no About e no mergulho. -->
+    <nav class="social-dock" aria-label="Social profiles">
+      <SocialLinks />
+    </nav>
   </div>
 
   <!-- cursor sutil que segue o mouse com atraso -->
@@ -426,6 +438,9 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
             <a class="btn btn-solid" href="mailto:carloslgp3585@gmail.com">Send a message</a>
             <button type="button" class="btn btn-glass" disabled>Download resume</button>
           </div>
+          <nav class="cta-social" aria-label="Social profiles">
+            <SocialLinks />
+          </nav>
         </div>
       </div>
     </div>
@@ -1413,6 +1428,31 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     transition: transform 0.5s ease;
   }
 
+  /* ——— GitHub e LinkedIn ———
+     Na quina de baixo à esquerda, na mesma linha e no mesmo vidro do .mode e
+     do .theme: a quina da direita já é do tema, e esta estava vazia. As
+     medidas descem pro componente como variáveis (ver SocialLinks.astro).
+     display: flex, e não o block do <nav>: num block o par vira conteúdo de
+     linha e ganha o respiro de descendente embaixo, e os círculos subiriam
+     alguns pixels acima da linha do .mode. */
+  .social-dock {
+    --social-size: 58px;
+    --social-icon: 21px;
+    --social-gap: 0.6rem;
+    --social-ink: #fff;
+    --social-bg: rgba(90, 90, 90, 0.28);
+    --social-line: transparent;
+    position: absolute;
+    bottom: 2.2rem;
+    left: 2rem;
+    display: flex;
+  }
+
+  /* a versão da linha do topo só existe no celular (ver a media query) */
+  .intro-social {
+    display: none;
+  }
+
   /* ——— toggle de tema claro/escuro (ver scripts/theme.ts) ———
      A mesma pílula de vidro do .mode, no canto de baixo à direita. position:
      fixed (e não absolute no .overlay): ele sobrevive ao display: none que o
@@ -1488,6 +1528,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   body.is-diving .hud.is-in,
   body.is-diving .card,
   body.is-diving .mode,
+  body.is-diving .social-dock,
   body.is-diving .cursor {
     opacity: 0;
     transition: opacity 0.45s ease;
@@ -1776,6 +1817,12 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     flex-wrap: wrap;
     gap: 0.9rem;
   }
+  /* os perfis embaixo dos botões: o convite primeiro, os endereços depois */
+  .cta-social {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.4rem;
+  }
   .btn {
     padding: 0.75rem 1.5rem;
     font-family: inherit;
@@ -1855,6 +1902,18 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
       height: 48px;
     }
 
+    /* A faixa de baixo não tem lugar pra mais dois botões: card à esquerda,
+       tema e modo à direita. As marcas sobem pra linha do topo, logo depois
+       da frase — é o lugar que o celular deixa livre, e ali o difference do
+       .intro já cuida da leitura sobre qualquer fundo. */
+    .social-dock {
+      display: none;
+    }
+    .intro-social {
+      display: inline;
+      margin-left: 0.4em;
+    }
+
     /* encosta à esquerda do .mode, na mesma faixa de baixo: o canto direito já
        é dele, e subir o tema pra cima do .mode invadiria a faixa da .quote */
     .theme {
@@ -1887,7 +1946,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   @media (max-height: 480px) {
     .bg-portfolio { padding-top: 1.2rem; }
     .intro { top: calc(0.8rem + max(env(safe-area-inset-top), var(--viewport-top))); }
-    .card, .mode { bottom: calc(1rem + env(safe-area-inset-bottom)); }
+    .card, .mode, .social-dock { bottom: calc(1rem + env(safe-area-inset-bottom)); }
     .theme { bottom: calc(1rem + max(env(safe-area-inset-bottom), var(--viewport-bottom))); }
   }
   /* ...e o mesmo para os cantos, só na faixa larga: abaixo de 700px eles já

@@ -17,6 +17,7 @@
 // mesma conta serve pro celular, pro monitor largo e pra janela que mudou de
 // tamanho enquanto a página estava aberta.
 import { storedMotionMode } from './motion';
+import { claimRingEntry } from './ringEntry';
 import {
   NOW_HOME_KEY, NOW_RETURN_KEY, clockWarp, msToNextMinute, nowDate, nowTime,
 } from './nowNavigation';
@@ -77,6 +78,10 @@ export function initNow() {
   const back = document.querySelector<HTMLAnchorElement>('[data-now-back]');
   const root = document.documentElement;
   let leaving = false;
+
+  // A home que abriu ESTA entrada do histórico (ver ringEntry.ts): decide se o
+  // Back volta pela história ou pelo href.
+  const home = claimRingEntry(NOW_HOME_KEY);
 
   const mode = storedMotionMode();
   if (mode) root.dataset.motion = mode;
@@ -266,14 +271,15 @@ export function initNow() {
     event.preventDefault();
     leaving = true;
 
-    await closeIntoSky();
-
-    let home: string | null = null;
-    try {
-      home = sessionStorage.getItem(NOW_HOME_KEY);
-      sessionStorage.setItem(NOW_RETURN_KEY, '1');
-      sessionStorage.removeItem(NOW_HOME_KEY);
-    } catch {}
+    // A volta costurada só existe pra quem já passou pelo portão da home nesta
+    // sessão — mesmo motivo do /craft (ver craft.ts): sem escolha guardada a
+    // home pergunta, e a pintura armada por cima da cortina taparia a pergunta.
+    if (mode) {
+      await closeIntoSky();
+      try {
+        sessionStorage.setItem(NOW_RETURN_KEY, '1');
+      } catch {}
+    }
 
     // Quando a origem é o anel, voltar no HISTÓRICO é o que permite ao
     // navegador restaurar a cena Three.js viva pelo BFCache — e aí a home

@@ -1,5 +1,6 @@
 import { storedMotionMode } from './motion';
 import { CRAFT_HOME_KEY, CRAFT_RETURN_KEY } from './craftNavigation';
+import { claimRingEntry } from './ringEntry';
 
 /** Quanto a página espera por um quadro ocioso antes de abrir a cortina. */
 const TIDE_CALM_CAP = 800;
@@ -43,11 +44,10 @@ export function initCraft() {
     : [];
   const back = document.querySelector<HTMLAnchorElement>('[data-craft-back]');
   let leaving = false;
-  let rememberedHome: string | null = null;
 
-  try {
-    rememberedHome = sessionStorage.getItem(CRAFT_HOME_KEY);
-  } catch {}
+  // A home que abriu ESTA entrada do histórico (ver ringEntry.ts). É ela que
+  // diz se o Back pode voltar pela história ou precisa ir pelo href.
+  const home = claimRingEntry(CRAFT_HOME_KEY);
 
   // A escolha feita no portão da home manda. Em acesso direto, onde ela ainda
   // não existe, respeitamos a preferência do sistema.
@@ -142,18 +142,21 @@ export function initCraft() {
     if (leaving) return;
     leaving = true;
 
-    await closeIntoWater();
-
-    let home = rememberedHome;
-    try {
-      home ??= sessionStorage.getItem(CRAFT_HOME_KEY);
-      rememberedHome = home;
-      sessionStorage.setItem(CRAFT_RETURN_KEY, '1');
-      sessionStorage.removeItem(CRAFT_HOME_KEY);
-    } catch {}
+    // A volta costurada — a água fechando aqui e a home recebendo esse mesmo
+    // quadro — só existe pra quem já passou pelo portão da home nesta sessão.
+    // Sem escolha guardada a home ABRE de verdade, com a pergunta, e a pintura
+    // que ela armaria por cima da cortina taparia justamente os botões dela: a
+    // volta ficava presa na água. Então, sem escolha, nem cortina nem recado.
+    if (mode) {
+      await closeIntoWater();
+      try {
+        sessionStorage.setItem(CRAFT_RETURN_KEY, '1');
+      } catch {}
+    }
 
     // Preservar o histórico permite ao BFCache devolver a cena Three.js viva.
-    // Acesso direto continua com um destino explícito e seguro.
+    // Sem o anel logo atrás — link direto, ou um /craft reaberto pelo Back de
+    // uma sala —, o destino é explícito.
     if (home && history.length > 1) history.back();
     else location.href = home ?? '/';
   });

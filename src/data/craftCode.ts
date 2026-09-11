@@ -194,6 +194,7 @@ export const CODE_PROJECTS: CodeProject[] = [
       'account, no server — the files never leave your device. It started when ' +
       'my own phone handed me photos I couldn’t open anywhere.',
     repo: 'https://github.com/Carloslgp/Meta-No-Data',
+    live: { label: 'Live', href: 'https://carloslgp.github.io/Meta-No-Data/' },
   },
   {
     id: 'elder-watch',

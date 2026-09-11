@@ -1429,21 +1429,23 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   }
 
   /* ——— GitHub e LinkedIn ———
-     Na quina de baixo à esquerda, na mesma linha e no mesmo vidro do .mode e
-     do .theme: a quina da direita já é do tema, e esta estava vazia. As
-     medidas descem pro componente como variáveis (ver SocialLinks.astro).
+     Na quina de baixo à esquerda, no mesmo vidro do .mode e do .theme: a
+     quina da direita já é do tema, e esta estava vazia. Menores que os dois:
+     são um atalho pra fora do site, não controle do anel, e no tamanho do
+     .mode chamavam mais atenção que o próprio card. Por serem menores ficam
+     CENTRADOS na linha dos controles de 58px, e não apoiados no pé dela.
+     As medidas descem pro componente como variáveis (ver SocialLinks.astro).
      display: flex, e não o block do <nav>: num block o par vira conteúdo de
-     linha e ganha o respiro de descendente embaixo, e os círculos subiriam
-     alguns pixels acima da linha do .mode. */
+     linha, ganha o respiro de descendente embaixo e sai do centro. */
   .social-dock {
-    --social-size: 58px;
-    --social-icon: 21px;
-    --social-gap: 0.6rem;
+    --social-size: 40px;
+    --social-icon: 17px;
+    --social-gap: 0.5rem;
     --social-ink: #fff;
     --social-bg: rgba(90, 90, 90, 0.28);
     --social-line: transparent;
     position: absolute;
-    bottom: 2.2rem;
+    bottom: calc(var(--dock-floor, 2.2rem) + (58px - var(--social-size)) / 2);
     left: 2rem;
     display: flex;
   }
@@ -1946,7 +1948,8 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   @media (max-height: 480px) {
     .bg-portfolio { padding-top: 1.2rem; }
     .intro { top: calc(0.8rem + max(env(safe-area-inset-top), var(--viewport-top))); }
-    .card, .mode, .social-dock { bottom: calc(1rem + env(safe-area-inset-bottom)); }
+    .card, .mode { bottom: calc(1rem + env(safe-area-inset-bottom)); }
+    .social-dock { --dock-floor: calc(1rem + env(safe-area-inset-bottom)); }
     .theme { bottom: calc(1rem + max(env(safe-area-inset-bottom), var(--viewport-bottom))); }
   }
   /* ...e o mesmo para os cantos, só na faixa larga: abaixo de 700px eles já

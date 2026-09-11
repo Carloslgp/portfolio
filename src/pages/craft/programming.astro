@@ -10,6 +10,7 @@
 // e mostra o monograma enquanto a foto não chega. Pôr a foto é um campo no
 // arquivo de dados — nada aqui muda, e nada na página muda de lugar.
 import CraftRoom from '../../components/CraftRoom.astro';
+import BrandMark from '../../components/BrandMark.astro';
 import { CODE_PROJECTS, CODE_ROOM, markHue } from '../../data/craftCode';
 
 /** "01", "02"… A numeração sai da POSIÇÃO na lista e não de um campo: um
@@ -67,6 +68,7 @@ const numero = (index: number) => String(index + 1).padStart(2, '0');
 
           <p class="code-links">
             <a href={project.repo} target="_blank" rel="noopener noreferrer">
+              <BrandMark name="github" />
               {CODE_ROOM.repoLabel}
               <span aria-hidden="true">{CODE_ROOM.linkMark}</span>
               <span class="sr-only">, opens in a new tab</span>
@@ -218,6 +220,10 @@ const numero = (index: number) => String(index + 1).padStart(2, '0');
   }
 
   .code-links a {
+    /* A marca do GitHub antes do rótulo diz pra onde o link leva antes de
+       alguém precisar ler. Só o do repositório a recebe: o "Live" leva pro
+       projeto no ar, que não tem marca nenhuma pra mostrar. */
+    --mark-size: 1.15em;
     display: inline-flex;
     gap: 0.42rem;
     align-items: center;

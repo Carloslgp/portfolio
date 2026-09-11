@@ -1,11 +1,38 @@
 ---
-// /craft is deliberately spare for now: the page has a point of view, but it
-// does not pretend that projects have been published before their content
-// exists. Its transition carries most of the expression.
+// /craft é um VESTÍBULO: a cortina de marés abre e o que ela revela são duas
+// portas, uma pra cada metade do que eu faço fora do trabalho. As salas em si
+// são /craft/programming e /craft/creativity, e a casca das duas é o
+// components/CraftRoom.astro.
+//
+// Esta página continua fina de propósito — a expressão dela é a transição, e
+// duas linhas é o que cabe entre a chegada e a escolha sem virar uma terceira
+// lista de projetos por cima das duas que já existem do outro lado.
 import Layout from '../layouts/Layout.astro';
 import { CRAFT_SEAM, CRAFT_TIDES } from '../scripts/craftNavigation';
 
 const tideHeight = 100 / CRAFT_TIDES.length;
+
+/** As duas portas.
+ *
+ *  Ficam aqui, e não em src/data/, porque isto não é conteúdo: é a navegação
+ *  da própria página, e ela tem exatamente o tamanho da lista de salas que
+ *  existem. Uma sala nova é um arquivo em src/pages/craft/ e uma linha aqui —
+ *  e as duas coisas nascem no mesmo commit, que é o motivo de não valer a pena
+ *  separá-las em dois arquivos.
+ *
+ *  A ordem da lista é a ordem na tela, e a numeração sai dela. */
+const DOORS = [
+  {
+    name: 'Programming',
+    note: 'Tools, engines and experiments, built in code.',
+    href: '/craft/programming',
+  },
+  {
+    name: 'Creativity',
+    note: 'Everything made away from a keyboard.',
+    href: '/craft/creativity',
+  },
+];
 ---
 
 <Layout lang="en">
@@ -109,16 +136,24 @@ const tideHeight = 100 / CRAFT_TIDES.length;
         </p>
       </header>
 
-      <section class="craft-status is-arriving" style="--i:1" aria-labelledby="craft-status-title">
-        <p class="status-k">Collection</p>
-        <div class="status-copy">
-          <h2 id="craft-status-title">Taking shape.</h2>
-          <p>This space is being assembled with care. Pieces will surface here when they are ready.</p>
-        </div>
-      </section>
+      {/* As duas portas entram no mesmo passo da coreografia em que estava o
+          aviso que elas substituíram (--i:1), porque ocupam o mesmo lugar na
+          grade: entre o título e o rodapé. */}
+      <nav class="craft-doors is-arriving" style="--i:1" aria-label="The two halves of Craft">
+        {DOORS.map((door, index) => (
+          <a class="craft-door" href={door.href}>
+            <span class="door-n" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+            <span class="door-copy">
+              <strong>{door.name}</strong>
+              <small>{door.note}</small>
+            </span>
+            <span class="door-arrow" aria-hidden="true">→</span>
+          </a>
+        ))}
+      </nav>
 
       <footer class="craft-foot is-arriving" style="--i:2">
-        <p>Until then, there is more to explore.</p>
+        <p>And there is more of the site beyond these two.</p>
         <nav aria-label="Explore the portfolio">
           <a href="/work">Work</a>
           <a href="/photos">Photos</a>
@@ -398,34 +433,57 @@ const tideHeight = 100 / CRAFT_TIDES.length;
     transition: color var(--theme-fade);
   }
 
-  .craft-status {
-    display: grid;
-    grid-template-columns: minmax(8rem, 0.34fr) minmax(0, 1fr);
-    gap: 1.5rem;
+  /* --- as duas portas ---------------------------------------------------- */
+  .craft-doors {
     margin-top: clamp(3rem, 8vh, 6rem);
-    padding: 1.45rem 0;
     border-top: 1px solid rgba(var(--ink-rgb), 0.13);
-    border-bottom: 1px solid rgba(var(--ink-rgb), 0.13);
     transition: border-color var(--theme-fade);
   }
 
-  .status-k {
-    padding-top: 0.24rem;
-    color: rgba(var(--ink-rgb), 0.42);
+  .craft-door {
+    display: grid;
+    grid-template-columns: minmax(3rem, 0.16fr) minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 1.5rem;
+    /* O respiro lateral negativo é o que dá ao realce do hover uma margem
+       maior que a da coluna de texto: sem ele o fundo encosta na letra. */
+    padding: 1.35rem 0.9rem;
+    margin: 0 -0.9rem;
+    border-bottom: 1px solid rgba(var(--ink-rgb), 0.13);
+    color: var(--ink);
+    text-decoration: none;
+    transition:
+      background-color 0.28s ease,
+      color var(--theme-fade),
+      border-color var(--theme-fade);
+  }
+
+  .craft-door:hover,
+  .craft-door:focus-visible {
+    background: rgba(var(--ink-rgb), 0.04);
+  }
+
+  .craft-door:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
+    border-radius: 3px;
+  }
+
+  .door-n {
+    color: rgba(var(--ink-rgb), 0.34);
     font-size: 0.66rem;
     font-weight: 650;
     letter-spacing: 0.17em;
-    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
     transition: color var(--theme-fade);
   }
 
-  .status-copy {
+  .door-copy {
     display: grid;
-    grid-template-columns: minmax(9rem, 0.62fr) minmax(16rem, 1fr);
-    gap: 1.5rem;
+    gap: 0.32rem;
   }
 
-  .status-copy h2 {
+  .door-copy strong {
     font-family: "Playfair Display", Georgia, serif;
     font-size: clamp(1.35rem, 2.5vw, 1.9rem);
     font-weight: 600;
@@ -433,12 +491,24 @@ const tideHeight = 100 / CRAFT_TIDES.length;
     letter-spacing: -0.035em;
   }
 
-  .status-copy p {
+  .door-copy small {
     max-width: 30rem;
     color: rgba(var(--ink-rgb), 0.62);
     font-size: 0.88rem;
     line-height: 1.62;
     transition: color var(--theme-fade);
+  }
+
+  .door-arrow {
+    color: rgba(var(--ink-rgb), 0.42);
+    font-size: 0.95rem;
+    transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1), color var(--theme-fade);
+  }
+
+  .craft-door:hover .door-arrow,
+  .craft-door:focus-visible .door-arrow {
+    color: var(--ink);
+    transform: translateX(0.3rem);
   }
 
   .craft-foot {
@@ -592,21 +662,18 @@ const tideHeight = 100 / CRAFT_TIDES.length;
       font-size: clamp(3.7rem, 18vw, 6.5rem);
     }
 
-    .craft-status,
-    .status-copy {
-      grid-template-columns: minmax(0, 1fr);
+    /* O número sai da linha e vira o rótulo de cima: numa tela estreita, uma
+       coluna de 3rem só pra ele rouba a largura que o nome da porta precisa. */
+    .craft-door {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.3rem 1rem;
     }
 
-    .craft-status,
-    .status-copy {
-      gap: 0.65rem;
+    .door-n {
+      grid-column: 1 / -1;
     }
 
-    .status-k {
-      padding-top: 0;
-    }
-
-    .status-copy p {
+    .door-copy small {
       max-width: 28rem;
     }
 
@@ -640,7 +707,7 @@ const tideHeight = 100 / CRAFT_TIDES.length;
       font-size: clamp(3.6rem, 12vh, 6rem);
     }
 
-    .craft-status {
+    .craft-doors {
       margin-top: 2rem;
     }
   }
@@ -672,11 +739,20 @@ const tideHeight = 100 / CRAFT_TIDES.length;
   :global(html[data-motion='reduced']) .craft-stitch,
   :global(html[data-motion='reduced']) .is-arriving,
   :global(html[data-motion='reduced']) .craft-page,
+  :global(html[data-motion='reduced']) .craft-door,
+  :global(html[data-motion='reduced']) .door-arrow,
   :global(html[data-motion='reduced']) .back,
   :global(html[data-motion='reduced']) .back::after,
   :global(html[data-motion='reduced']) .theme,
   :global(html[data-motion='reduced']) .theme svg {
     transition: none;
+  }
+
+  /* Movimento baixo tira o DESLIZE da seta, não o realce: o deslocamento é o
+     enfeite, e a cor é o que diz "esta linha está sob o cursor". */
+  :global(html[data-motion='reduced']) .craft-door:hover .door-arrow,
+  :global(html[data-motion='reduced']) .craft-door:focus-visible .door-arrow {
+    transform: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -685,11 +761,18 @@ const tideHeight = 100 / CRAFT_TIDES.length;
     .craft-stitch,
     .is-arriving,
     .craft-page,
+    .craft-door,
+    .door-arrow,
     .back,
     .back::after,
     .theme,
     .theme svg {
       transition: none;
+    }
+
+    .craft-door:hover .door-arrow,
+    .craft-door:focus-visible .door-arrow {
+      transform: none;
     }
   }
 </style>

@@ -1,0 +1,95 @@
+---
+// /craft/creativity — a sala do que não é código.
+//
+// Ela nasce vazia de propósito. A porta existe no vestíbulo desde o primeiro
+// dia porque as duas metades do Craft são as duas metades, e uma porta que
+// aparece depois lê-se como conteúdo que estava escondido. O que ela não faz
+// é fingir que o conteúdo já existe: o aviso abaixo é o mesmo que o /craft
+// inteiro carregava antes de virar vestíbulo.
+//
+// Encher esta sala é o mesmo trabalho da de programação: um arquivo em
+// src/data/ com a lista, e este miolo percorrendo a lista. A casca
+// (CraftRoom.astro) já está pronta e é a mesma.
+import CraftRoom from '../../components/CraftRoom.astro';
+---
+
+<CraftRoom
+  docTitle="Creativity · Craft · Carlos Leonardo"
+  description="Things made outside of code — still being gathered."
+  eyebrow="Craft · Creativity"
+  title={{ line1: 'Made with', line2: 'hands.' }}
+  lead="The half of Craft that isn’t code: things made for the pleasure of making them, and for no other reason."
+  footNote="The other half of Craft is next door."
+  footLinks={[
+    { label: 'Programming', href: '/craft/programming' },
+    { label: 'Craft', href: '/craft' },
+    { label: 'Photos', href: '/photos' },
+  ]}
+>
+  <section class="room-status" data-craft-row aria-labelledby="creativity-status">
+    <p class="status-k">Collection</p>
+    <div class="status-copy">
+      <h2 id="creativity-status">Taking shape.</h2>
+      <p>This room is being assembled with care. Pieces will surface here when they are ready.</p>
+    </div>
+  </section>
+</CraftRoom>
+
+<script>
+  import { initTheme } from '../../scripts/theme';
+  import { initCraftRoom } from '../../scripts/craftRooms';
+
+  initTheme();
+  initCraftRoom();
+</script>
+
+<style>
+  .room-status {
+    display: grid;
+    grid-template-columns: minmax(8rem, 0.34fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    margin-top: clamp(3rem, 8vh, 6rem);
+    padding: 1.45rem 0;
+    /* Só o traço de cima: quem fecha o bloco é o do rodapé, logo abaixo. */
+    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
+    transition: border-color var(--theme-fade);
+  }
+
+  .status-k {
+    padding-top: 0.24rem;
+    color: rgba(var(--ink-rgb), 0.42);
+    font-size: 0.66rem;
+    font-weight: 650;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .status-copy h2 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(1.35rem, 2.5vw, 1.9rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+  }
+
+  .status-copy p {
+    max-width: 30rem;
+    margin-top: 0.6rem;
+    color: rgba(var(--ink-rgb), 0.62);
+    font-size: 0.88rem;
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  @media (max-width: 46rem) {
+    .room-status {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.65rem;
+    }
+
+    .status-k {
+      padding-top: 0;
+    }
+  }
+</style>

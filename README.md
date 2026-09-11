@@ -8,7 +8,8 @@ Astro, Three.js, GSAP and Lenis. No UI framework, no client router.
 ## Sections
 
 - **Work**: projects and jobs.
-- **Craft**: the tools I use and how I work.
+- **Craft**: a vestibule with two doors — Programming, which lists what I've
+  built in code, and Creativity, for everything made away from a keyboard.
 - **Photos**: photos I've taken, laid out on a canvas you can drag around in
   any direction.
 - **About**: games, music, and the rest of it.

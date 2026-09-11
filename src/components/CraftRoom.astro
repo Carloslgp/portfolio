@@ -1,0 +1,367 @@
+---
+// src/components/CraftRoom.astro — a casca das duas salas de /craft.
+//
+// O /craft é um vestíbulo com duas portas, e o que está atrás delas é gêmeo:
+// mesmo papel de fundo, mesmo `‹ Back`, mesmo botão de tema, mesmo cabeçalho
+// em três partes e mesmo rodapé. Só o MIOLO muda — e o miolo é o <slot />.
+//
+// Por que componente, e não uma terceira cópia: work.astro, now.astro e
+// craft.astro já carregam cada um a sua cópia do .back e do .theme, umas 120
+// linhas iguais. Duas salas gêmeas seriam a quarta e a quinta, e a partir daí
+// "mexer no botão de tema" vira cinco edições que precisam sair idênticas.
+//
+// O escopo do Astro faz o corte sozinho: o estilo daqui vale pra casca e NÃO
+// atravessa pro slot, e o estilo de cada sala vale pro miolo e não atravessa
+// pra cá. As duas únicas regras que precisam valer dos dois lados — as da
+// entrada das linhas — estão marcadas com :global() e explicadas lá embaixo.
+import Layout from '../layouts/Layout.astro';
+
+interface Props {
+  /** o <title> do documento e a meta description */
+  docTitle: string;
+  description: string;
+  /** o rótulo pequeno em caixa alta acima do título */
+  eyebrow: string;
+  /** o título em duas linhas; a segunda sai em itálico */
+  title: { line1: string; line2: string };
+  lead: string;
+  /** a frase do rodapé, antes dos links */
+  footNote: string;
+  footLinks: { label: string; href: string }[];
+}
+
+const { docTitle, description, eyebrow, title, lead, footNote, footLinks } =
+  Astro.props;
+---
+
+<Layout lang="en">
+  <Fragment slot="head">
+    <title>{docTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="prefetch" href="/craft" />
+    <link
+      rel="preload"
+      href="/fonts/playfair-600-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    {/* A marca da entrada precisa existir ANTES do primeiro paint, e por isso
+        nasce aqui e não no bundle: é ela que deixa as linhas invisíveis até o
+        observador acender cada uma. Decidida depois do primeiro quadro, a
+        página apareceria inteira e só então se apagaria pra entrar de novo.
+
+        E ela é condicional de propósito, em duas frentes. Sem JavaScript o
+        script não roda, a marca não existe e o CSS entrega a página pronta —
+        ninguém fica com uma sala em branco por causa de um bundle que não
+        chegou. Com baixa animação escolhida no portão, a marca também não
+        vem: o conteúdo nasce no lugar, sem entrada nenhuma. */}
+    <script is:inline>
+      try {
+        var mode = sessionStorage.getItem('motion-mode');
+        if (mode === 'full' || mode === 'reduced')
+          document.documentElement.dataset.motion = mode;
+
+        var reduced = mode === 'reduced' ||
+          (!mode && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+        if (!reduced) document.documentElement.dataset.craftRows = 'armed';
+      } catch (e) {}
+    </script>
+
+    <slot name="head" />
+  </Fragment>
+
+  <div class="paper" aria-hidden="true"></div>
+
+  {/* Link comum, e não o gesto do /craft: a cortina de marés é a emenda entre
+      a home e o vestíbulo, e só existe lá. Daqui pra trás é uma navegação
+      normal, que no desktop o cross-fade nativo já acaba (ver global.css). */}
+  <a class="back" href="/craft">‹ Back</a>
+
+  <button
+    class="theme"
+    data-theme-toggle
+    aria-pressed="false"
+    aria-label="Toggle dark theme"
+    title="Light / dark theme"
+  >
+    <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
+    </svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+    </svg>
+  </button>
+
+  <main class="room">
+    <div class="room-inner">
+      <header class="room-head" data-craft-row>
+        <p class="eyebrow">{eyebrow}</p>
+        <h1>{title.line1}<br /><em>{title.line2}</em></h1>
+        <p class="lead">{lead}</p>
+      </header>
+
+      <slot />
+
+      <footer class="room-foot" data-craft-row>
+        <p>{footNote}</p>
+        <nav aria-label="More of this portfolio">
+          {footLinks.map((link) => <a href={link.href}>{link.label}</a>)}
+        </nav>
+      </footer>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .paper {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--paper);
+    transition: background-color var(--theme-fade);
+  }
+
+  /* O body do site nasce com overflow: hidden por causa da home, que é uma
+     cena fixa. Estas salas são texto e rolam. */
+  :global(html:has(.room)),
+  :global(html:has(.room) body) {
+    height: auto;
+    overflow: visible;
+  }
+
+  :global(html:has(.room)) {
+    scrollbar-gutter: stable;
+  }
+
+  /* --- a casca ---------------------------------------------------------- */
+  .room {
+    position: relative;
+    z-index: 1;
+    min-height: 100dvh;
+    padding: clamp(6.5rem, 13vh, 9rem) 2rem clamp(2.5rem, 6vh, 4rem);
+    color: var(--ink);
+    transition: color var(--theme-fade);
+  }
+
+  .room-inner {
+    width: min(68rem, 100%);
+    margin: 0 auto;
+  }
+
+  .eyebrow {
+    margin-bottom: 1rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .room-head h1 {
+    max-width: 12ch;
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(3.2rem, min(9vw, 13vh), 6.6rem);
+    font-weight: 600;
+    line-height: 0.84;
+    letter-spacing: -0.06em;
+  }
+
+  .room-head h1 em {
+    font-weight: 400;
+  }
+
+  .lead {
+    max-width: 34rem;
+    margin-top: clamp(1.4rem, 3.5vh, 2.2rem);
+    color: rgba(var(--ink-rgb), 0.68);
+    font-size: clamp(0.95rem, 1.4vw, 1.08rem);
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  .room-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 2rem;
+    margin-top: clamp(3.5rem, 9vh, 6rem);
+    padding-top: 1.55rem;
+    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.76rem;
+    transition: color var(--theme-fade), border-color var(--theme-fade);
+  }
+
+  .room-foot nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+  }
+
+  .room-foot a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--ink-rgb), 0.25);
+    text-underline-offset: 3px;
+    transition: color var(--theme-fade), text-decoration-color 0.25s ease;
+  }
+
+  .room-foot a:hover,
+  .room-foot a:focus-visible {
+    text-decoration-color: currentColor;
+  }
+
+  /* --- a entrada das linhas --------------------------------------------- */
+  /* Estas duas são :global() de propósito, e são as ÚNICAS.
+     [data-craft-row] existe dos dois lados do slot — o cabeçalho e o rodapé
+     são daqui, as linhas de projeto são da sala —, e o escopo do Astro
+     recusaria metade delas. Escopar significaria escrever a mesma regra em
+     todo arquivo que abre uma linha, que é justamente a duplicação que este
+     componente existe pra evitar.
+     O que as mantém honestas é o portão: html[data-craft-rows] só é escrito
+     pelo script inline daqui de cima, então fora destas salas as regras não
+     encontram nada pra casar. */
+  :global(html[data-craft-rows] [data-craft-row]) {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  /* O --row-delay é escrito pelo scripts/craftRooms.ts, e só nas linhas que
+     entram JUNTAS — a primeira tela. Quem chega depois, chega rolando, e a
+     rolagem já é o escalonamento. */
+  :global(html[data-craft-rows] [data-craft-row].is-in) {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.62s ease var(--row-delay, 0s),
+      transform 0.72s cubic-bezier(0.2, 0.86, 0.24, 1) var(--row-delay, 0s);
+  }
+
+  /* --- os dois cantos ---------------------------------------------------- */
+  .back {
+    position: fixed;
+    top: calc(1.5rem + env(safe-area-inset-top));
+    left: 2rem;
+    z-index: 6;
+    padding: 0.35rem 0;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color var(--theme-fade);
+  }
+
+  .back::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0.12rem;
+    left: 1.05rem;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .back:hover::after,
+  .back:focus-visible::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  .theme {
+    position: fixed;
+    top: calc(1.3rem + env(safe-area-inset-top));
+    right: 1.5rem;
+    z-index: 6;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(var(--ink-rgb), 0.12);
+    border-radius: 999px;
+    background: rgba(90, 90, 90, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--ink);
+    cursor: pointer;
+    transition:
+      background 0.2s,
+      color var(--theme-fade),
+      border-color var(--theme-fade);
+  }
+
+  .theme:hover {
+    background: rgba(90, 90, 90, 0.42);
+  }
+
+  .theme svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    transition: opacity var(--theme-fade), transform var(--theme-fade);
+  }
+
+  .theme .icon-sun {
+    opacity: 0;
+    transform: rotate(-90deg);
+  }
+
+  :global(html[data-theme='dark']) .theme .icon-moon {
+    opacity: 0;
+    transform: rotate(90deg);
+  }
+
+  :global(html[data-theme='dark']) .theme .icon-sun {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (max-width: 46rem) {
+    .room {
+      padding: 6.5rem 1.35rem 2rem;
+    }
+
+    .room-head h1 {
+      font-size: clamp(2.9rem, 14vw, 5rem);
+    }
+
+    .room-foot {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .back {
+      left: 1.35rem;
+    }
+
+    .theme {
+      right: 1rem;
+      width: 40px;
+      height: 40px;
+    }
+  }
+
+  /* A escolha feita no portão do site é autoritativa; a media query abaixo é
+     a rede de acesso direto, antes de essa escolha existir. */
+  @media (prefers-reduced-motion: reduce) {
+    .back::after,
+    .theme,
+    .theme svg {
+      transition: none;
+    }
+  }
+
+  :global(html[data-motion='reduced']) .back::after,
+  :global(html[data-motion='reduced']) .theme,
+  :global(html[data-motion='reduced']) .theme svg {
+    transition: none;
+  }
+</style>

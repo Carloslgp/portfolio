@@ -1,0 +1,268 @@
+---
+// /craft/programming — a sala de código.
+//
+// Esta página não conhece nenhuma frase: ela percorre CODE_PROJECTS e desenha.
+// Todo o texto — títulos, parágrafos, stacks, links, e até o cabeçalho da
+// sala — mora em src/data/craftCode.ts. A casca (papel, voltar, tema,
+// cabeçalho, rodapé) é o CraftRoom.astro.
+//
+// O QUADRO de cada projeto é o ponto desta página: ele já tem o tamanho final
+// e mostra o monograma enquanto a foto não chega. Pôr a foto é um campo no
+// arquivo de dados — nada aqui muda, e nada na página muda de lugar.
+import CraftRoom from '../../components/CraftRoom.astro';
+import { CODE_PROJECTS, CODE_ROOM, markHue } from '../../data/craftCode';
+
+/** "01", "02"… A numeração sai da POSIÇÃO na lista e não de um campo: um
+ *  número escrito à mão vira mentira no dia em que alguém reordena. */
+const numero = (index: number) => String(index + 1).padStart(2, '0');
+---
+
+<CraftRoom
+  docTitle="Programming · Craft · Carlos Leonardo"
+  description="Tools, engines and experiments built in code — some for people to use, some to find out how a thing works."
+  eyebrow={CODE_ROOM.eyebrow}
+  title={CODE_ROOM.title}
+  lead={CODE_ROOM.lead}
+  footNote="The other half of Craft is next door."
+  footLinks={[
+    { label: 'Creativity', href: '/craft/creativity' },
+    { label: 'Craft', href: '/craft' },
+    { label: 'Work', href: '/work' },
+  ]}
+>
+  <ol class="code-list">
+    {CODE_PROJECTS.map((project, index) => (
+      <li class="code-item" id={`project-${project.id}`} data-craft-row>
+        {/* O quadro. Sem foto ele é decorativo inteiro — o monograma repete
+            em duas letras o nome que está escrito ao lado, e um leitor de
+            tela não ganha nada lendo "LF" antes de "Leitura Fácil". Com foto,
+            quem responde pela imagem é o alt dela. */}
+        <div
+          class:list={['code-frame', project.photo && 'has-photo']}
+          style={`--mark-hue:${markHue(index)}`}
+          aria-hidden={project.photo ? undefined : 'true'}
+        >
+          {project.photo ? (
+            <img
+              src={project.photo.src.src}
+              alt={project.photo.alt}
+              width={project.photo.src.width}
+              height={project.photo.src.height}
+              style={`--photo-position:${project.photo.position ?? 'center'}`}
+              loading={index < 2 ? 'eager' : 'lazy'}
+              decoding="async"
+            />
+          ) : (
+            <span class="code-mark">{project.mark}</span>
+          )}
+        </div>
+
+        <article class="code-main">
+          <p class="code-number" aria-hidden="true">{numero(index)}</p>
+          <h2>{project.title}</h2>
+          <ul class="chips">
+            {project.stack.map((tool) => <li>{tool}</li>)}
+          </ul>
+          <p class="code-copy">{project.description}</p>
+
+          <p class="code-links">
+            <a href={project.repo} target="_blank" rel="noopener noreferrer">
+              {CODE_ROOM.repoLabel}
+              <span aria-hidden="true">{CODE_ROOM.linkMark}</span>
+              <span class="sr-only">, opens in a new tab</span>
+            </a>
+            {project.live && (
+              <a href={project.live.href} target="_blank" rel="noopener noreferrer">
+                {project.live.label}
+                <span aria-hidden="true">{CODE_ROOM.linkMark}</span>
+                <span class="sr-only">, opens in a new tab</span>
+              </a>
+            )}
+          </p>
+        </article>
+      </li>
+    ))}
+  </ol>
+</CraftRoom>
+
+<script>
+  import { initTheme } from '../../scripts/theme';
+  import { initCraftRoom } from '../../scripts/craftRooms';
+
+  initTheme();
+  initCraftRoom();
+</script>
+
+<style>
+  .code-list {
+    list-style: none;
+    margin-top: clamp(3rem, 8vh, 5.5rem);
+  }
+
+  .code-item {
+    display: grid;
+    /* O quadro tem largura PRESA, e o texto fica com o resto. Uma fração pros
+       dois deixaria a moldura crescer junto com a tela, e doze molduras
+       enormes empurrariam a lista pra baixo sem acrescentar leitura. */
+    grid-template-columns: clamp(7rem, 16vw, 11rem) minmax(0, 1fr);
+    gap: clamp(1.4rem, 3vw, 2.4rem);
+    padding: clamp(1.8rem, 4vh, 2.6rem) 0;
+    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
+    transition: border-color var(--theme-fade);
+  }
+
+  /* A última linha NÃO ganha traço embaixo: quem fecha a lista é o traço do
+     rodapé, que vem logo em seguida. Os dois juntos davam duas réguas quase
+     paralelas separadas por um palmo de branco, e a de cima não fechava nada
+     que a de baixo já não fechasse. */
+
+  /* --- o quadro (o lugar guardado pra foto) ------------------------------ */
+  .code-frame {
+    /* A proporção é do QUADRO, não da foto: é ela que reserva o espaço, e é
+       por isso que o dia em que a foto chegar nada desce nem sobe na página.
+       4:3 porque o que vai entrar aqui é, na maior parte, tela de projeto. */
+    aspect-ratio: 4 / 3;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid hsla(var(--mark-hue), 45%, 45%, 0.18);
+    border-radius: 0.7rem;
+    background: hsla(var(--mark-hue), 55%, 50%, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: background-color var(--theme-fade), border-color var(--theme-fade);
+  }
+
+  /* Com foto o quadro some atrás dela: o campo de cor era o substituto, e
+     deixá-lo aparecendo pelas bordas viraria uma moldura colorida em volta
+     de uma imagem que não pediu nenhuma. */
+  .code-frame.has-photo {
+    border-color: rgba(var(--ink-rgb), 0.13);
+    background: rgba(var(--ink-rgb), 0.04);
+  }
+
+  .code-frame img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: var(--photo-position, center);
+  }
+
+  .code-mark {
+    color: hsl(var(--mark-hue), 42%, 38%);
+    font-size: clamp(1.1rem, 3vw, 1.5rem);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    transition: color var(--theme-fade);
+  }
+
+  /* No escuro o mesmo matiz precisa subir de luminosidade, senão a letra
+     desaparece dentro do próprio campo. Mesma correção da /work. */
+  :global(html[data-theme='dark']) .code-mark {
+    color: hsl(var(--mark-hue), 55%, 72%);
+  }
+
+  /* --- o texto ----------------------------------------------------------- */
+  .code-number {
+    margin-bottom: 0.5rem;
+    color: rgba(var(--ink-rgb), 0.34);
+    font-size: 0.66rem;
+    font-weight: 650;
+    letter-spacing: 0.17em;
+    font-variant-numeric: tabular-nums;
+    transition: color var(--theme-fade);
+  }
+
+  .code-main h2 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(1.45rem, 2.8vw, 2.05rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+  }
+
+  .chips {
+    list-style: none;
+    margin-top: 0.5rem;
+    color: rgba(var(--ink-rgb), 0.6);
+    font-size: clamp(0.78rem, 1.7vw, 0.84rem);
+    line-height: 1.7;
+    transition: color var(--theme-fade);
+  }
+
+  .chips li {
+    display: inline;
+  }
+
+  .chips li + li::before {
+    content: '·';
+    margin: 0 0.5rem;
+    color: rgba(var(--ink-rgb), 0.3);
+  }
+
+  .code-copy {
+    max-width: 42rem;
+    margin-top: 0.95rem;
+    color: rgba(var(--ink-rgb), 0.72);
+    font-size: clamp(0.88rem, 1.6vw, 0.96rem);
+    line-height: 1.68;
+    text-wrap: pretty;
+    transition: color var(--theme-fade);
+  }
+
+  .code-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.3rem;
+    margin-top: 1.25rem;
+  }
+
+  .code-links a {
+    display: inline-flex;
+    gap: 0.42rem;
+    align-items: center;
+    color: var(--ink);
+    font-size: 0.8rem;
+    font-weight: 650;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(var(--ink-rgb), 0.28);
+    transition: color var(--theme-fade), border-color 0.25s ease;
+  }
+
+  .code-links a:hover,
+  .code-links a:focus-visible {
+    border-bottom-color: currentColor;
+  }
+
+  a:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  /* O aviso de "abre em outra aba" existe só pra quem lê com leitor de tela:
+     a setinha ↗ conta isso visualmente e não conta nada pra ele. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 46rem) {
+    /* O quadro sobe pra cima do texto: a 360px de largura, um retângulo de
+       7rem ao lado de um parágrafo deixa o parágrafo com quatro palavras por
+       linha. Aqui ele vira uma faixa, e o texto ganha a largura inteira. */
+    .code-item {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.1rem;
+    }
+
+    .code-frame {
+      aspect-ratio: 16 / 9;
+      max-width: 14rem;
+    }
+  }
+</style>

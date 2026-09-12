@@ -82,6 +82,31 @@ const POLICY = [
     pickSmaller: true,
   },
   {
+    // A pixel art da sala de Criatividade.
+    //
+    // pickSmaller aqui não é desempate apertado como nas outras pastas: é
+    // goleada, e na direção que também preserva o desenho. Medido nas cinco
+    // peças, o lossless faz 0,3 a 0,6 KB e o lossy q80 faz 3 a 5 KB — de seis
+    // a dez vezes MAIOR. O motivo é o que a pixel art é: campos de cor
+    // chapada com bordas duras. O lossless codifica "esta cor repete" e
+    // acaba; o lossy gasta bytes inventando gradiente onde não há, e o que
+    // ele inventa aparece como sujeira em volta de cada pixel. É o raro caso
+    // em que a escolha certa pro olho e a escolha certa pra balança são a
+    // mesma, e por isso a regra não precisa de exceção: pickSmaller acerta
+    // sozinho, e continuaria acertando se um dia caísse uma fotografia aqui.
+    //
+    // O teto de 1120 é herdado da sala e hoje não corta nada (a maior tem
+    // 855px). Ele é um limite de segurança, não um alvo — e vale saber que
+    // REDUZIR pixel art é destrutivo de um jeito que reduzir foto não é: a
+    // grade de pixels só sobrevive a divisões inteiras. Se algum dia uma peça
+    // passar do teto, o certo é exportá-la menor na origem, não deixar o
+    // resize daqui resolver.
+    dir: 'src/assets/craft/creativity',
+    maxSide: 1120,
+    quality: 80,
+    pickSmaller: true,
+  },
+  {
     // As fotos dentro do texto do About (.shot). A coluna tem 42rem de teto,
     // ~624px de conteúdo — 1400 já é dpr 2 com sobra.
     dir: 'public/images/about_main_photos',

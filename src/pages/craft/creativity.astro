@@ -1,24 +1,41 @@
 ---
 // /craft/creativity — a sala do que não é código.
 //
-// Ela nasce vazia de propósito. A porta existe no vestíbulo desde o primeiro
-// dia porque as duas metades do Craft são as duas metades, e uma porta que
-// aparece depois lê-se como conteúdo que estava escondido. O que ela não faz
-// é fingir que o conteúdo já existe: o aviso abaixo é o mesmo que o /craft
-// inteiro carregava antes de virar vestíbulo.
+// Esta página não conhece nenhuma frase: todo o texto mora em
+// src/data/craftCreative.ts. A casca (papel, voltar, tema, cabeçalho, rodapé)
+// é o CraftRoom.astro, a mesma da sala de programação.
 //
-// Encher esta sala é o mesmo trabalho da de programação: um arquivo em
-// src/data/ com a lista, e este miolo percorrendo a lista. A casca
-// (CraftRoom.astro) já está pronta e é a mesma.
+// POR QUE A FORMA AQUI NÃO É A DE LÁ. A sala de código é uma lista numerada
+// com a mesma linha repetida catorze vezes, e está certa: são catorze coisas
+// da mesma natureza. Aqui são três de naturezas diferentes, e a página dá uma
+// forma pra cada uma em vez de achatar as três numa lista:
+//
+//   1. A FAIXA da pixel art. É a única coisa que mora nesta sala, e o que ela
+//      tem a dizer é uma progressão no tempo. Vira uma cronologia vertical,
+//      com um fio ligando os desenhos, do primeiro ao mais recente.
+//   2. As PORTAS. O canal e o mural moram fora (YouTube, /photos). Duas
+//      colunas curtas que dizem o que tem do outro lado e saem da frente.
+//   3. O FECHAMENTO. Sozinho no fim, porque é de outra ordem: leva pra
+//      Coleção de Criações, que é a pessoa e não o trabalho.
+//
+// A pixel art é o único lugar do site que NÃO passa pelo getImage, e isso é
+// medido, não preguiça: ver o comentário de .shot img lá embaixo.
 import CraftRoom from '../../components/CraftRoom.astro';
+import {
+  CREATIVE_ROOM,
+  PIXEL,
+  PIXEL_PIECES,
+  DOORS,
+  CLOSING,
+} from '../../data/craftCreative';
 ---
 
 <CraftRoom
   docTitle="Creativity · Craft · Carlos Leonardo"
-  description="Things made outside of code, still being gathered."
-  eyebrow="Craft · Creativity"
-  title={{ line1: 'Made with', line2: 'hands.' }}
-  lead="The half of Craft that isn’t code: things made for the pleasure of making them, and for no other reason."
+  description="The half of Craft that is not code: pixel art, a YouTube channel and photographs."
+  eyebrow={CREATIVE_ROOM.eyebrow}
+  title={CREATIVE_ROOM.title}
+  lead={CREATIVE_ROOM.lead}
   footNote="The other half of Craft is next door."
   footLinks={[
     { label: 'Programming', href: '/craft/programming' },
@@ -26,13 +43,84 @@ import CraftRoom from '../../components/CraftRoom.astro';
     { label: 'Photos', href: '/photos' },
   ]}
 >
-  <section class="room-status" data-craft-row aria-labelledby="creativity-status">
-    <p class="status-k">Collection</p>
-    <div class="status-copy">
-      <h2 id="creativity-status">Taking shape.</h2>
-      <p>This room is being assembled with care. Pieces will surface here when they are ready.</p>
+  <section class="pixels" aria-labelledby="pixel-heading">
+    <header class="block-head" data-craft-row>
+      <p class="kicker">{PIXEL.label}</p>
+      <h2 id="pixel-heading">{PIXEL.heading}</h2>
+      <p class="block-lead">{PIXEL.intro}</p>
+    </header>
+
+    <ol class="timeline">
+      {PIXEL_PIECES.map((piece, index) => (
+        <li class="shot" data-craft-row>
+          <div class="shot-tile">
+            {/* width/height vêm do arquivo e existem pra reservar a caixa
+                antes de o desenho chegar: sem elas a cronologia inteira
+                pularia de altura no carregamento. */}
+            <img
+              src={piece.src.src}
+              width={piece.src.width}
+              height={piece.src.height}
+              alt={piece.alt}
+              loading={index < 2 ? 'eager' : 'lazy'}
+              decoding="async"
+            />
+          </div>
+
+          <div class="shot-copy">
+            <p class="shot-when">
+              <time datetime={piece.datetime}>{piece.date}</time>
+              {index === 0 && <span class="shot-badge">the first one</span>}
+            </p>
+            <p class="shot-caption">{piece.caption}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+
+    <div class="pixel-note" data-craft-row>
+      <p>{PIXEL.note}</p>
+      <p class="pixel-go">
+        <a href={PIXEL.noteLink.href}>
+          {PIXEL.noteLink.label}
+          <span aria-hidden="true">→</span>
+        </a>
+      </p>
     </div>
   </section>
+
+  <section class="doors" aria-label="Things that live elsewhere">
+    {DOORS.map((door) => (
+      <article class="door" data-craft-row>
+        <p class="kicker">{door.label}</p>
+        <h2>{door.title}</h2>
+        <p class="door-body">{door.body}</p>
+        <p class="door-link">
+          <a
+            href={door.href}
+            target={door.external ? '_blank' : null}
+            rel={door.external ? 'noopener noreferrer' : null}
+          >
+            {door.linkLabel}
+            <span aria-hidden="true">{door.external ? '↗' : '→'}</span>
+            {door.external && <span class="sr-only">, opens in a new tab</span>}
+          </a>
+        </p>
+      </article>
+    ))}
+  </section>
+
+  <aside class="closing" aria-labelledby="closing-heading" data-craft-row>
+    <p class="kicker">{CLOSING.kicker}</p>
+    <h2 id="closing-heading">{CLOSING.title}</h2>
+    <p class="closing-text">{CLOSING.text}</p>
+    <p class="closing-go">
+      <a href={CLOSING.link.href}>
+        {CLOSING.link.label}
+        <span aria-hidden="true">→</span>
+      </a>
+    </p>
+  </aside>
 </CraftRoom>
 
 <script>
@@ -44,19 +132,8 @@ import CraftRoom from '../../components/CraftRoom.astro';
 </script>
 
 <style>
-  .room-status {
-    display: grid;
-    grid-template-columns: minmax(8rem, 0.34fr) minmax(0, 1fr);
-    gap: 1.5rem;
-    margin-top: clamp(3rem, 8vh, 6rem);
-    padding: 1.45rem 0;
-    /* Só o traço de cima: quem fecha o bloco é o do rodapé, logo abaixo. */
-    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
-    transition: border-color var(--theme-fade);
-  }
-
-  .status-k {
-    padding-top: 0.24rem;
+  /* --- peças comuns aos três blocos -------------------------------------- */
+  .kicker {
     color: rgba(var(--ink-rgb), 0.42);
     font-size: 0.66rem;
     font-weight: 650;
@@ -65,31 +142,293 @@ import CraftRoom from '../../components/CraftRoom.astro';
     transition: color var(--theme-fade);
   }
 
-  .status-copy h2 {
+  .pixels h2,
+  .doors h2,
+  .closing h2 {
+    margin-top: 0.55rem;
     font-family: "Playfair Display", Georgia, serif;
-    font-size: clamp(1.35rem, 2.5vw, 1.9rem);
     font-weight: 600;
     line-height: 1.05;
     letter-spacing: -0.035em;
   }
 
-  .status-copy p {
-    max-width: 30rem;
-    margin-top: 0.6rem;
+  /* --- 1. a faixa da pixel art ------------------------------------------- */
+  .pixels {
+    margin-top: clamp(3rem, 8vh, 6rem);
+    padding-top: 1.45rem;
+    /* Só o traço de cima: quem fecha cada bloco é o traço do bloco seguinte,
+       e o último é fechado pelo rodapé da casca. */
+    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
+    transition: border-color var(--theme-fade);
+  }
+
+  .block-head {
+    max-width: 34rem;
+  }
+
+  .pixels h2 {
+    font-size: clamp(1.35rem, 2.5vw, 1.9rem);
+  }
+
+  .block-lead {
+    margin-top: 0.7rem;
     color: rgba(var(--ink-rgb), 0.62);
     font-size: 0.88rem;
     line-height: 1.62;
     transition: color var(--theme-fade);
   }
 
+  /* O teto de 48rem é a soma das partes (11 do quadro + 2 do vão + 35 da
+     legenda), e não um número escolhido: sem ele a linha se estica pelos
+     68rem da sala, a legenda para nos 32rem dela e sobram uns 23rem de vazio
+     à direita de cada item. A faixa passava a parecer encostada na margem
+     esquerda em vez de ser um bloco. Com o teto, ela fica do tamanho do que
+     tem dentro e alinha com o cabeçalho de 34rem logo acima. */
+  .timeline {
+    position: relative;
+    max-width: 48rem;
+    margin-top: clamp(2rem, 5vh, 3.2rem);
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: clamp(1.5rem, 3.5vh, 2.4rem);
+  }
+
+  /* O FIO da cronologia. Ele passa pelo centro da coluna dos quadros (5.5rem
+     de 11rem) e fica ATRÁS deles: os quadros têm fundo próprio, então o fio
+     só aparece nos vãos, e a faixa lê como uma linha do tempo em vez de cinco
+     quadrinhos empilhados. Some junto com as duas colunas, lá embaixo. */
+  .timeline::before {
+    content: '';
+    position: absolute;
+    top: 0.6rem;
+    bottom: 0.6rem;
+    left: 5.5rem;
+    width: 1px;
+    background: rgba(var(--ink-rgb), 0.16);
+    transition: background-color var(--theme-fade);
+  }
+
+  .shot {
+    position: relative;
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    gap: clamp(1.2rem, 2.6vw, 2rem);
+    align-items: center;
+  }
+
+  .shot-tile {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    padding: 0.7rem;
+    border: 1px solid rgba(var(--ink-rgb), 0.13);
+    border-radius: 0.7rem;
+    /* O fundo é o do papel, e não transparente, porque é ele que corta o fio
+       da cronologia atrás do quadro. */
+    background: var(--paper);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    transition:
+      border-color var(--theme-fade),
+      background-color var(--theme-fade);
+  }
+
+  /* PIXELATED, e a imagem entra SEM passar pelo getImage.
+     São as duas únicas decisões de imagem desta sala, e as duas são medidas.
+
+     `pixelated` manda o navegador ampliar e reduzir por vizinho mais próximo.
+     O padrão é interpolar, e interpolar pixel art é desfazê-la: a borda dura
+     que é o ponto do desenho vira um degradê de três pixels.
+
+     Sem getImage porque o pipeline aqui PIORARIA os dois lados. Medido nas
+     cinco peças: o webp lossless que o `npm run images` já gravou dá 0,3 a
+     0,6 KB, e o mesmo desenho reencodado em webp q78 dá 3 a 5 KB — de seis a
+     dez vezes mais pesado E com sujeira em volta de cada pixel, porque o
+     lossy gasta bytes inventando gradiente onde só existe cor chapada.
+     Mandar o arquivo original é o menor e o mais fiel ao mesmo tempo; não há
+     troca a fazer. (O plugin prunar-imagens-orfas do astro.config preserva o
+     original justamente porque este markup o referencia.) */
+  .shot-tile img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
+  }
+
+  .shot-when {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    color: rgba(var(--ink-rgb), 0.45);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .shot-badge {
+    padding: 0.15rem 0.5rem;
+    border: 1px solid rgba(var(--ink-rgb), 0.2);
+    border-radius: 999px;
+    color: rgba(var(--ink-rgb), 0.58);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    transition: color var(--theme-fade), border-color var(--theme-fade);
+  }
+
+  .shot-caption {
+    max-width: 32rem;
+    margin-top: 0.55rem;
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  .pixel-note {
+    max-width: 34rem;
+    margin-top: clamp(2rem, 5vh, 3rem);
+    color: rgba(var(--ink-rgb), 0.62);
+    font-size: 0.88rem;
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  /* O link sai na cor cheia da tinta enquanto o parágrafo acima fica em 0.62:
+     é o contraste que faz dele um destino e não a continuação da frase. Ele
+     NÃO compete com o fechamento lá embaixo — aquele é maior, em Playfair e
+     sozinho num bloco; este é uma saída lateral do tamanho do assunto dela. */
+  .pixel-go {
+    margin-top: 0.85rem;
+  }
+
+  .pixel-go a {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    color: var(--ink);
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 0.28em;
+    text-decoration-thickness: 1px;
+    text-decoration-color: rgba(var(--ink-rgb), 0.25);
+    transition: color var(--theme-fade), text-decoration-color 0.25s ease;
+  }
+
+  .pixel-go a:hover,
+  .pixel-go a:focus-visible {
+    text-decoration-color: currentColor;
+  }
+
+  /* --- 2. as portas ------------------------------------------------------- */
+  .doors {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(1.8rem, 4vw, 3.5rem);
+    margin-top: clamp(3rem, 8vh, 6rem);
+    padding-top: 1.45rem;
+    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
+    transition: border-color var(--theme-fade);
+  }
+
+  .doors h2 {
+    font-size: clamp(1.2rem, 2.1vw, 1.55rem);
+  }
+
+  /* Coluna com o link empurrado pro fim: os dois textos têm comprimentos
+     diferentes e, sem isto, os dois links pousam em alturas diferentes. O par
+     passa a parecer desalinhado em vez de duas portas lado a lado. */
+  .door {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .door-body {
+    margin-top: 0.75rem;
+    color: rgba(var(--ink-rgb), 0.68);
+    font-size: 0.9rem;
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  .door-link {
+    margin-top: auto;
+    padding-top: 1rem;
+  }
+
+  .door-link a,
+  .closing-go a {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    color: var(--ink);
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 0.28em;
+    text-decoration-thickness: 1px;
+    text-decoration-color: rgba(var(--ink-rgb), 0.25);
+    transition: color var(--theme-fade), text-decoration-color 0.25s ease;
+  }
+
+  .door-link a:hover,
+  .door-link a:focus-visible,
+  .closing-go a:hover,
+  .closing-go a:focus-visible {
+    text-decoration-color: currentColor;
+  }
+
+  /* --- 3. o fechamento ---------------------------------------------------- */
+  .closing {
+    margin-top: clamp(3.5rem, 9vh, 6rem);
+    padding-top: 1.45rem;
+    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
+    transition: border-color var(--theme-fade);
+  }
+
+  /* Mais largo que as portas e com o tipo maior: é o último gesto da página,
+     e ele precisa parecer uma saída, não um terceiro item. */
+  .closing h2 {
+    font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  }
+
+  .closing-text {
+    max-width: 38rem;
+    margin-top: 0.9rem;
+    color: rgba(var(--ink-rgb), 0.68);
+    font-size: clamp(0.92rem, 1.3vw, 1.02rem);
+    line-height: 1.62;
+    transition: color var(--theme-fade);
+  }
+
+  .closing-go {
+    margin-top: 1.4rem;
+    font-size: 1.05rem;
+  }
+
+  /* --- estreito ----------------------------------------------------------- */
   @media (max-width: 46rem) {
-    .room-status {
+    .shot {
       grid-template-columns: minmax(0, 1fr);
-      gap: 0.65rem;
+      gap: 0.9rem;
+      justify-items: start;
     }
 
-    .status-k {
-      padding-top: 0;
+    /* O fio ligava os quadros em coluna. Empilhado, quadro e texto se
+       alternam e não há mais o que ligar: ele viraria um risco solto no meio
+       do texto. */
+    .timeline::before {
+      display: none;
+    }
+
+    .shot-tile {
+      width: 9.5rem;
+    }
+
+    .doors {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2.2rem;
     }
   }
 </style>

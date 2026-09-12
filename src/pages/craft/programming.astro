@@ -71,12 +71,20 @@ const rows = await Promise.all(
   CODE_PROJECTS.map(async (project, index) => {
     const photos = project.photos ?? [];
 
+    // TRÊS não consulta a proporção, e é a única forma que não consulta: com
+    // três imagens o bloco já está cheio, e o que sobra pra decidir é qual
+    // delas leva a largura toda. Isso a proporção não sabe responder — a
+    // captura mais larga não é a que mais precisa de largura, é só a mais
+    // larga. Quem sabe é quem escolheu as fotos, e ele já disse: a PRIMEIRA
+    // da lista lidera. Trocar o cabeça é reordenar o array em craftCode.ts.
     const arranjo =
       photos.length < 2
         ? 'solo'
-        : photos.every((photo) => photo.src.width / photo.src.height >= PAR_DEITADO)
-          ? 'stack'
-          : 'pair';
+        : photos.length > 2
+          ? 'trio'
+          : photos.every((photo) => photo.src.width / photo.src.height >= PAR_DEITADO)
+            ? 'stack'
+            : 'pair';
 
     const shots = await Promise.all(
       photos.map(async (photo) => {
@@ -113,7 +121,7 @@ const rows = await Promise.all(
 
 <CraftRoom
   docTitle="Programming · Craft · Carlos Leonardo"
-  description="Tools, engines and experiments built in code — some for people to use, some to find out how a thing works."
+  description="Tools, engines and experiments built in code. Some for people to use, some to find out how a thing works."
   eyebrow={CODE_ROOM.eyebrow}
   title={CODE_ROOM.title}
   lead={CODE_ROOM.lead}
@@ -135,17 +143,27 @@ const rows = await Promise.all(
       >
         {shots.length ? (
           <div class="code-shots">
-            {shots.map((shot) => (
-              <img
-                src={shot.src}
-                srcset={shot.srcset}
-                sizes={arranjo === 'pair' ? SHOT.SIZES_HALF : SHOT.SIZES_FULL}
-                alt={shot.alt}
-                style={`--shot-ratio:${shot.ratio}`}
-                loading={index < 2 ? 'eager' : 'lazy'}
-                decoding="async"
-              />
-            ))}
+            {shots.map((shot, lugar) => {
+              // Quem divide o bloco com uma irmã pede METADE da largura. No
+              // par são as duas; no trio, só as duas de baixo — a primeira
+              // ali ocupa o bloco inteiro. Dar SIZES_HALF às três faria a de
+              // cima baixar um degrau de variante e chegar borrada; dar
+              // SIZES_FULL às três faria as de baixo baixarem o dobro dos
+              // bytes necessários.
+              const meiaLargura = arranjo === 'pair' || (arranjo === 'trio' && lugar > 0);
+
+              return (
+                <img
+                  src={shot.src}
+                  srcset={shot.srcset}
+                  sizes={meiaLargura ? SHOT.SIZES_HALF : SHOT.SIZES_FULL}
+                  alt={shot.alt}
+                  style={`--shot-ratio:${shot.ratio}`}
+                  loading={index < 2 ? 'eager' : 'lazy'}
+                  decoding="async"
+                />
+              );
+            })}
           </div>
         ) : (
           /* O quadro do monograma é decorativo inteiro: ele repete em duas
@@ -165,12 +183,17 @@ const rows = await Promise.all(
           <p class="code-copy">{project.description}</p>
 
           <p class="code-links">
-            <a href={project.repo} target="_blank" rel="noopener noreferrer">
-              <BrandMark name="github" />
-              {CODE_ROOM.repoLabel}
-              <span aria-hidden="true">{CODE_ROOM.linkMark}</span>
-              <span class="sr-only">, opens in a new tab</span>
-            </a>
+            {/* Sem repo, a linha fica só com o `live` — ver o porquê no campo
+                `repo` de data/craftCode.ts. Toda linha tem pelo menos um dos
+                dois, então `code-links` nunca sai vazio. */}
+            {project.repo && (
+              <a href={project.repo} target="_blank" rel="noopener noreferrer">
+                <BrandMark name="github" />
+                {CODE_ROOM.repoLabel}
+                <span aria-hidden="true">{CODE_ROOM.linkMark}</span>
+                <span class="sr-only">, opens in a new tab</span>
+              </a>
+            )}
             {project.live && (
               <a href={project.live.href} target="_blank" rel="noopener noreferrer">
                 {project.live.label}
@@ -298,6 +321,28 @@ const rows = await Promise.all(
     align-items: start;
   }
 
+  /* TRÊS: a primeira toma o bloco inteiro, as outras duas dividem a fileira
+     de baixo. É o único arranjo de três que não estreita nada abaixo do que
+     esta sala já pratica — as de baixo ficam com 18,6rem, que é a mesma
+     ordem dos 21rem do `pair`. Três colunas dariam 12,1rem cada, e aí sim a
+     captura vira textura.
+
+     O teto é o do `stack` pelo mesmo motivo dele: a de cima é uma imagem
+     ocupando o bloco inteiro, e sem teto uma captura quase quadrada ali
+     comeria a tela. Medido no StudySync, a linha inteira fica em 32,8rem —
+     MENOS que os 37,1rem que as mesmas duas primeiras fotos ocupavam
+     empilhadas. Três fotos que cabem em menos altura que duas: é por isso
+     que o teto de duas caiu. */
+  .code-item[data-shots='trio'] .code-shots {
+    --shot-cap: min(19rem, 38vh);
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  .code-item[data-shots='trio'] .code-shots img:first-child {
+    grid-column: 1 / -1;
+  }
+
   /* O lado a lado precisa de linha larga pra existir: ele divide o bloco em
      dois e empresta largura do texto. Abaixo de 62rem as duas pontas perdem —
      medido a 800px: imagens de 227px e texto de 32 letras por linha, que é
@@ -307,17 +352,29 @@ const rows = await Promise.all(
      Ou seja: o arranjo é a proporção da imagem VEZES a largura que a tela
      tem pra dar. A proporção decide sozinha só onde há folga. */
   @media (max-width: 62rem) {
-    .code-item.has-shots[data-shots='pair'][data-side='left'] {
+    .code-item.has-shots[data-shots='pair'][data-side='left'],
+    .code-item.has-shots[data-shots='trio'][data-side='left'] {
       grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     }
 
-    .code-item.has-shots[data-shots='pair'][data-side='right'] {
+    .code-item.has-shots[data-shots='pair'][data-side='right'],
+    .code-item.has-shots[data-shots='trio'][data-side='right'] {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
     }
 
-    .code-item[data-shots='pair'] .code-shots {
+    /* O trio desmancha aqui pelo mesmo motivo do par, e mais um: a fileira de
+       baixo dividiria uma coluna que já é estreita, e aí sim cairia nos 11rem
+       que o teto de duas existia pra evitar. Uma sobre a outra, as três ficam
+       com a largura inteira do bloco — a linha fica alta, e num bloco desta
+       largura rolar é mais barato que espremer. */
+    .code-item[data-shots='pair'] .code-shots,
+    .code-item[data-shots='trio'] .code-shots {
       --shot-cap: min(18rem, 38vh);
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .code-item[data-shots='trio'] .code-shots img:first-child {
+      grid-column: auto;
     }
   }
 

@@ -20,7 +20,7 @@
 // fica onde está e o .webp é descartado.
 //
 //   npm run images
-import { readdir, stat, unlink, mkdir, rename, writeFile } from 'node:fs/promises';
+import { readdir, readFile, stat, unlink, mkdir, rename, writeFile } from 'node:fs/promises';
 import { join, extname, basename } from 'node:path';
 import sharp from 'sharp';
 
@@ -54,6 +54,32 @@ const POLICY = [
     dir: 'public/textures',
     convert: false,
     thumbs: { dir: 'public/textures/thumbs', maxSide: 160, quality: 75 },
+  },
+  {
+    // As capturas da sala de Craft.
+    //
+    // 1120 é o TETO DAS VARIANTES que a página pede (SHOT.WIDTHS em
+    // pages/craft/programming.astro): o bloco tem 38rem e o 1120 é ele em tela
+    // densa. Pixel acima disso nunca chega a ninguém — o getImage reduziria a
+    // fonte a 1120 no build de qualquer jeito, e a captura de 1920px só ficava
+    // pesando no repositório. Se aquele teto subir, este sobe junto.
+    //
+    // Estas fontes são re-encodadas pelo getImage (q78) antes de ir pro ar, ou
+    // seja: a compressão aqui é a PRIMEIRA de duas. Medido nesta pasta, a
+    // segunda passagem é quem domina a perda — de q80 pra q92 na fonte, o
+    // arquivo que o visitante baixa melhora entre 0,0 e 0,6 dB de PSNR e a
+    // pasta engorda 45%. Por isso q80 e não mais: guardar qualidade que o
+    // build joga fora logo depois é peso sem contrapartida.
+    //
+    // pickSmaller pelo mesmo motivo de public/images/work — a pasta é mista.
+    // Convivem sprite de Pokémon (pixel art chapada, onde o lossless faz 7 KB
+    // contra 18 do lossy, e ainda evita o chiado que o lossy põe na borda de
+    // cada pixel) e fotografia de tela cheia (onde o lossless faz 576 KB
+    // contra 92). Escolher por arquivo custa alguns ms e acerta os dois.
+    dir: 'src/assets/craft',
+    maxSide: 1120,
+    quality: 80,
+    pickSmaller: true,
   },
   {
     // As fotos dentro do texto do About (.shot). A coluna tem 42rem de teto,
@@ -106,22 +132,39 @@ const POLICY = [
   },
 ];
 
-// .gif fica de fora: GIF animado não vira webp, vira VÍDEO (ver o comentário do
-// bloco `video` em src/data/about.ts). Converter aqui só perderia a animação.
-const SOURCES = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
+// .gif entra, e o encode() abaixo leva os quadros TODOS — webp animado é um
+// formato, não um still. O que continua valendo é a régua do bloco `video` em
+// src/data/about.ts: gravação de tela longa é caso de VÍDEO, e nenhum encoder
+// conserta isso. A diferença é de ordem de grandeza, não de formato — uma
+// animação curta (o flood fill são 19 quadros, 21 KB) não é esse caso.
+const SOURCES = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif']);
 
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
 
 /** O webp de uma foto, já no tamanho, como buffer.
  *
+ *  Recebe os BYTES da fonte, não o caminho dela, e isso não é estilo: dando o
+ *  caminho, o libvips segura o arquivo aberto (ele mapeia em memória em vez de
+ *  ler de uma vez) e o Windows então recusa tanto apagar quanto renomear por
+ *  cima dele — `EPERM: operation not permitted, rename` ao regravar um .webp
+ *  no próprio lugar, `EBUSY` ao apagar a fonte convertida. No Linux o mesmo
+ *  código passa, porque lá apagar um arquivo aberto é legal; era um bug que só
+ *  existia na máquina de quem roda isto.
+ *
  *  `lossless` é decisão de PASTA, não de arquivo — exceto onde a regra pede
  *  pickSmaller, e aí quem decide é a balança. */
-async function encode(srcPath, maxSide, quality, lossless = false) {
+async function encode(fonte, maxSide, quality, lossless = false, animado = false) {
   // failOn: 'none' — alguns JPEGs de câmera/celular trazem marcadores fora do
   // padrão ("Invalid SOS parameters") que o libvips recusa por padrão. O
   // navegador decodifica esses arquivos numa boa, então recusá-los aqui só
   // deixaria a foto pesada no ar.
-  return sharp(srcPath, { failOn: 'none' })
+  //
+  // pages: -1 lê a fonte INTEIRA, todos os quadros; 1 lê só o primeiro. Sem
+  // isso, uma animação sai daqui como still — e o still do flood fill é o
+  // desenho ainda em branco, ou seja, o quadro que não mostra nada. O resize
+  // sabe o que fazer com múltiplas páginas: o libvips guarda a altura de um
+  // quadro à parte e reduz cada um.
+  return sharp(fonte, { failOn: 'none', pages: animado ? -1 : 1 })
     // .rotate() sem argumento GRAVA NOS PIXELS a rotação que o EXIF só
     // descrevia. Isto não é detalhe: a saída não leva metadado, então uma foto
     // com Orientation=6 que saísse daqui sem o giro chegaria ao navegador
@@ -139,10 +182,12 @@ async function encode(srcPath, maxSide, quality, lossless = false) {
 /** Escreve o webp e devolve o tamanho. Com `pickSmaller`, encoda dos dois jeitos
  *  e grava o menor — os dois caminhos custam alguns ms numa imagem de 192px, e
  *  é a única forma de acertar numa pasta com origens diferentes. */
-async function convert(srcPath, outPath, maxSide, quality, pickSmaller = false) {
-  const lossy = await encode(srcPath, maxSide, quality);
+async function convert(fonte, outPath, maxSide, quality, pickSmaller = false, animado = false) {
+  const lossy = await encode(fonte, maxSide, quality, false, animado);
   const best = pickSmaller
-    ? [lossy, await encode(srcPath, maxSide, quality, true)].sort((a, b) => a.length - b.length)[0]
+    ? [lossy, await encode(fonte, maxSide, quality, true, animado)].sort(
+        (a, b) => a.length - b.length,
+      )[0]
     : lossy;
 
   await writeFile(outPath, best);
@@ -178,11 +223,15 @@ async function run() {
       // um arquivo problemático não pode derrubar a leva inteira e deixar
       // public/ metade convertido: cada foto se resolve (ou falha) sozinha
       try {
+        // Os bytes da fonte, lidos UMA vez e usados por todo o resto — ver o
+        // porquê de não passar o caminho adiante no comentário de encode().
+        const fonte = await readFile(srcPath);
+
         // o thumb sai da fonte GRANDE, então é gerado antes de ela virar webp
         // (e é regerado sempre: são alguns KB, não vale rastrear estado)
         if (rule.thumbs) {
           await convert(
-            srcPath,
+            fonte,
             join(rule.thumbs.dir, `${name}.webp`),
             rule.thumbs.maxSide,
             rule.thumbs.quality,
@@ -192,17 +241,21 @@ async function run() {
         // pasta só de thumb (ver convert: false): a fonte fica como está
         if (rule.convert === false) continue;
 
+        // Mais de uma página é GIF ou webp ANIMADO. A pergunta é feita aos
+        // metadados e não à extensão porque, depois da primeira passagem por
+        // aqui, a animação já é um .webp — e um segundo `npm run images` que
+        // olhasse só a extensão a achataria em still sem avisar.
+        const meta = await sharp(fonte, { failOn: 'none' }).metadata();
+        const animado = (meta.pages ?? 1) > 1;
+
         // já é o próprio destino e já está no tamanho: nada a fazer
-        if (srcPath === outPath) {
-          const meta = await sharp(srcPath, { failOn: 'none' }).metadata();
-          if (Math.max(meta.width ?? 0, meta.height ?? 0) <= rule.maxSide) {
-            console.log(`= ${srcPath} (já no tamanho)`);
-            continue;
-          }
+        if (srcPath === outPath && Math.max(meta.width ?? 0, meta.height ?? 0) <= rule.maxSide) {
+          console.log(`= ${srcPath} (já no tamanho)`);
+          continue;
         }
 
         const tmp = `${outPath}.tmp`;
-        await convert(srcPath, tmp, rule.maxSide, rule.quality, rule.pickSmaller);
+        await convert(fonte, tmp, rule.maxSide, rule.quality, rule.pickSmaller, animado);
         const out = await stat(tmp);
 
         // o webp saiu maior que a fonte (avif costuma ganhar): fica a fonte

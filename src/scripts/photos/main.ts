@@ -92,10 +92,7 @@ export function initMural() {
   // ——— o Voltar ———
   // Quem chegou aqui vindo da home volta PELA HISTÓRIA, não pelo href: o
   // BFCache do navegador restaura a home viva — anel no lugar, sem cortina —
-  // que é a melhor volta possível. (E se o BFCache não servir a página, o
-  // reboot da home reconhece a volta e entra sem pergunta nem descida: ver
-  // main.ts → isInternalArrival.) O href="/" fica de rede pra quem entrou
-  // direto em /photos por link — aí não há história pra voltar.
+  // que é a melhor volta possível.
   //
   // A origem é uma marca explícita da home. `document.referrer` não serve de
   // contrato: ele pode vir vazio por Referrer-Policy ou configuração de
@@ -110,6 +107,18 @@ export function initMural() {
     }
   } catch {}
 
+  // Sem a home logo atrás — quem chegou pelo link da /craft/creativity, ou
+  // direto por URL — a volta é uma navegação de verdade, e não um passo atrás.
+  // A coreografia é a MESMA: o mergulho na foto da emenda acontece igual, e as
+  // duas marcas fazem a home nascer no segmento Photos rebobinando o avanço a
+  // partir daquele quadro (ver main.ts → initPhotosLink). O que muda é só quem
+  // paga o documento; o gesto que se vê é o mesmo de quem entrou pelo anel.
+  const goHome = () => {
+    if (returnToRing && history.length > 1) return void history.back();
+    try { sessionStorage.setItem(PHOTOS_RETURN_KEY, '/'); } catch {}
+    location.href = '/';
+  };
+
   // A saída, montada no clique e não antes: ela precisa da câmera onde a pessoa
   // parou, e isso só existe na hora. `exit` de pé também é a trava do clique
   // duplo — o mesmo papel do `leaving` da home.
@@ -117,28 +126,36 @@ export function initMural() {
   let entering = false;   // a chegada ainda anda? (ver o enterFromSeam lá embaixo)
 
   document.querySelector<HTMLAnchorElement>('[data-back]')?.addEventListener('click', (e) => {
-    if (!returnToRing || history.length <= 1) return;
+    // Abrir em outra aba continua sendo do navegador: o href é o destino de
+    // verdade, e só o clique simples vira coreografia.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     if (exit || !canvas) return;
 
     // A emenda pede a foto da emenda. Sem ela na pasta (basta alguém renomear o
     // arquivo), em baixa animação, e com a CHEGADA ainda em curso, voltar
     // continua sendo só voltar.
-    const seamPhoto = reduced || entering
+    //
+    // E pede também uma escolha de movimento JÁ FEITA nesta sessão. Sem ela a
+    // home abre de verdade, com a pergunta do portão — e a foto que ela armaria
+    // por cima da cortina taparia justamente os botões dela. É a mesma trava do
+    // Voltar do /craft, e pelo mesmo motivo: quem entrou no site por
+    // /craft/creativity pode chegar aqui sem nunca ter visto o portão.
+    const seamPhoto = reduced || entering || !stored
       ? null
       : photos.find((p) => p.id === SEAM_PHOTO);
     exit = seamPhoto
       ? leaveToSeam(canvas, plane, seamPhoto, blur, desiredTunnelStrength, setTunnel)
       : null;
 
-    if (!exit) return void history.back();
+    if (!exit) return void goHome();
 
     exit.done.then(() => {
       // O recado pra home, escrito só agora: o quadro que ela vai receber é a
       // foto cobrindo a tela, e não o mural. Escrever antes seria prometer uma
       // emenda que uma saída interrompida no meio não entregaria.
       try { sessionStorage.setItem(SEAM_BACK_KEY, '1'); } catch {}
-      history.back();
+      goHome();
     });
   });
 

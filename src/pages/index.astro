@@ -4,7 +4,7 @@ import type { ImageMetadata } from 'astro';
 import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
 import { SECTIONS } from '../components/carousel/config';
-import { SEAM_ASPECT, SEAM_PHOTO, FULL } from '../data/gallery';
+import { SEAM_ASPECT, SEAM_BACK_KEY, SEAM_PHOTO, FULL } from '../data/gallery';
 import { WORK_SEAM } from '../scripts/workNavigation';
 import { NOW_SEAM, NOW_TZ } from '../scripts/nowNavigation';
 import { CRAFT_SEAM } from '../scripts/craftNavigation';
@@ -69,6 +69,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
         craftAspect: CRAFT_SEAM.aspect,
         craftOverscan: CRAFT_SEAM.overscan,
         craftRotation: CRAFT_SEAM.rotation,
+        seamBackKey: SEAM_BACK_KEY,
       }}
     >
       document.documentElement.style.setProperty('--seam-aspect', seamAspect);
@@ -98,6 +99,15 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
           document.documentElement.dataset.nowReturn = 'armed';
         if (craftReturning && !reducesMotion)
           document.documentElement.dataset.craftReturn = 'armed';
+        /* A volta de /photos que chega num documento NOVO: quem vem pelo link
+           da /craft/creativity não tem home no histórico, então o BFCache não
+           entra e a página nasce de novo. O último quadro de lá é a foto da
+           emenda cobrindo a tela, e ele precisa estar pintado antes da cortina
+           de carregamento — o bundle rebobina dali até o anel (ver main.ts →
+           initPhotosLink). Quem dá o `src` à imagem é o script logo abaixo
+           dela: daqui o corpo ainda não existe. */
+        if (sessionStorage.getItem(seamBackKey) && !reducesMotion)
+          document.documentElement.dataset.photosReturn = 'armed';
       } catch (e) {}
     </script>
 
@@ -236,14 +246,30 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
        transição que não vai ver — quem leva, baixa na ociosidade, muito antes
        do clique (ver `arm` no main.ts). -->
   {seam && seamModule && (
-    <img
-      class="depart"
-      data-depart
-      data-src={seam.src}
-      data-aspect={SEAM_ASPECT}
-      alt=""
-      aria-hidden="true"
-    />
+    <>
+      <img
+        class="depart"
+        data-depart
+        data-src={seam.src}
+        data-aspect={SEAM_ASPECT}
+        alt=""
+        aria-hidden="true"
+      />
+
+      {/* O src, só na volta armada no <head>. Aqui e não no bundle porque este
+          é o primeiro quadro do documento: esperar o JS seria mostrar a cortina
+          de carregamento no lugar da foto que a página anterior entregou. Fora
+          da volta o atributo continua vazio, que é o que poupa 2400px de imagem
+          a quem nunca vai ver esta transição. */}
+      <script is:inline>
+        try {
+          if (document.documentElement.dataset.photosReturn === 'armed') {
+            var flat = document.querySelector('[data-depart]');
+            if (flat) flat.src = flat.dataset.src;
+          }
+        } catch (e) {}
+      </script>
+    </>
   )}
 
   <!-- ——— a emenda com /work ———
@@ -574,6 +600,36 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
        travada na da janela e a foto chegava espremida no fim do avanço. */
     max-width: none;
     max-height: none;
+  }
+
+  /* A home que NASCE de volta de /photos: sem BFCache não há avanço vivo pra
+     rebobinar, e o primeiro quadro tem que ser o último da página anterior — a
+     foto da emenda cobrindo a tela. Mesmo estado armado da /work e do /craft, e
+     pelo mesmo motivo: isto precisa valer antes de o bundle existir.
+
+     A medida é a conta do seamBox (main.ts → initPhotosLink) escrita em calc(),
+     com as duas variáveis que o <head> já publica pro resto das emendas: o
+     retângulo que cobre a tela na proporção da FITA, com a mesma sobra. Assim
+     que o bundle assume ele reescreve width/height/left/top inline, e o inline
+     ganha desta regra sem que nada se mexa entre os dois. */
+  :global(html[data-photos-return='armed']) .depart {
+    --depart-w: calc(
+      max(var(--viewport-w), var(--viewport-h) * var(--seam-aspect)) * var(--seam-overscan)
+    );
+    --depart-h: calc(var(--depart-w) / var(--seam-aspect));
+    width: var(--depart-w);
+    height: var(--depart-h);
+    left: calc(var(--viewport-left) + (var(--viewport-w) - var(--depart-w)) / 2);
+    top: calc(var(--viewport-top) + (var(--viewport-h) - var(--depart-h)) / 2);
+    opacity: 1;
+  }
+
+  /* Mesma razão da regra gêmea do /craft: o vidro do toggle de tema é composto
+     em camada própria e atravessa a foto opaca por cima dele. Aqui o quadro
+     armado dura o carregamento inteiro, então a pílula ficaria boiando nele. */
+  :global(html[data-photos-return='armed']) .theme {
+    opacity: 0;
+    pointer-events: none;
   }
 
   /* ——— a emenda com /work ———

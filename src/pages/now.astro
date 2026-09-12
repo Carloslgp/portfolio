@@ -13,9 +13,12 @@
 // `new Date()` pela mesma função (scripts/nowNavigation.ts → nowTime) e chegam
 // na mesma string porque é o mesmo instante. É a emenda mais barata que este
 // site tem: não há nada a sincronizar.
+import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
+import NowFigure from '../components/NowFigure.astro';
 import { NOW_SEAM, NOW_TZ } from '../scripts/nowNavigation';
 import { ASIDES, HORIZONS, LEAD, NOW_NOTE, PANELS, PLACE, STRANDS, UPDATED } from '../data/now';
+import type { Figure } from '../data/now';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -52,6 +55,53 @@ const REVEAL_ROWS = 3;
 function step(panel: number, row: number): number | null {
   return panel === 0 && row < REVEAL_ROWS ? NOTE_STEP + 1 + row : null;
 }
+
+/** A imagem de uma linha, já reduzida ao que a caixa pede.
+ *
+ *  768 é a caixa de 24rem (384px) em tela densa, e é teto: o sharp não amplia,
+ *  então quem chega menor continua do tamanho que é. As fontes vêm de pastas
+ *  com regras diferentes (a foto do time do Nock tem 1280px, a captura do
+ *  simulador tem 900), e pedir a mesma largura pra todas é o que faz a fileira
+ *  inteira chegar no mesmo peso por pixel.
+ *
+ *  A PROPORÇÃO viaja junto porque ela é medida na FONTE: enquanto a Pokédex era
+ *  a única imagem da página, ela morava como número fixo no CSS; com uma
+ *  imagem por linha, cada uma tem a sua, e é ela que reserva a caixa antes do
+ *  arquivo chegar — sem isso a lista pula a cada uma que carrega. */
+async function shot(figure: Figure) {
+  const img = await getImage({
+    src: figure.src,
+    width: Math.min(768, figure.src.width),
+    format: 'webp',
+    quality: 80,
+  });
+
+  return {
+    src: img.src,
+    width: img.attributes.width ?? figure.src.width,
+    height: img.attributes.height ?? figure.src.height,
+    ratio: figure.src.width / figure.src.height,
+    alt: figure.alt,
+    caption: figure.caption,
+  };
+}
+
+// As duas listas resolvem as imagens no BUILD, e por isso elas são percorridas
+// aqui em cima: o markup lá embaixo é síncrono e não tem como esperar por um
+// getImage no meio de um .map().
+const strands = await Promise.all(
+  STRANDS.map(async (strand) => ({
+    strand,
+    figure: strand.figure ? await shot(strand.figure) : null,
+  })),
+);
+
+const horizons = await Promise.all(
+  HORIZONS.map(async (horizon) => ({
+    horizon,
+    figure: horizon.figure ? await shot(horizon.figure) : null,
+  })),
+);
 ---
 
 <Layout lang="en">
@@ -237,7 +287,7 @@ function step(panel: number, row: number): number | null {
                 {panel.id === 'now' ? (
                   <>
                     <ol class="strands">
-                      {STRANDS.map((strand, row) => (
+                      {strands.map(({ strand, figure }, row) => (
                         <li
                           class:list={['strand', step(index, row) !== null && 'is-arriving']}
                           style={`--row:${row + 1}${step(index, row) !== null ? `;--i:${step(index, row)}` : ''}`}
@@ -251,6 +301,7 @@ function step(panel: number, row: number): number | null {
                             </h2>
                             {strand.since && <p class="strand-since">Since {month(strand.since)}</p>}
                             <p>{strand.body}</p>
+                            <NowFigure figure={figure} eager={row === 0} />
                           </div>
                         </li>
                       ))}
@@ -265,9 +316,9 @@ function step(panel: number, row: number): number | null {
                       ))}
                     </ul>
                   </>
-                ) : HORIZONS.length > 0 ? (
+                ) : horizons.length > 0 ? (
                   <ol class="strands">
-                    {HORIZONS.map((horizon, row) => (
+                    {horizons.map(({ horizon, figure }, row) => (
                       <li class="strand" style={`--row:${row + 1}`}>
                         <p class="strand-label">{horizon.label}</p>
                         <div class="strand-body">
@@ -293,35 +344,18 @@ function step(panel: number, row: number): number | null {
                               {/* Uma DIV e não um P de propósito: o corpo do
                                   fio é estilizado por `p:last-of-type`, e um
                                   parágrafo depois dele roubaria a regra. */}
-                              <span>After</span>
+                              <span>Inspired in</span>
                               <a href={horizon.ref.href} target="_blank" rel="noopener noreferrer">
                                 {horizon.ref.label}
                               </a>
                             </div>
                           )}
 
-                          {/* A única imagem das duas abas. `lazy` sem culpa:
-                              este painel nasce fora da tela e ninguém o vê
-                              antes de trocar de aba, então baixá-la no primeiro
-                              quadro seria peso pago por quem talvez nem chegue
-                              aqui. As medidas vão no atributo pra reservar a
-                              caixa antes do arquivo chegar — sem elas a lista
-                              inteira pula quando ele chega. */}
-                          {horizon.figure && (
-                            <figure class="strand-figure">
-                              <img
-                                src={horizon.figure.src}
-                                alt={horizon.figure.alt}
-                                width="900"
-                                height="601"
-                                loading="lazy"
-                                decoding="async"
-                              />
-                              {horizon.figure.caption && (
-                                <figcaption>{horizon.figure.caption}</figcaption>
-                              )}
-                            </figure>
-                          )}
+                          {/* `lazy` sem culpa em TODA linha desta aba: o painel
+                              nasce fora da tela e ninguém o vê antes de trocar
+                              de aba, então baixar no primeiro quadro seria peso
+                              pago por quem talvez nem chegue aqui. */}
+                          <NowFigure figure={figure} />
                         </div>
                       </li>
                     ))}
@@ -950,16 +984,31 @@ function step(panel: number, row: number): number | null {
      Hall of Fame ainda se lê inteira sem virar o assunto da linha. O
      `aspect-ratio` casado com o width/height do <img> é o que impede o pulo de
      layout quando o arquivo chega — ela é lazy, então chega mesmo depois. */
+  /* A caixa é DUAS medidas, e precisa das duas desde que a página deixou de ter
+     uma imagem só: 24rem de largura é o que a coluna de texto empresta sem a
+     imagem virar o assunto, e o teto de ALTURA é o que impede a foto quase
+     quadrada (a do kit do Bradesco) de ocupar 24rem nos dois eixos e afundar a
+     linha seguinte. Com os dois, tudo cai entre 18 e 24rem de largura e nada
+     passa de 18rem de altura — uma faixa estreita o bastante pra lista
+     continuar sendo uma lista. É a mesma conta da sala de Craft. */
   .strand-figure {
+    --shot-cap: 18rem;
     margin-top: 0.95rem;
     max-width: 24rem;
   }
 
   .strand-figure img {
     display: block;
-    width: 100%;
+    /* a menor entre a largura da caixa e a que o teto de altura permite pra
+       esta proporção — a imagem cabe inteira nos dois limites, sem corte */
+    width: min(100%, var(--shot-cap) * var(--shot-ratio, 1.5));
     height: auto;
-    aspect-ratio: 900 / 601;
+    /* A proporção de CADA imagem, medida na fonte e escrita pelo componente.
+       Era o 900/601 da Pokédex fixo aqui, de quando ela era a única imagem da
+       página; com uma por linha, uma proporção só deformaria sete delas. O
+       fallback existe pro caso improvável de a variável não chegar — melhor
+       uma caixa errada que caixa nenhuma, que é a lista pulando. */
+    aspect-ratio: var(--shot-ratio, 3 / 2);
     border-radius: 0.5rem;
     border: 1px solid rgba(var(--ink-rgb), 0.1);
     /* a sombra é a mesma do selo da /work: a tela é escura e sem ela a imagem

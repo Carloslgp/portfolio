@@ -121,10 +121,16 @@ const POLICY = [
     quality: 80,
   },
   {
-    // A imagem da aba Next da /now (.strand-figure). A caixa tem 24rem de teto
+    // As imagens das linhas da /now (.strand-figure). A caixa tem 24rem de teto
     // (384px), então 900 já é dpr 2 com folga — e é a largura em que a captura
     // de Hall of Fame chegou aqui, depois de cortadas as tarjas pretas.
-    dir: 'public/images/now',
+    //
+    // Em src/assets/ e não em public/ porque a página agora importa estes
+    // arquivos: é o import que dá a ela as medidas de cada um, e sem elas não
+    // há como reservar a caixa de imagens que já não têm todas a mesma
+    // proporção. As linhas que reaproveitam foto de outra página (a do Nock, a
+    // do project_cars) apontam direto pra fonte original, sem cópia aqui.
+    dir: 'src/assets/now',
     maxSide: 900,
     quality: 80,
   },

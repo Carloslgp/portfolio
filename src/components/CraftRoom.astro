@@ -102,6 +102,7 @@ const { docTitle, description, eyebrow, title, lead, footNote, footLinks } =
         <p class="eyebrow">{eyebrow}</p>
         <h1>{title.line1}<br /><em>{title.line2}</em></h1>
         <p class="lead">{lead}</p>
+        <slot name="lead-note" />
       </header>
 
       <slot />

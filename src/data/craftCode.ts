@@ -44,6 +44,8 @@ import elderWatch1 from '../assets/craft/elder_watch_1.webp';
 import elderWatch2 from '../assets/craft/elder_watch_2.webp';
 import ghosty1 from '../assets/craft/ghosty_1.webp';
 import ghosty2 from '../assets/craft/ghosty_2.webp';
+import projectCars1 from '../assets/craft/projectcar_2.webp';
+import projectCars2 from '../assets/craft/projectcars_1.webp';
 import studySync1 from '../assets/craft/studysync_1.webp';
 import studySync2 from '../assets/craft/studysync_2.webp';
 import studySync3 from '../assets/craft/studysync_3.webp';
@@ -135,6 +137,11 @@ export interface CodeProject {
    *  Não há campo de enquadramento porque não há corte: a imagem entra
    *  inteira, na proporção dela. */
   photos?: { src: ImageMetadata; alt: string }[];
+  /** true quando IA (Claude, Copilot etc.) ajudou a escrever PARTES do
+   *  código — não o projeto inteiro. Vira uma nota discreta na página, entre
+   *  as chips e a descrição. Ausente (ou false) não mostra nada: a nota é
+   *  pra quando vale marcar, não pra virar rodapé de todo item da lista. */
+  aiAssisted?: boolean;
 }
 
 /** Os textos fixos da sala. Ficam aqui pelo mesmo motivo dos projetos: a
@@ -232,6 +239,7 @@ export const CODE_PROJECTS: CodeProject[] = [
       'and no client router. Just the browser doing what it already knows ' +
       'how to do.',
     repo: 'https://github.com/Carloslgp/portfolio',
+    aiAssisted: true,
     photos: [
       {
         src: portfolio1,
@@ -279,6 +287,7 @@ export const CODE_PROJECTS: CodeProject[] = [
       'because my own phone kept handing me photos I couldn’t open anywhere.',
     repo: 'https://github.com/Carloslgp/Meta-No-Data',
     live: { label: 'Live', href: 'https://carloslgp.github.io/Meta-No-Data/' },
+    aiAssisted: true,
     photos: [
       {
         src: metaNoData1,
@@ -334,6 +343,7 @@ export const CODE_PROJECTS: CodeProject[] = [
       'away the very thing it’s supposed to hide, so the disguise is the ' +
       'whole idea.',
     repo: 'https://github.com/Carloslgp/Ghosty-App',
+    aiAssisted: true,
     photos: [
       {
         src: ghosty1,
@@ -346,6 +356,33 @@ export const CODE_PROJECTS: CodeProject[] = [
         alt: 'The same app showing what everyone else sees, a working ' +
           'calculator, with the first-run hint that typing 1984 opens the ' +
           'setup.',
+      },
+    ],
+  },
+  {
+    id: 'project-cars',
+    title: 'project_cars',
+    mark: 'PC',
+    stack: ['Python', 'PySide6', 'PyVista', 'VTK'],
+    description:
+      'Two 3D cars nose to tail on a straight, to see where the slipstream gain ' +
+      'actually comes from when the cars aren’t the same size. Nothing is ' +
+      'hand-written: drag uses the frontal area measured off the uploaded mesh, ' +
+      'each face is colored by how hard it fights the air, and the car behind ' +
+      'only gets relief for the part of it that fits inside the leader’s wake.',
+    repo: 'https://github.com/Carloslgp/project-cars',
+    photos: [
+      {
+        src: projectCars1,
+        alt: 'The simulation running: two red cars on a dark highway, one well ' +
+          'ahead of the other, with elapsed time, both speeds and the gap ' +
+          'between them along the bottom edge.',
+      },
+      {
+        src: projectCars2,
+        alt: 'The setup screen: a card per car, each taking a 3D model file, a ' +
+          'base acceleration and a starting speed, with a Rodar button below ' +
+          'the pair.',
       },
     ],
   },
@@ -478,6 +515,7 @@ export const CODE_PROJECTS: CodeProject[] = [
       'to guess what comes next.',
     repo: 'https://github.com/Carloslgp/python-do-zero-roadmap',
     live: { label: 'Live', href: 'https://carloslgp.github.io/python-do-zero-roadmap/' },
+    aiAssisted: true,
     photos: [
       {
         src: pythonDoZero1,

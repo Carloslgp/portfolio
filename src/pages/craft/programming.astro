@@ -132,6 +132,14 @@ const rows = await Promise.all(
     { label: 'Work', href: '/work' },
   ]}
 >
+  <p slot="lead-note" class="lead-note">
+    There's a lot more on my{' '}
+    <a href="https://github.com/Carloslgp" target="_blank" rel="noopener noreferrer">
+      GitHub
+      <span aria-hidden="true">{CODE_ROOM.linkMark}</span>
+      <span class="sr-only">, opens in a new tab</span>
+    </a>.
+  </p>
   <ol class="code-list">
     {rows.map(({ project, index, arranjo, shots, side }) => (
       <li
@@ -180,6 +188,9 @@ const rows = await Promise.all(
           <ul class="chips">
             {project.stack.map((tool) => <li>{tool}</li>)}
           </ul>
+          {project.aiAssisted && (
+            <p class="ai-note">AI helped write some parts of this one.</p>
+          )}
           <p class="code-copy">{project.description}</p>
 
           <p class="code-links">
@@ -432,6 +443,37 @@ const rows = await Promise.all(
     color: hsl(var(--mark-hue), 55%, 72%);
   }
 
+  /* --- a nota sob o lead, no cabeçalho ------------------------------------
+     Quase do tamanho do `.lead`, só um pouco abaixo — um aparte, não uma
+     segunda frase do mesmo peso. O link segue o mesmo desenho do
+     `.code-links a`: traço embaixo em vez de sublinhado, pra combinar com o
+     resto da sala. */
+  .lead-note {
+    max-width: 34rem;
+    margin-top: 0.6rem;
+    color: rgba(var(--ink-rgb), 0.6);
+    font-size: 0.94rem;
+    line-height: 1.55;
+    transition: color var(--theme-fade);
+  }
+
+  .lead-note a {
+    --mark-size: 1.1em;
+    display: inline-flex;
+    gap: 0.3rem;
+    align-items: center;
+    color: var(--ink);
+    font-weight: 650;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(var(--ink-rgb), 0.28);
+    transition: color var(--theme-fade), border-color 0.25s ease;
+  }
+
+  .lead-note a:hover,
+  .lead-note a:focus-visible {
+    border-bottom-color: currentColor;
+  }
+
   /* --- o texto ----------------------------------------------------------- */
   .code-number {
     margin-bottom: 0.5rem;
@@ -468,6 +510,19 @@ const rows = await Promise.all(
     content: '·';
     margin: 0 0.5rem;
     color: rgba(var(--ink-rgb), 0.3);
+  }
+
+  /* A nota de "IA ajudou aqui": um aparte, não uma segunda descrição — por
+     isso itálico e menor que o `.code-copy` que vem logo abaixo, e não uma
+     chip a mais na fileira de cima (que listaria "AI" ao lado de stacks reais
+     como se fosse ferramenta, quando é a origem do texto, não uma delas). */
+  .ai-note {
+    margin-top: 0.55rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.76rem;
+    font-style: italic;
+    line-height: 1.5;
+    transition: color var(--theme-fade);
   }
 
   .code-copy {

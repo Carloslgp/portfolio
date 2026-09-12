@@ -1,0 +1,45 @@
+---
+// src/components/NowFigure.astro — a imagem de uma linha da /now.
+//
+// Existe como componente porque as DUAS abas desenham a mesma caixa, e ela
+// deixou de ser markup trivial: a proporção viaja por variável CSS (cada linha
+// tem a sua agora), o caption é opcional e a primeira linha da aba de abertura
+// carrega adiantada. Duplicar isso nos dois ramos do now.astro seria manter
+// duas cópias de uma coisa que precisa sair idêntica.
+//
+// `figure` chega nulo pra linha sem imagem — a decisão de ter ou não foto é do
+// data/now.ts, e o chamador não precisa repetir a pergunta.
+interface Props {
+  figure: {
+    src: string;
+    width: number | string;
+    height: number | string;
+    ratio: number;
+    alt: string;
+    caption?: string;
+  } | null;
+  /** A primeira linha da aba que abre a página: ela já está na tela quando o
+   *  documento chega, e adiar o pedido dela só atrasaria a única imagem que
+   *  alguém vê sem rolar nem trocar de aba. */
+  eager?: boolean;
+}
+
+const { figure, eager = false } = Astro.props;
+---
+
+{figure && (
+  <figure class="strand-figure" style={`--shot-ratio:${figure.ratio}`}>
+    {/* As medidas vão no atributo E a proporção na variável: o atributo é o que
+        o navegador lê antes do CSS, e a variável é o que segura a caixa depois
+        que a largura vira 100% da coluna. */}
+    <img
+      src={figure.src}
+      alt={figure.alt}
+      width={figure.width}
+      height={figure.height}
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+    />
+    {figure.caption && <figcaption>{figure.caption}</figcaption>}
+  </figure>
+)}

@@ -37,6 +37,47 @@
  *
  *  É o número mais importante do arquivo. A página inteira fala no presente, e
  *  a única coisa que autoriza um presente escrito é dizer de quando ele é. */
+import type { ImageMetadata } from 'astro';
+
+// As imagens das linhas. A maioria não mora numa pasta desta página: ela aponta
+// pro MESMO arquivo que a /craft ou a /work já usa. É de propósito — copiar a
+// foto do time do Nock (ou as capturas do project_cars) pra cá daria dois
+// arquivos iguais pra manter sincronizados, e no dia em que um fosse trocado as
+// duas páginas passariam a mostrar coisas diferentes. O Astro gera as variantes
+// por opções pedidas, então cada página recorta a mesma fonte sem baixar duas
+// vezes o que for igual.
+import nockTeam from '../assets/work_photos/professional/nock_1.webp';
+import projectCars from '../assets/craft/projectcar_2.webp';
+import ghosty from '../assets/craft/ghosty_1.webp';
+import bradesco from '../assets/work_photos/professional/bradesco_1.webp';
+import buildersClub from '../assets/work_photos/professional/builders_club_1.webp';
+import youtube from '../assets/work_photos/professional/youtube_1.webp';
+import lynx from '../assets/craft/lynx_engine_1.webp';
+import homer from '../assets/now/iliad.webp';
+import pokedex from '../assets/now/pokemon-hall-of-fame.webp';
+
+/** Uma imagem de linha, nas duas abas.
+ *
+ *  Era exceção de UMA linha (a Pokédex), com o argumento de que três delas
+ *  virariam padrão e parariam de significar. O que mudou é que a lista deixou
+ *  de ser só texto: cada fio aqui é uma coisa que existe e que dá pra VER, e
+ *  mostrar o simulador rodando diz num quadro o que o parágrafo gasta três
+ *  frases pra descrever. O padrão agora é o ponto — e o que sustenta o ritmo é
+ *  a caixa ser a mesma pra todas (ver .strand-figure em pages/now.astro).
+ *
+ *  A imagem é IMPORTADA, e não um caminho em public/: é o import que traz as
+ *  medidas do arquivo, e sem elas a página não tem como reservar a caixa de
+ *  imagens que já não têm todas a mesma proporção — a lista inteira pularia
+ *  quando cada uma chegasse.
+ *
+ *  `alt` nunca vazio: a imagem carrega sentido, então ela tem que existir
+ *  também pra quem não a vê. */
+export interface Figure {
+  src: ImageMetadata;
+  alt: string;
+  caption?: string;
+}
+
 export const UPDATED = '2026-09';
 
 /** Onde eu estou. Sai ao lado da hora, no cabeçalho — os dois juntos são a
@@ -85,6 +126,8 @@ export interface Strand {
   since?: string;
   href?: string;
   body: string;
+  /** A coisa, VISTA. Mesmo campo do Horizon — ver o comentário lá embaixo. */
+  figure?: Figure;
 }
 
 /** Os fios abertos, na ordem em que eu contaria. Sem ordenação automática:
@@ -100,6 +143,12 @@ export const STRANDS: Strand[] = [
       'B2B lead enrichment for the Brazilian market. Right now I’m structuring ' +
       'the database with our CTO, ahead of our first paying customers. Most of ' +
       'my week that isn’t the internship is this.',
+    figure: {
+      src: nockTeam,
+      alt:
+        'The four of us on a bench in front of the Hotmilk wall at PUCPR, the ' +
+        'innovation hub where Nock is being built.',
+    },
   },
   {
     id: 'project-cars',
@@ -114,6 +163,13 @@ export const STRANDS: Strand[] = [
       'behind only gets slipstream relief for the part of it that actually ' +
       'fits inside the leader’s wake. I’m on the PySide6 input screens; the ' +
       'physics comes once the navigation holds.',
+    figure: {
+      src: projectCars,
+      alt:
+        'The simulator running: two red cars on a dark road, one well ahead of ' +
+        'the other, with elapsed time, both speeds and the gap between them ' +
+        'along the bottom edge.',
+    },
   },
   {
     id: 'ghosty',
@@ -127,6 +183,12 @@ export const STRANDS: Strand[] = [
       'button underneath. The triggers call the police and open a live voice ' +
       'stream to emergency contacts. Only the front end exists so far, which ' +
       'is where I am.',
+    figure: {
+      src: ghosty,
+      alt:
+        'Ghosty open in the Android emulator, on the vault screen behind the ' +
+        'disguise, with its Kotlin source beside it.',
+    },
   },
   {
     id: 'bradesco',
@@ -137,6 +199,12 @@ export const STRANDS: Strand[] = [
       'Data analyst intern on life insurance and private pension. I build the ' +
       'analytical bases other teams decide from, and I maintain the routine ' +
       'that reaches customers at the moment they’re about to pull their money out.',
+    figure: {
+      src: bradesco,
+      alt:
+        'The welcome kit that met me on the first day, laid out on a desk: ' +
+        'notebook, bottle and card, all in Bradesco Seguros red.',
+    },
   },
   {
     id: 'builders-club',
@@ -147,6 +215,12 @@ export const STRANDS: Strand[] = [
       'PUCPR’s developer community meets every week and about fifteen people ' +
       'show up. I speak on APIs and databases. The talks are the easy part; ' +
       'keeping a room of students building on a schedule is the actual work.',
+    figure: {
+      src: buildersClub,
+      alt:
+        'Me at the projector in a PUCPR classroom, pointing at a FastAPI file ' +
+        'on screen while walking the room through it.',
+    },
   },
   {
     id: 'sudocarlos',
@@ -158,6 +232,12 @@ export const STRANDS: Strand[] = [
       'A small YouTube channel I make with care: Python, computer architecture, ' +
       'and what my own path through tech actually looks like. Six videos in, ' +
       'and I still write every one of them out before recording.',
+    figure: {
+      src: youtube,
+      alt:
+        'The @sudocarlos channel page, six videos in: two Python course ' +
+        'episodes and one on computer architecture.',
+    },
   },
 ];
 
@@ -223,18 +303,12 @@ export interface Horizon {
    *  coisa que já existe. Sai numa linha discreta embaixo do corpo, dizendo de
    *  onde veio. */
   ref?: { href: string; label: string };
-  /** Uma imagem, quando o horizonte é sobre uma coisa que se VÊ.
+  /** A coisa, VISTA — ver o comentário do Figure lá em cima.
    *
-   *  Nenhum outro item da página tem foto, e é isso que faz esta funcionar: a
-   *  Pokédex é a única linha das duas abas que fala de um acervo, e um acervo
-   *  descrito em duas frases é abstrato até você ver a tela. Se um dia tiver
-   *  três destas, elas viram um padrão e param de significar — o campo é
-   *  opcional pra continuar sendo exceção.
-   *
-   *  O arquivo mora em public/images/now/ (ver a regra dessa pasta em
-   *  scripts/optimize-images.mjs). `alt` é obrigatório junto: a imagem carrega
-   *  sentido, então ela tem que existir também pra quem não a vê. */
-  figure?: { src: string; alt: string; caption?: string };
+   *  Aqui ela é mais rara que na outra aba, e não por regra: um horizonte que
+   *  ainda não existe não tem o que mostrar. Quem tem imagem nesta lista é
+   *  quem já tem código escrito ou um acervo parado em algum lugar. */
+  figure?: Figure;
 }
 
 /** O que ainda não aconteceu, na ORDEM em que eu contaria — do que já tem
@@ -260,6 +334,12 @@ export const HORIZONS: Horizon[] = [
       'then I stopped. I want to study OpenGL properly and rewrite the renderer ' +
       'knowing what the driver is actually doing, instead of whatever made the ' +
       'triangle appear.',
+    figure: {
+      src: lynx,
+      alt:
+        'Everything Lynx does so far: its own window open on a flat green ' +
+        'field, with a single sprite sitting in the middle of it.',
+    },
   },
   {
     id: 'math',
@@ -293,6 +373,12 @@ export const HORIZONS: Horizon[] = [
       'Both are on my shelf. Neither has been opened. Bought them with real ' +
       'intention and let them sit there, which is somehow worse than never ' +
       'buying them.',
+    figure: {
+      src: homer,
+      alt:
+        'The Penguin Classics slipcase and both volumes, Ilíada and Odisseia, ' +
+        'lying on a bed in low light, as untouched as the paragraph admits.',
+    },
   },
   {
     id: 'pokedex',
@@ -302,7 +388,7 @@ export const HORIZONS: Horizon[] = [
       'Bank is shutting down and years of collection are still stuck on the ' +
       '3DS. This one has a deadline and no excuse.',
     figure: {
-      src: '/images/now/pokemon-hall-of-fame.webp',
+      src: pokedex,
       alt:
         'Pixel-art Pokémon Hall of Fame screen showing Venusaur, Ninetales, ' +
         'Snorlax, Lapras, Alakazam, and Dragonite beneath the words ' +

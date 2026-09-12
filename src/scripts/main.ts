@@ -23,10 +23,12 @@ import { viewportSize, viewportOffset } from './viewport';
 // Desktop keeps the native document cross-fade. Capture it before bootstrap
 // waits for textures so a rebuilt return never rewinds under its snapshot.
 // Mobile does not opt into that transition, so this remains resolved there.
-let craftRevealed: Promise<unknown> = Promise.resolve();
+// Vale pras duas voltas que nascem num documento novo — a do /craft e a de
+// /photos —, porque o retrato é do DOCUMENTO e não de uma delas.
+let documentRevealed: Promise<unknown> = Promise.resolve();
 window.addEventListener('pagereveal', (event) => {
   const transition = (event as any).viewTransition;
-  if (transition) craftRevealed = transition.finished.catch(() => {});
+  if (transition) documentRevealed = transition.finished.catch(() => {});
 });
 
 // Esta chegada à home veio de DENTRO do site? (o "‹ Voltar" do /photos, o
@@ -130,11 +132,12 @@ export async function bootstrap() {
   const internal = returningFromPhotos || returningFromWork || returningFromNow || returningFromCraft
     || isInternalArrival();
 
-  // Este documento nasceu agora, então não há avanço congelado pra rebobinar: a
-  // cortina de carregamento é que cobre a troca, e a home reaparece no segmento
-  // de fotos (logo abaixo). Consumir a marca aqui é o que impede ela de valer
-  // numa volta futura — ver takeSeamBack.
-  takeSeamBack();
+  // Este documento nasceu agora, então não há avanço congelado pra rebobinar —
+  // mas o quadro que /photos entregou É a foto da emenda, e o <head> já a
+  // pintou por cima da cortina (ver index.astro → data-photos-return). Quem
+  // desfaz o avanço a partir dela, com a cena já montada, é o initPhotosLink.
+  // Consumir a marca aqui é o que impede ela de valer numa volta futura.
+  const seamBack = takeSeamBack();
 
   // O portão é armado ANTES do carregamento e só esperado depois: a pergunta
   // fica na tela enquanto as fotos baixam, então a escolha corre em paralelo e
@@ -190,7 +193,7 @@ export async function bootstrap() {
     .forEach((el) => el.classList.add('is-in'));
 
   initAbout(carousel, lenis);
-  initPhotosLink(carousel);
+  initPhotosLink(carousel, returningFromPhotos && seamBack);
   initWorkLink(carousel, returningFromWork);
   initNowLink(carousel, returningFromNow);
   initCraftLink(carousel, returningFromCraft);
@@ -489,7 +492,7 @@ function initCraftLink(carousel: Carousel, returningFromCraft = false) {
 
   if (returningFromCraft) {
     if (reducedMotion()) settle();
-    else requestAnimationFrame(() => craftRevealed.then(() => returnToRing(false)));
+    else requestAnimationFrame(() => documentRevealed.then(() => returnToRing(false)));
   }
 
   window.addEventListener('section:open', async (event) => {
@@ -546,7 +549,7 @@ function initCraftLink(carousel: Carousel, returningFromCraft = false) {
       return;
     }
     const rewindDeparture = leaving;
-    requestAnimationFrame(() => craftRevealed.then(() => returnToRing(rewindDeparture)));
+    requestAnimationFrame(() => documentRevealed.then(() => returnToRing(rewindDeparture)));
   });
 }
 
@@ -842,7 +845,7 @@ function seamBox(flat: HTMLImageElement): { w: number; h: number } | null {
   return { w, h };
 }
 
-function initPhotosLink(carousel: Carousel) {
+function initPhotosLink(carousel: Carousel, returningFromSeam = false) {
   let leaving = false;   // clique duplo não pode empilhar duas navegações
 
   const flat = document.querySelector<HTMLImageElement>('[data-depart]');
@@ -869,6 +872,99 @@ function initPhotosLink(carousel: Carousel) {
     if (SECTIONS[(e as CustomEvent).detail?.index]?.id === 'photos') arm();
   });
 
+  // Quem desenha a foto chapada, nas DUAS direções. `k` é zero com ela colada
+  // na foto 3D deste quadro e um no quadro da emenda, cobrindo a tela — a ida
+  // é esse peso subindo, e a volta sem BFCache é ele descendo.
+  //
+  // Ela não "assume" o movimento: ela GRUDA nele. A cada quadro a foto 3D é
+  // medida na tela, e a chapada é desenhada entre essa medida e o quadro da
+  // emenda, com um peso que sai do zero DEVAGAR (smoothstep tem derivada
+  // nula nas duas pontas). O efeito é que ela nasce exatamente do tamanho da
+  // foto que está substituindo E crescendo no mesmo ritmo, e só depois se
+  // desprende, em direção à tela cheia.
+  //
+  // A alternativa óbvia — medir a foto 3D uma vez e interpolar dali até a
+  // emenda — é o que estava aqui antes, e tem um defeito que só aparece
+  // medindo: as duas metades do avanço não crescem no mesmo ritmo (a 3D
+  // ainda tem 1,2x pela frente, a chapada tem 1,4x em menos tempo), então a
+  // troca de mãos dobrava a velocidade do zoom num quadro só. Tamanho igual
+  // e velocidade diferente ainda é um tranco.
+  const drawFlatAt = (k: number) => {
+    if (!flat || !seam) return;
+
+    const now = carousel.frontPhotoSize();       // a foto 3D NESTE quadro
+
+    // smootherstep, e não o smoothstep comum: a derivada dele sai do zero
+    // MAIS devagar (30k²(1−k)² contra 6k(1−k)), e é justo no comecinho que
+    // o desprendimento aparece — a distância que falta pra tela cheia é
+    // grande, então um peso que cresce rápido demais vira aceleração
+    // repentina mesmo saindo do zero. O tempo perdido aqui é devolvido no
+    // meio da curva, onde o avanço já está veloz e ninguém repara.
+    const w = k * k * k * (k * (k * 6 - 15) + 10);
+
+    flat.style.transform =
+      `scale(${(now.w + (seam.w - now.w) * w) / seam.w}, ` +
+      `${(now.h + (seam.h - now.h) * w) / seam.h})`;
+
+    // o crossfade também por smoothstep: ele atravessa depressa a faixa do
+    // meio, que é onde as duas imagens aparecem somadas — a fita é curva e
+    // a chapada não, então o miolo delas nunca casa perfeitamente, e o que
+    // dá pra fazer é passar rápido por ali, no ponto mais veloz do avanço
+    const f = Math.min(1, k / DEPART.flatFade);
+    flat.style.opacity = `${f * f * (3 - 2 * f)}`;
+  };
+
+  // A segunda metade do avanço, pendurada no relógio da primeira: recebe o
+  // MESMO progresso já suavizado que move a câmera. A emenda só começa depois
+  // de `flatAt`, quando a fita já desenrolou e a câmera já pousou.
+  const drawFlat = (p: number) => {
+    if (p < DEPART.flatAt) return;
+    drawFlatAt(Math.min(1, (p - DEPART.flatAt) / (1 - DEPART.flatAt)));
+  };
+
+  // o que sobra depois de qualquer um dos caminhos: a foto chapada volta a ser
+  // o elemento inerte de sempre e a HUD reaparece (o CSS cuida do fade)
+  const settle = () => {
+    document.body.classList.remove('is-diving');
+    if (flat) {
+      flat.style.opacity = '';
+      flat.style.transform = '';
+    }
+  };
+
+  // ——— a volta num documento NOVO ———
+  // Sem BFCache não há timeline pra rebobinar: a home nasceu coberta pela foto
+  // da emenda (index.astro → data-photos-return), e o peso anda sozinho daquele
+  // quadro até a foto do anel, pela mesma função de desenho da ida. É o mesmo
+  // arranjo do /work e do /craft, e a duração é a do rebobinar do BFCache — as
+  // duas voltas têm que soar iguais, porque são a mesma volta.
+  if (returningFromSeam && flat && !reducedMotion()) {
+    document.body.classList.add('is-diving');
+    // No desktop, espere o retrato nativo soltar o documento novo — rebobinar
+    // debaixo dele animaria uma foto que ninguém está vendo ainda.
+    requestAnimationFrame(() => documentRevealed.then(() => {
+      // a janela pode ter mudado de tamanho enquanto a pessoa estava em /photos,
+      // e é a medida NOVA que a página de fotos acabou de usar do outro lado
+      seam = seamBox(flat);
+      document.documentElement.removeAttribute('data-photos-return');
+
+      // Sem caixa da emenda o drawFlatAt desiste de desenhar, e desistir AQUI
+      // deixaria a foto parada cobrindo a tela: o quadro armado precisa sair de
+      // cena de um jeito ou de outro.
+      if (!seam) return void settle();
+
+      drawFlatAt(1);
+      const at = { k: 1 };
+      gsap.to(at, {
+        k: 0,
+        duration: DEPART.dur / DEPART.returnScale,
+        ease: DEPART.ease,
+        onUpdate: () => drawFlatAt(at.k),
+        onComplete: settle,
+      });
+    }));
+  }
+
   window.addEventListener('section:open', async (e) => {
     const detail = (e as CustomEvent).detail;
     if (detail?.id !== 'photos' || leaving) return;
@@ -891,47 +987,6 @@ function initPhotosLink(carousel: Carousel) {
       // desenrolada. /photos monta este mesmo retângulo antes de começar o
       // recuo, então a navegação troca documentos sem trocar o quadro.
       seam = flat ? seamBox(flat) : null;
-
-      // Quem desenha a segunda metade do avanço.
-      //
-      // Ela não "assume" o movimento: ela GRUDA nele. A cada quadro a foto 3D é
-      // medida na tela, e a chapada é desenhada entre essa medida e o quadro da
-      // emenda, com um peso que sai do zero DEVAGAR (smoothstep tem derivada
-      // nula nas duas pontas). O efeito é que ela nasce exatamente do tamanho da
-      // foto que está substituindo E crescendo no mesmo ritmo, e só depois se
-      // desprende, em direção à tela cheia.
-      //
-      // A alternativa óbvia — medir a foto 3D uma vez e interpolar dali até a
-      // emenda — é o que estava aqui antes, e tem um defeito que só aparece
-      // medindo: as duas metades do avanço não crescem no mesmo ritmo (a 3D
-      // ainda tem 1,2x pela frente, a chapada tem 1,4x em menos tempo), então a
-      // troca de mãos dobrava a velocidade do zoom num quadro só. Tamanho igual
-      // e velocidade diferente ainda é um tranco.
-      const drawFlat = (p: number) => {
-        if (!flat || !seam || p < DEPART.flatAt) return;
-
-        const k = Math.min(1, (p - DEPART.flatAt) / (1 - DEPART.flatAt));
-        const now = carousel.frontPhotoSize();       // a foto 3D NESTE quadro
-
-        // smootherstep, e não o smoothstep comum: a derivada dele sai do zero
-        // MAIS devagar (30k²(1−k)² contra 6k(1−k)), e é justo no comecinho que
-        // o desprendimento aparece — a distância que falta pra tela cheia é
-        // grande, então um peso que cresce rápido demais vira aceleração
-        // repentina mesmo saindo do zero. O tempo perdido aqui é devolvido no
-        // meio da curva, onde o avanço já está veloz e ninguém repara.
-        const w = k * k * k * (k * (k * 6 - 15) + 10);
-
-        flat.style.transform =
-          `scale(${(now.w + (seam.w - now.w) * w) / seam.w}, ` +
-          `${(now.h + (seam.h - now.h) * w) / seam.h})`;
-
-        // o crossfade também por smoothstep: ele atravessa depressa a faixa do
-        // meio, que é onde as duas imagens aparecem somadas — a fita é curva e
-        // a chapada não, então o miolo delas nunca casa perfeitamente, e o que
-        // dá pra fazer é passar rápido por ali, no ponto mais veloz do avanço
-        const f = Math.min(1, k / DEPART.flatFade);
-        flat.style.opacity = `${f * f * (3 - 2 * f)}`;
-      };
 
       const tl = carousel.departInto(detail.index, drawFlat);
       tl.to({}, { duration: DEPART.hold });   // o pouso, com a tela já coberta
@@ -967,16 +1022,6 @@ function initPhotosLink(carousel: Carousel) {
     // futura à página inicial.
     try { sessionStorage.removeItem(PHOTOS_RETURN_KEY); } catch {}
     leaving = false;
-
-    // o que sobra depois dos dois caminhos: a foto chapada volta a ser o
-    // elemento inerte de sempre e a HUD reaparece (o CSS cuida do fade)
-    const settle = () => {
-      document.body.classList.remove('is-diving');
-      if (flat) {
-        flat.style.opacity = '';
-        flat.style.transform = '';
-      }
-    };
 
     // ——— a volta costurada ———
     // /photos terminou mergulhando na MESMA foto que esta página deixou

@@ -91,7 +91,12 @@ import acampamento2 from '../assets/creations/acampamento_2.webp';
 import acampamento3 from '../assets/creations/acampamento_3.webp';
 import ensino1 from '../assets/creations/ensino_1.webp';
 import construindoFuturo from '../assets/creations/construindo_futuro.webp';
-import treinador1 from '../assets/creations/treinador_1.jpg';
+// treinador_1 é o logo recortado rente às letras, com fundo transparente — e
+// a moldura corta ~5% de cada borda (a foto é deitada maior pra andar por
+// dentro, ver FIELD.INNER no config), o que comia o "L" e o "OF". Esta é a
+// mesma imagem com 12% de margem transparente em volta; o original continua
+// na pasta, intocado.
+import treinador1 from '../assets/creations/treinador_1_moldura.webp';
 import primeiraMusicaAutoral1 from '../assets/creations/primeira_musica_autoral_1.webp';
 import bonsai1 from '../assets/creations/bonsai_1.webp';
 import oradorTurma1 from '../assets/creations/oradro_turma_1.webp';

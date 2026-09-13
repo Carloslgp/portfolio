@@ -1857,8 +1857,9 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
   /* ——— celular: moldura em cima, texto embaixo ———
      O orçamento vertical aqui é o que define LAYOUT.MIN_STAGE_HEIGHT no
      config: moldura de 36dvh + título de duas linhas + três frases + link
-     precisam caber numa tela presa. O padding direito maior é pro texto não
-     passar por baixo do indicador. */
+     precisam caber numa tela presa. O padding de cima deixa o contador (fixo
+     no alto, à direita) livre: a foto vai de borda a borda da coluna e
+     passaria por baixo dele. */
   @media (max-width: 46rem) {
     .cc-hero {
       padding: 6.5rem 1.35rem 6rem;
@@ -1873,58 +1874,75 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
       grid-template-rows: auto auto;
       align-content: center;
       row-gap: 1.3rem;
-      padding: 4.5rem 2.9rem 2.5rem 1.35rem;
+      padding: 6.25rem 1.35rem 2rem;
     }
 
-    /* ——— as composições no celular ———
-       Uma coluna só não tem "outro lado", mas as composições não eram sobre
-       lado: eram sobre QUANTO da tela a foto toma e de onde ela sai. A régua
-       aqui é vertical — foto e texto dividem a altura.
+    /* ——— as composições no celular: uma só ———
+       No desktop cada composição é um jeito de dividir a tela com o texto ao
+       lado. Numa coluna só essas variações viravam desordem: foto à esquerda,
+       à direita, estreita, vazando pela borda, ou a tela inteira com um
+       parágrafo longo por cima. Aqui TODAS viram a mesma coisa: foto
+       centralizada em cima, na largura da coluna, e o texto embaixo, no
+       papel. O ritmo de uma criação pra outra fica por conta do efeito de
+       encaixe.
 
-       --phone-frame é a fatia normal, e cada composição é um fator dela. Um
-       knob só: o celular baixo (iPhone SE, mais abaixo) muda a base e todas
-       as composições encolhem junto. */
+       --phone-frame é a altura máxima da foto, e é um knob só: o celular
+       baixo (mais abaixo) muda a base. Foto deitada enche a largura e fica
+       mais baixa que isso; foto em pé para nessa altura, mais estreita. */
     .cc-media {
       --phone-frame: 36dvh;
       --frame-h: var(--phone-frame);
-      justify-self: start;
+      --frame-cap: 100%;
+      justify-self: center;
     }
 
-    /* Todas escopadas ao palco, como as do desktop. Sem isto elas vazam pra
-       versão simples, que é uma pilha comum sem canva nem tela presa — e ali
-       o -8vw do edge não teria quem o cortasse. As que encostam à direita
-       param antes: o indicador lateral é fixo no meio da altura. */
-    :global(html[data-creations='stage']) [data-layout='flip'] .cc-media {
-      --frame-h: calc(var(--phone-frame) * 0.94);
-      justify-self: end;
-      margin-right: 1.4rem;
+    /* Escopadas ao palco, como as do desktop — a versão simples já é uma
+       pilha comum. Não redefinem --phone-frame, senão passariam por cima do
+       celular baixo. */
+    :global(html[data-creations='stage']) [data-layout] .cc-media {
+      --frame-h: var(--phone-frame);
+      --frame-cap: 100%;
+      justify-self: center;
+      align-self: auto;
+      margin: 0;
     }
 
-    /* tower: come metade da tela e sobra o justo pro texto */
-    :global(html[data-creations='stage']) [data-layout='tower'] .cc-media {
-      --frame-h: calc(var(--phone-frame) * 1.28);
-      --frame-cap: 62vw;
-      justify-self: end;
-      margin-right: 1.4rem;
+    /* a `full` é a que mais muda: deixa de cobrir a tela e de pôr o texto
+       branco por cima — mesmo papel, mesma tinta e mesma moldura das outras */
+    :global(html[data-creations='stage']) .cc-slide[data-layout='full'] {
+      padding: 6.25rem 1.35rem 2rem;
+      grid-template-columns: minmax(0, 1fr);
     }
 
-    /* quiet: o selo pequeno. Aqui o título é que cresce e manda na tela */
-    :global(html[data-creations='stage']) [data-layout='quiet'] .cc-media {
-      --frame-h: calc(var(--phone-frame) * 0.66);
-      justify-self: end;
-      margin-right: 1.4rem;
-    }
-    :global(html[data-creations='stage']) [data-layout='quiet'] .cc-title {
-      font-size: clamp(2.2rem, 9.5vw, 3.2rem);
+    :global(html[data-creations='stage']) [data-layout='full'] .cc-media {
+      position: relative;
+      top: auto;
+      left: auto;
+      translate: none;
+      width: min(var(--frame-cap), calc(var(--frame-h) * var(--ratio)));
+      max-width: 100%;
     }
 
-    /* edge: sangra pra fora da esquerda. No celular a saída é menor (8vw
-       contra 16 do desktop) porque a largura toda é menor */
-    :global(html[data-creations='stage']) [data-layout='edge'] .cc-media {
-      --frame-h: calc(var(--phone-frame) * 1.15);
-      --frame-cap: 92vw;
-      justify-self: start;
-      margin-left: -8vw;
+    :global(html[data-creations='stage']) [data-layout='full'] .cc-copy {
+      --ink: inherit;
+      --ink-rgb: inherit;
+      position: static;
+      padding: 0;
+      max-width: none;
+      color: inherit;
+      text-shadow: none;
+    }
+
+    /* sem sombra no texto, a caixa da máscara não precisa crescer (ver o
+       @supports da varredura) */
+    :global(html[data-creations='stage']) [data-layout='full'] .cc-desc {
+      padding: 0;
+      margin: 0.8rem 0 0;
+    }
+
+    /* e sem texto branco por cima, o véu escuro na foto não tem motivo */
+    .cc-card.is-featured[data-layout='full']::after {
+      display: none;
     }
 
     .cc-kicker {
@@ -2007,16 +2025,10 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
       display: none;
     }
 
-    /* o fólio no alto, atrás da moldura: embaixo é onde o texto mora aqui */
-    .cc-folio,
-    .cc-folio[data-layout='flip'],
-    .cc-folio[data-layout='tower'],
-    .cc-folio[data-layout='quiet'] {
-      top: 10vh;
-      bottom: auto;
-      left: auto;
-      right: 4vw;
-      font-size: 44vw;
+    /* o fólio sai no celular: numa coluna só não sobra um "lado do texto"
+       com ar pra ele, e atrás da foto ele só embaralhava o alto da tela */
+    .cc-folio {
+      display: none;
     }
 
     .cc-nav {
@@ -2040,9 +2052,11 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
 
   /* celular baixo (iPhone SE e afins): ainda cabe, com tudo um pouco menor */
   @media (max-width: 46rem) and (max-height: 700px) {
-    .cc-slide {
+    .cc-slide,
+    :global(html[data-creations='stage']) .cc-slide[data-layout='full'] {
       row-gap: 1rem;
-      padding-top: 4rem;
+      padding-top: 5.5rem;
+      padding-bottom: 1.25rem;
     }
 
     /* o knob único: baixar a base encolhe TODAS as composições na proporção,

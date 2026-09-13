@@ -183,8 +183,12 @@ const blocks = await Promise.all(
           </Fragment>
         )}
 
-        {block.entry.link && (
-          <p><a href={simpleHref(block.entry.link.href)}>{block.entry.link.label}</a></p>
+        {block.entry.links && block.entry.links.length > 0 && (
+          <ul role="list" class="link-row">
+            {block.entry.links.map((link) => (
+              <li><a href={simpleHref(link.href)}>{link.label}</a></li>
+            ))}
+          </ul>
         )}
       </article>
     ),

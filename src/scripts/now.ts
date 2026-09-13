@@ -271,10 +271,11 @@ export function initNow() {
     event.preventDefault();
     leaving = true;
 
-    // A volta costurada só existe pra quem já passou pelo portão da home nesta
-    // sessão — mesmo motivo do /craft (ver craft.ts): sem escolha guardada a
-    // home pergunta, e a pintura armada por cima da cortina taparia a pergunta.
-    if (mode) {
+    // A volta costurada só existe quando o anel abriu esta entrada e pra quem
+    // já passou pelo portão da home nesta sessão — mesmos motivos do /craft
+    // (ver craft.ts): sem o anel atrás a home é uma chegada e desce inteira; sem
+    // escolha guardada ela pergunta, e a pintura armada taparia a pergunta.
+    if (home && mode) {
       await closeIntoSky();
       try {
         sessionStorage.setItem(NOW_RETURN_KEY, '1');

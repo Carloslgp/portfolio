@@ -107,15 +107,20 @@ export function initMural() {
     }
   } catch {}
 
-  // Sem a home logo atrás — quem chegou pelo link da /craft/creativity, ou
-  // direto por URL — a volta é uma navegação de verdade, e não um passo atrás.
-  // A coreografia é a MESMA: o mergulho na foto da emenda acontece igual, e as
-  // duas marcas fazem a home nascer no segmento Photos rebobinando o avanço a
-  // partir daquele quadro (ver main.ts → initPhotosLink). O que muda é só quem
-  // paga o documento; o gesto que se vê é o mesmo de quem entrou pelo anel.
+  // Sem a home logo atrás — quem chegou por um link (a /colecaocriacoes, a
+  // /craft/creativity) ou direto por URL — não há de onde voltar: a home é uma
+  // CHEGADA, e nasce com o portão e a descida da câmera inteira. A marca a faria
+  // nascer já assentada no segmento Photos — o visitante era teleportado pra
+  // frente do anel. É a mesma regra do Voltar do /craft, da /work e da /now.
+  //
+  // Com o anel atrás mas sem histórico pra percorrer, a marca continua: a home
+  // nasce de novo no segmento Photos, rebobinando dali (ver main.ts →
+  // initPhotosLink).
   const goHome = () => {
     if (returnToRing && history.length > 1) return void history.back();
-    try { sessionStorage.setItem(PHOTOS_RETURN_KEY, '/'); } catch {}
+    if (returnToRing) {
+      try { sessionStorage.setItem(PHOTOS_RETURN_KEY, '/'); } catch {}
+    }
     location.href = '/';
   };
 
@@ -136,12 +141,15 @@ export function initMural() {
     // arquivo), em baixa animação, e com a CHEGADA ainda em curso, voltar
     // continua sendo só voltar.
     //
+    // E pede o ANEL logo atrás: sem ele a home é uma chegada (ver goHome), e não
+    // há avanço nenhum do outro lado pra emenda continuar.
+    //
     // E pede também uma escolha de movimento JÁ FEITA nesta sessão. Sem ela a
     // home abre de verdade, com a pergunta do portão — e a foto que ela armaria
     // por cima da cortina taparia justamente os botões dela. É a mesma trava do
     // Voltar do /craft, e pelo mesmo motivo: quem entrou no site por
     // /craft/creativity pode chegar aqui sem nunca ter visto o portão.
-    const seamPhoto = reduced || entering || !stored
+    const seamPhoto = reduced || entering || !stored || !returnToRing
       ? null
       : photos.find((p) => p.id === SEAM_PHOTO);
     exit = seamPhoto

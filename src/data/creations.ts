@@ -255,8 +255,9 @@ export interface Creation {
   image: ImageMetadata;
   /** o que a imagem mostra, pra leitor de tela. Nunca vazio */
   alt: string;
-  /** opcional: um link embaixo do texto (abre em aba nova) */
-  link?: { label: string; href: string };
+  /** opcional: um ou mais links embaixo do texto, lado a lado (abrem em
+   *  aba nova) — mesmo formato dos links do intervalo, logo abaixo */
+  links?: { label: string; href: string }[];
   /** só nos repositórios: o `id` do mesmo projeto em data/craftCode.ts. É de
    *  lá que sai se houve ajuda de IA (`aiAssisted`), pra não existir uma
    *  segunda resposta aqui. O build para se o id não existir lá. */
@@ -388,11 +389,9 @@ export const CLOSING = {
   quote: 'I\'ve spread myself under your feet, tread softly.',
   links: [
     { label: 'Voltar pro início', href: '/' },
-    { label: 'Work', href: '/work' },
-    { label: 'Craft', href: '/craft' },
-    { label: 'Photos', href: '/photos' },
-    { label: 'About', href: '/#about' },
     { label: 'GitHub', href: 'https://github.com/Carloslgp' },
+    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/carlos-leonardo-garcia-pscheidt/' },
+    { label: 'YouTube', href: 'https://www.youtube.com/@sudocarlos/videos' },
   ],
 } as const;
 
@@ -513,7 +512,7 @@ export const CREATIONS: Entry[] = [
       'conheci na faculdade.',
     image: nockTeam,
     alt: 'Quatro integrantes da Nock posando no Hotmilk, o polo de inovação da PUCPR.',
-    link: { label: 'Ver a Nock', href: 'https://usenock.com/' },
+    links: [{ label: 'Ver a Nock', href: 'https://usenock.com/' }],
     effect: 'pieces',
   },
   {
@@ -566,7 +565,7 @@ export const CREATIONS: Entry[] = [
       'para pessoas pela internet, pois adoro ENSINAR e compartilhar ideias.',
     image: sudocarlosChannel,
     alt: 'A página do canal @sudocarlos no YouTube, com a série de Python e a de arquitetura de computadores.',
-    link: { label: 'Ver o canal', href: 'https://www.youtube.com/@sudocarlos/videos' },
+    links: [{ label: 'Ver o canal', href: 'https://www.youtube.com/@sudocarlos/videos' }],
     effect: 'grow',
   },
   {
@@ -727,7 +726,7 @@ export const CREATIONS: Entry[] = [
       'categorias do Lighthouse.',
     image: easyRead1,
     alt: 'A página do Easy Read: uma caixa vazia para o texto original à esquerda, a versão simplificada à direita e, embaixo, uma escala de nível de leitura que vai de muito fácil a jurídico.',
-    link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/EasyRead' },
+    links: [{ label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/EasyRead' }],
     craftId: 'leitura-facil',
     effect: 'iris',
     // Cairia em 'tower' pelo ciclo, que só cabe com foto bem vertical — esta
@@ -746,7 +745,7 @@ export const CREATIONS: Entry[] = [
       'na próxima.',
     image: portfolio1,
     alt: 'A home deste site: a palavra PORTFOLIO atrás do anel 3D, parado na face de Craft, refletida no chão.',
-    link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/portfolio' },
+    links: [{ label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/portfolio' }],
     craftId: 'portfolio',
     effect: 'slide',
     from: 'right',
@@ -767,7 +766,10 @@ export const CREATIONS: Entry[] = [
       'você erra.',
     image: grimoire1,
     alt: 'O Grimoire inicializando em letras verdes fósforo: "Getting the rinnegan…", "Loading Mjölnir…", e um prompt pra entrar ou criar um grimório.',
-    link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/grimoire' },
+    links: [
+      { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/grimoire' },
+      { label: 'Live', href: 'https://grimoire-hcj5.onrender.com/' },
+    ],
     craftId: 'grimoire',
     effect: 'tilt',
     // Cairia em 'quiet' pelo ciclo, e essa captura é BEM mais larga que alta
@@ -788,7 +790,10 @@ export const CREATIONS: Entry[] = [
       'conseguia abrir em lugar nenhum.',
     image: metaNoData1,
     alt: 'A página inicial do Meta No Data: “Remova os metadados das suas fotos” em letras grandes, ao lado de um mapa do Brasil desenhado com caracteres, e embaixo a promessa de que os arquivos não saem do seu dispositivo.',
-    link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/Meta-No-Data' },
+    links: [
+      { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/Meta-No-Data' },
+      { label: 'Live', href: 'https://carloslgp.github.io/Meta-No-Data/' },
+    ],
     craftId: 'meta-no-data',
     effect: 'flip',
     // Cairia em 'edge' pelo ciclo, que só cabe com foto bem vertical — e esta
@@ -809,7 +814,7 @@ export const CREATIONS: Entry[] = [
       'vezes, o que transforma um susto em algo grave.',
     image: elderWatch1,
     alt: 'O painel do Elder Watch: um gráfico do monitor de quedas em que a linha do movimento normal, perto de 1 g, cai para 0,6 e depois dispara acima de 2,4, que é a queda, sobre uma lista de alarmes programados para o remédio da pressão e o almoço.',
-    link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/Elder-Watch' },
+    links: [{ label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/Elder-Watch' }],
     craftId: 'elder-watch',
     effect: 'pieces',
   },
@@ -827,7 +832,7 @@ export const CREATIONS: Entry[] = [
       'jogo: o disfarce é a proteção.',
     image: ghosty1,
     alt: 'O Ghosty rodando no emulador de Android ao lado do código em Kotlin: a tela do cofre, com um botão vermelho de Emergência que só responde se for segurado.',
-    link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/Ghosty-App' },
+    links: [{ label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/Ghosty-App' }],
     craftId: 'ghosty',
     effect: 'grow',
     // Cairia em 'full' pelo ciclo — mas a captura é código denso, e o texto
@@ -849,7 +854,7 @@ export const CREATIONS: Entry[] = [
       'cabe dentro do rastro do da frente.',
     image: projectCars1,
     alt: 'A simulação rodando: dois carros vermelhos numa pista escura, um bem à frente do outro, com o tempo decorrido, as duas velocidades e a distância entre eles na borda de baixo.',
-    link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/project-cars' },
+    links: [{ label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/project-cars' }],
     craftId: 'project-cars',
     effect: 'slide',
     from: 'left',
@@ -1046,7 +1051,7 @@ export const CREATIONS: Entry[] = [
       'portfólio e aqui: todas as fotos foram tiradas por mim ou feitas por mim.',
     image: feetInStream,
     alt: 'Uma pedra parada no meio de um riacho raso, com os pés de quem tira a foto entrando no quadro.',
-    link: { label: 'Ver a parede de fotos', href: '/photos' },
+    links: [{ label: 'Ver a parede de fotos', href: '/photos' }],
     effect: 'pieces',
   },
   {

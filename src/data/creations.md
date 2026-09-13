@@ -25,7 +25,7 @@ Tudo que está lá hoje é mock. Nenhum texto é real.
  │   │          │   title                                  │ ← Playfair grande, 2–4 palavras
  │   │  image   │   description                            │ ← até 3 frases (~260 caracteres)
  │   │  (alt)   │   description continua...                │
- │   │          │   link.label ↗                           │ ← opcional
+ │   │          │   links[0].label ↗  links[1].label ↗     │ ← opcional, 1 ou mais
  │   └──────────┘                                          │
  │                                                 03 / 08 │ ← contador (automático)
  └────────────────────────────────────────────────────────┘
@@ -54,7 +54,7 @@ lista. Não há campo pra eles.
 | `description` | sim         | até 3 frases. Mais que isso pode não caber num celular em pé |
 | `image`       | sim         | um import de `src/assets/…` (ver abaixo)                      |
 | `alt`         | sim         | o que a imagem mostra, pra leitor de tela                     |
-| `link`        | não         | `{ label: 'Ver no GitHub', href: 'https://…' }` — abre em aba nova |
+| `links`       | não         | `[{ label: 'Ver no GitHub', href: 'https://…' }]` — um ou mais, lado a lado, abrem em aba nova |
 | `effect`      | sim         | a animação (ver abaixo)                                       |
 | `from`        | não         | só pro `slide`: `'left'` ou `'right'` (padrão)                |
 | `missingPhoto`| não         | `true` quando a foto de verdade ainda não chegou (ver abaixo) |

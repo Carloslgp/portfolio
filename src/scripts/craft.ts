@@ -143,11 +143,18 @@ export function initCraft() {
     leaving = true;
 
     // A volta costurada — a água fechando aqui e a home recebendo esse mesmo
-    // quadro — só existe pra quem já passou pelo portão da home nesta sessão.
+    // quadro — só existe quando o ANEL abriu esta entrada e pra quem já passou
+    // pelo portão da home nesta sessão.
+    //
+    // Sem o anel logo atrás (chegou por link, ou por um /craft reaberto pelo
+    // Back de uma sala) não há de onde voltar: a home é uma chegada e nasce com
+    // a descida da câmera inteira. O recado a faria nascer já assentada no
+    // segmento Craft — o visitante era teleportado pra frente do anel.
+    //
     // Sem escolha guardada a home ABRE de verdade, com a pergunta, e a pintura
     // que ela armaria por cima da cortina taparia justamente os botões dela: a
     // volta ficava presa na água. Então, sem escolha, nem cortina nem recado.
-    if (mode) {
+    if (home && mode) {
       await closeIntoWater();
       try {
         sessionStorage.setItem(CRAFT_RETURN_KEY, '1');

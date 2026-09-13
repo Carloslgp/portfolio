@@ -31,12 +31,12 @@ window.addEventListener('pagereveal', (event) => {
   if (transition) documentRevealed = transition.finished.catch(() => {});
 });
 
-// Esta chegada à home veio de DENTRO do site? (o "‹ Voltar" do /photos, o
-// botão voltar do navegador.) A distinção importa porque uma volta não é uma
-// chegada: quem volta já respondeu ao portão e já viu a descida da câmera —
-// re-encenar os dois transforma um passo atrás numa reabertura do site
-// inteiro. Reload (F5) e visita nova contam como chegada de verdade: o portão
-// pergunta e a entrada roda inteira.
+// Esta chegada à home veio de DENTRO do site? Esta é só a pergunta do PORTÃO:
+// quem anda entre as páginas daqui já respondeu a ele nesta sessão. Reload (F5)
+// e visita nova contam como chegada de verdade, e o portão pergunta.
+//
+// A descida da câmera NÃO segue esta resposta (ver isHistoryReturn): um link
+// comum de outra página pra home ainda é uma chegada, e a entrada roda inteira.
 function isInternalArrival(): boolean {
   const nav = performance.getEntriesByType('navigation')[0] as
     PerformanceNavigationTiming | undefined;
@@ -48,6 +48,16 @@ function isInternalArrival(): boolean {
   } catch {
     return false;
   }
+}
+
+/** Esta home é um passo atrás no HISTÓRICO? (o botão voltar do navegador, com a
+ *  página reconstruída fora do BFCache.) Uma volta não é uma chegada: quem volta
+ *  já viu a descida da câmera, e re-encená-la transforma um passo atrás numa
+ *  reabertura do site inteiro. */
+function isHistoryReturn(): boolean {
+  const nav = performance.getEntriesByType('navigation')[0] as
+    PerformanceNavigationTiming | undefined;
+  return nav?.type === 'back_forward';
 }
 
 /** Consome a marca deixada pela saída para /photos.
@@ -123,14 +133,16 @@ export async function bootstrap() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
   if (!canvas) return;
 
-  // Numa volta interna a escolha da sessão vale sem perguntar; numa chegada
-  // de verdade o portão pergunta, como sempre.
+  // Uma VOLTA (a marca de uma página que o anel abriu, ou o botão voltar) nasce
+  // assentada no anel. Vinda de dentro do site a escolha da sessão vale sem
+  // perguntar; numa chegada de verdade o portão pergunta, como sempre.
   const returningFromPhotos = takePhotosReturn();
   const returningFromWork = takeWorkReturn();
   const returningFromNow = takeNowReturn();
   const returningFromCraft = takeCraftReturn();
-  const internal = returningFromPhotos || returningFromWork || returningFromNow || returningFromCraft
-    || isInternalArrival();
+  const returning = returningFromPhotos || returningFromWork || returningFromNow || returningFromCraft
+    || isHistoryReturn();
+  const internal = returning || isInternalArrival();
 
   // Este documento nasceu agora, então não há avanço congelado pra rebobinar —
   // mas o quadro que /photos entregou É a foto da emenda, e o <head> já a
@@ -173,9 +185,10 @@ export async function bootstrap() {
   await hideLoader();                   // cortina sai, mostrando o anel de cima
 
   // câmera desce até a foto inicial — ou já nasce lá, em baixa animação E na
-  // volta interna: quem está voltando do /photos já assistiu à descida, e
-  // repeti-la é o que fazia o "voltar" parecer o site carregando do zero
-  if (reducedMotion() || internal) carousel.revealInstant();
+  // volta: quem está voltando do /photos já assistiu à descida, e repeti-la é
+  // o que fazia o "voltar" parecer o site carregando do zero. Um link comum de
+  // outra página (ex.: o Back de um /craft que o anel não abriu) desce inteira.
+  if (reducedMotion() || returning) carousel.revealInstant();
   else await carousel.reveal();
 
   // a linha do topo e os cantos (hora / frase) entram por último, com a cena já parada

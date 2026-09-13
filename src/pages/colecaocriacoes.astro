@@ -643,10 +643,14 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
                 </ul>
               </div>
             )}
-            {s.link && (
-              <a class="cc-link" data-cc-line data-cc-link href={s.link.href} target="_blank" rel="noopener">
-                {s.link.label}<svg class="cc-link-mark" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3.5 8.5l5-5M4.5 3.5h4v4" /></svg>
-              </a>
+            {s.links && s.links.length > 0 && (
+              <div class="cc-links" data-cc-line data-cc-link>
+                {s.links.map((link) => (
+                  <a class="cc-link" href={link.href} target="_blank" rel="noopener">
+                    {link.label}<svg class="cc-link-mark" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3.5 8.5l5-5M4.5 3.5h4v4" /></svg>
+                  </a>
+                ))}
+              </div>
             )}
           </div>
 
@@ -1544,7 +1548,6 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
 
   .cc-link {
     display: inline-block;
-    margin-top: 1.6rem;
     color: var(--ink);
     font-size: 0.85rem;
     font-weight: 500;
@@ -1574,6 +1577,21 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
     stroke-width: 1.5;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+
+  /* O grupo de links de uma criação (ver `links` em data/creations.ts).
+     Quase sempre um só; quando há dois (repositório + versão no ar), ficam
+     lado a lado em vez de empilhados — a mesma disposição do intervalo
+     logo abaixo, só que alinhada à esquerda, como o resto da coluna. */
+  .cc-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.4rem;
+    margin-top: 1.6rem;
+  }
+
+  .cc-links .cc-link {
+    margin-top: 0;
   }
 
   /* ——— o intervalo (ver `Interlude` em data/creations.ts) ———
@@ -2133,8 +2151,11 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
     }
 
     .cc-link {
-      margin-top: 1rem;
       font-size: 0.8rem;
+    }
+
+    .cc-links {
+      margin-top: 1rem;
     }
 
     .cc-closing h2 {

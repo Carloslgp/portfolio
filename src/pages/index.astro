@@ -100,9 +100,9 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
           document.documentElement.dataset.nowReturn = 'armed';
         if (craftReturning && !reducesMotion)
           document.documentElement.dataset.craftReturn = 'armed';
-        /* A volta de /photos que chega num documento NOVO: quem vem pelo link
-           da /craft/creativity não tem home no histórico, então o BFCache não
-           entra e a página nasce de novo. O último quadro de lá é a foto da
+        /* A volta de /photos que chega num documento NOVO: a /photos foi aberta
+           pelo anel, mas a home saiu do BFCache (ou não há histórico pra
+           percorrer), então a página nasce de novo. O último quadro de lá é a foto da
            emenda cobrindo a tela, e ele precisa estar pintado antes da cortina
            de carregamento — o bundle rebobina dali até o anel (ver main.ts →
            initPhotosLink). Quem dá o `src` à imagem é o script logo abaixo

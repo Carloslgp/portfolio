@@ -103,10 +103,9 @@ import acampamento3 from '../assets/creations/acampamento_3.webp';
 import ensino1 from '../assets/creations/ensino_1.webp';
 import construindoFuturo from '../assets/creations/construindo_futuro.webp';
 // treinador_1 é o logo recortado rente às letras, com fundo transparente — e
-// a moldura corta ~5% de cada borda (a foto é deitada maior pra andar por
-// dentro, ver FIELD.INNER no config), o que comia o "L" e o "OF". Esta é a
-// mesma imagem com 12% de margem transparente em volta; o original continua
-// na pasta, intocado.
+// quando a moldura cortava ~5% de cada borda (ver FIELD.INNER no config) isso
+// comia o "L" e o "OF". Esta é a mesma imagem com 12% de margem transparente
+// em volta; o original continua na pasta, intocado.
 import treinador1 from '../assets/creations/treinador_1_moldura.webp';
 import primeiraMusicaAutoral1 from '../assets/creations/primeira_musica_autoral_1.webp';
 import bonsai1 from '../assets/creations/bonsai_1.webp';
@@ -119,6 +118,7 @@ import pokemon3 from '../assets/creations/pokemon_3.webp';
 // lado. Esta é a mesma foto girada 90° pra esquerda (os títulos na horizontal);
 // o original continua na pasta, intocado.
 import livrosHorizontal from '../assets/creations/livros_1_horizontal.webp';
+import githubPerfil from '../assets/creations/github_perfil.png';
 
 /** As fotos comuns do canva de fundo. Decorativas: não têm alt nem legenda,
  *  e a versão simples da página não as mostra. O canva tem mais lugares que
@@ -257,6 +257,10 @@ export interface Creation {
   alt: string;
   /** opcional: um link embaixo do texto (abre em aba nova) */
   link?: { label: string; href: string };
+  /** só nos repositórios: o `id` do mesmo projeto em data/craftCode.ts. É de
+   *  lá que sai se houve ajuda de IA (`aiAssisted`), pra não existir uma
+   *  segunda resposta aqui. O build para se o id não existir lá. */
+  craftId?: string;
   effect: Effect;
   /** só pro `slide`: de que lado ele vem. Padrão 'right' */
   from?: 'left' | 'right';
@@ -307,7 +311,7 @@ export interface Creation {
  *  os projetos de programação avisando que ali estão só os principais. Mora
  *  na mesma lista CREATIONS, no lugar em que aparece, e rola no mesmo ritmo de
  *  uma criação (entrada, pausa de leitura, saída). Mas não é uma: não tem
- *  foto, efeito, composição nem número — "Criação NN", o contador e as
+ *  efeito, composição nem número — "Criação NN", o contador e as
  *  âncoras #criacao-NN pulam ele, e a âncora dele é o próprio `id`. */
 export interface Interlude {
   interlude: true;
@@ -318,6 +322,9 @@ export interface Interlude {
   /** 2 a 4 palavras, como o de uma criação */
   title: string;
   description: string;
+  /** opcional: uma foto AO LADO do texto. Não vem do canva nem se encaixa —
+   *  fica parada e entra e sai com o intervalo inteiro */
+  photo?: { image: ImageMetadata; alt: string };
   /** os links embaixo do texto, lado a lado (abrem em aba nova) */
   links: { label: string; href: string }[];
 }
@@ -339,6 +346,9 @@ export const UI = {
   /** o aviso, visível, de uma criação sem foto de verdade (ver
    *  `missingPhoto` na interface Creation) */
   missingPhoto: 'Fotos em falta',
+  /** no rótulo de um repositório com `craftId`: se a IA ajudou em partes do
+   *  código, segundo o `aiAssisted` da página Craft */
+  ai: { yes: 'Com ajuda de IA', no: 'Sem IA' },
 } as const;
 
 /** A abertura: título da página, que sai de cena quando se começa a rolar.
@@ -408,7 +418,7 @@ export const CREATIONS: Entry[] = [
     // do título e da fita. Vira a primeira criação, não um pedaço do herói.
     id: 'quem-eu-sou',
     kind: 'bio',
-    title: 'Quem eu sou',
+    title: 'Quem sou eu',
     date: '',
     description:
       'Essa é uma das primeiras vezes que não precisarei poupar palavras ' +
@@ -458,8 +468,8 @@ export const CREATIONS: Entry[] = [
     date: '',
     description:
       'Digo isso porque eu não vim para cá apenas estudar, mas conhecer ' +
-      'PESSOAS e fazer AMIGOS, e eu fiz vários, como você vai poder ver nas ' +
-      'fotos logo abaixo. E, por último, mas não menos importante, pela ' +
+      'PESSOAS e fazer AMIGOS, e eu fiz vários, como você pode ver nas ' +
+      'fotos ao lado. E, por último, mas não menos importante, pela ' +
       'oportunidade de trabalhar em grandes e originais empresas como a ' +
       'Bradesco Seguros, onde eu trabalho agora, ou talvez estudar o ' +
       'ecossistema Apple pelo Apple Developer Academy, quem sabe… Isso só o ' +
@@ -518,8 +528,8 @@ export const CREATIONS: Entry[] = [
       'Ou talvez participar do Techstars Startup Weekend Curitiba durante 54 ' +
       'horas com pessoas que eu nunca tinha visto na vida, e elas acreditarem ' +
       'na minha ideia de solução e, entre 15 equipes, nós darmos um jeito de ' +
-      'ganhar o segundo lugar. Fui líder e também fui responsável por ' +
-      'apresentar o pitch para os avaliadores e na frente de mais de 120 pessoas.',
+      'ganhar o segundo lugar. Fui líder e responsável por apresentar o ' +
+      'pitch para os avaliadores (na frente de mais de 120 pessoas XD).',
     image: startupWeekendAward,
     alt: 'O time do FuelCheck e os organizadores do evento no palco, depois do prêmio de segundo lugar.',
     effect: 'iris',
@@ -530,10 +540,10 @@ export const CREATIONS: Entry[] = [
     title: 'Presidente do Builders Club',
     date: '2026',
     description:
-      'Também posso falar que eu sou líder e participante ativo da ' +
-      'comunidade de desenvolvedores da PUCPR, por ser o presidente e ' +
-      'estudante no Builders Club, que é um clube focado em desenvolvimento ' +
-      'de produtos de software.',
+      'Como presidente do Builders Club, clube da PUCPR focado em ' +
+      'desenvolvimento de produtos de software, posso dizer que lidero e ' +
+      'participo ativamente da comunidade de desenvolvedores da ' +
+      'universidade.',
     image: buildersClubTalk,
     alt: 'Carlos explicando código de FastAPI projetado numa sala de aula da PUCPR, pro Builders Club.',
     effect: 'flip',
@@ -584,10 +594,10 @@ export const CREATIONS: Entry[] = [
     title: 'Construir o futuro',
     date: '',
     description:
-      'Estamos apenas definindo o horário da monitoria; no momento em que ' +
-      'você estiver lendo isso, provavelmente já serei, pela segunda vez, ' +
-      'monitor acadêmico. Isso é uma das coisas que eu faço para construir ' +
-      'o meu futuro :P',
+      'Eu e o Professor estamos apenas definindo o horário da monitoria; ' +
+      'no momento em que você estiver lendo isso, provavelmente já serei, ' +
+      'pela segunda vez, monitor acadêmico. Isso é uma das coisas que eu ' +
+      'faço para construir o meu futuro :P',
     image: construindoFuturo,
     alt: 'Carlos apresentando o pitch do FuelCheck num auditório, apontando para o slide "Sistema integrado" projetado no telão.',
     effect: 'tilt',
@@ -684,9 +694,13 @@ export const CREATIONS: Entry[] = [
     kicker: 'Projetos de programação',
     title: 'Só os principais',
     description:
-      'O que você vai ver aqui são apenas alguns dos meus projetos: os meus ' +
-      'principais. Se quiser ver mais, recomendo dar uma passada no meu ' +
-      'GitHub ou na página Craft do portfólio, onde estão todos os outros.',
+      'O que você vai ver aqui são apenas os meus projetos principais. ' +
+      'Todos os outros estão no meu GitHub, e na página Craft do portfólio ' +
+      'eu reuni os mais relevantes.',
+    photo: {
+      image: githubPerfil,
+      alt: 'O meu perfil no GitHub: a foto, o nome e a bio à esquerda e, ao lado, o README com um Abra em 3D, uma citação de David J. Wheeler sobre níveis de indireção e a seção About Me.',
+    },
     links: [
       { label: 'Ver o meu GitHub', href: 'https://github.com/Carloslgp' },
       { label: 'Ir para a página Craft', href: '/craft/programming' },
@@ -696,7 +710,7 @@ export const CREATIONS: Entry[] = [
     id: 'leitura-facil',
     kind: 'repo',
     // o nome que o próprio app mostra na tela (o repositório se chama EasyRead)
-    title: 'Leitura Fácil',
+    title: 'Easy Read',
     date: '',
     // Esta e as seis seguintes: tradução da descrição do mesmo projeto em
     // /craft/programming (data/craftCode.ts), na ordem de peso de lá — o
@@ -704,15 +718,17 @@ export const CREATIONS: Entry[] = [
     // portfólio", e a coleção é em português. O Nock fica de fora porque já
     // está na coleção ('fundar-a-nock').
     description:
-      'Reescreve contratos, bulas de remédio e decisões judiciais em ' +
-      'linguagem simples, no nível de leitura que você escolher, do 1º ano ' +
-      'do fundamental até a faculdade. Mais da metade dos adultos brasileiros ' +
-      'não consegue ler por completo os documentos que decidem a vida deles. ' +
-      'Isso é um problema de escrita, não de raciocínio. Sem cadastro, nada ' +
-      'fica armazenado, e ele ainda lê o resultado em voz alta.',
+      'Cole um contrato, uma bula ou uma decisão judicial e receba o mesmo ' +
+      'texto em linguagem simples, no nível de leitura que você escolher: do ' +
+      '1º ano do fundamental até a faculdade. Mais da metade dos adultos ' +
+      'brasileiros não consegue ler por completo os documentos que decidem a ' +
+      'vida deles, e o Easy Read resolve isso sem cadastro, sem guardar nada ' +
+      'e ainda lê o resultado em voz alta. Tudo isso com média 100 nas ' +
+      'categorias do Lighthouse.',
     image: easyRead1,
-    alt: 'A página do Leitura Fácil: uma caixa vazia para o texto original à esquerda, a versão simplificada à direita e, embaixo, uma escala de nível de leitura que vai de muito fácil a jurídico.',
+    alt: 'A página do Easy Read: uma caixa vazia para o texto original à esquerda, a versão simplificada à direita e, embaixo, uma escala de nível de leitura que vai de muito fácil a jurídico.',
     link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/EasyRead' },
+    craftId: 'leitura-facil',
     effect: 'iris',
     // Cairia em 'tower' pelo ciclo, que só cabe com foto bem vertical — esta
     // captura é quase quadrada e sangraria sobre o texto.
@@ -724,14 +740,14 @@ export const CREATIONS: Entry[] = [
     title: 'Este portfólio',
     date: '',
     description:
-      'Este site. A página inicial é um anel 3D que você gira com a rolagem, ' +
-      'e cada face abre uma seção por meio de uma transição que é uma única ' +
-      'imagem cortada em pedaços num documento e remontada no seguinte. Sem ' +
-      'framework de interface e sem roteador no cliente. Só o navegador ' +
-      'fazendo o que ele já sabe fazer.',
+      'Este site é um projeto por si só. A página inicial é um anel 3D que ' +
+      'você gira com a rolagem, e cada face abre uma seção com uma transição ' +
+      'feita de uma única imagem, cortada em pedaços numa página e remontada ' +
+      'na próxima.',
     image: portfolio1,
     alt: 'A home deste site: a palavra PORTFOLIO atrás do anel 3D, parado na face de Craft, refletida no chão.',
     link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/portfolio' },
+    craftId: 'portfolio',
     effect: 'slide',
     from: 'right',
   },
@@ -744,13 +760,15 @@ export const CREATIONS: Entry[] = [
     // veja o meu GitHub") saiu: agora quem diz isso é o intervalo que abre os
     // projetos, e o link voltou a ser o do repositório.
     description:
-      'Guarde qualquer coisa do seu jeito: livros, músicas, ideias, feitiços. ' +
-      'Sem formulários, sem menus, sem listas suspensas. Você digita e o ' +
-      'grimório responde. Ele liga como uma máquina antiga, responde letra ' +
-      'por letra e fica mais mal-educado quanto mais comandos você erra.',
+      'Um lugar pra guardar qualquer coisa do seu jeito: livros, músicas, ' +
+      'ideias, feitiços. Nada de formulários, menus ou listas suspensas: você ' +
+      'digita e o grimório responde. Ele liga como uma máquina antiga, ' +
+      'responde letra por letra e fica mais mal-educado a cada comando que ' +
+      'você erra.',
     image: grimoire1,
     alt: 'O Grimoire inicializando em letras verdes fósforo: "Getting the rinnegan…", "Loading Mjölnir…", e um prompt pra entrar ou criar um grimório.',
     link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/grimoire' },
+    craftId: 'grimoire',
     effect: 'tilt',
     // Cairia em 'quiet' pelo ciclo, e essa captura é BEM mais larga que alta
     // (2:1): numa moldura pequena vira uma tira ilegível. 'duet' aguenta
@@ -763,14 +781,15 @@ export const CREATIONS: Entry[] = [
     title: 'Meta No Data',
     date: '',
     description:
-      'Converte fotos HEIC e remove localização, aparelho e data antes de ' +
-      'você compartilhá-las. Tudo acontece no navegador: sem upload, sem ' +
-      'conta, sem servidor. Os arquivos nunca saem do seu dispositivo. Eu ' +
-      'criei porque o meu próprio celular vivia me entregando fotos que eu ' +
-      'não conseguia abrir em lugar nenhum.',
+      'Converta fotos HEIC e apague localização, aparelho e data antes de ' +
+      'compartilhar. Tudo roda no seu navegador: sem upload, sem conta e sem ' +
+      'servidor, então os arquivos nunca saem do seu dispositivo. Nasceu de ' +
+      'um problema meu: o meu celular vivia me entregando fotos que eu não ' +
+      'conseguia abrir em lugar nenhum.',
     image: metaNoData1,
     alt: 'A página inicial do Meta No Data: “Remova os metadados das suas fotos” em letras grandes, ao lado de um mapa do Brasil desenhado com caracteres, e embaixo a promessa de que os arquivos não saem do seu dispositivo.',
     link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/Meta-No-Data' },
+    craftId: 'meta-no-data',
     effect: 'flip',
     // Cairia em 'edge' pelo ciclo, que só cabe com foto bem vertical — e esta
     // captura é quase duas vezes e meia mais larga que alta.
@@ -782,15 +801,16 @@ export const CREATIONS: Entry[] = [
     title: 'Elder Watch',
     date: '',
     description:
-      'Um dispositivo que fica com uma pessoa idosa e avisa a família pelo ' +
-      'Telegram quando algo acontece. Ele reconhece uma queda pelo formato ' +
-      'dela: a fração de segundo em queda livre e, logo depois, o impacto. ' +
-      'Também funciona como botão de pânico e lembrete de remédios. O tempo ' +
-      'que a pessoa fica caída até alguém perceber é, muitas vezes, o que ' +
-      'transforma um susto em algo grave.',
+      'Um dispositivo com ESP32 que acompanha uma pessoa idosa e avisa a ' +
+      'família pelo Telegram na hora em que algo acontece. Ele reconhece uma ' +
+      'queda pelo formato dela: a fração de segundo em queda livre e, logo ' +
+      'depois, o impacto. Também é botão de pânico e lembrete de remédios, ' +
+      'porque o tempo que alguém fica caído até ser encontrado é, muitas ' +
+      'vezes, o que transforma um susto em algo grave.',
     image: elderWatch1,
     alt: 'O painel do Elder Watch: um gráfico do monitor de quedas em que a linha do movimento normal, perto de 1 g, cai para 0,6 e depois dispara acima de 2,4, que é a queda, sobre uma lista de alarmes programados para o remédio da pressão e o almoço.',
     link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/Elder-Watch' },
+    craftId: 'elder-watch',
     effect: 'pieces',
   },
   {
@@ -799,16 +819,16 @@ export const CREATIONS: Entry[] = [
     title: 'Ghosty',
     date: '',
     description:
-      'Um app de segurança pessoal que parece e funciona como uma ' +
-      'calculadora de verdade, com ícone e tudo. Um código escondido abre um ' +
-      'cofre ou dispara um alerta silencioso com localização e gravação; um ' +
-      'segundo código, o de coação, abre um cofre falso convincente para quem ' +
-      'estiver te obrigando a desbloquear o celular. Um botão vermelho de ' +
-      'pânico entregaria justamente o que ele deveria esconder, então o ' +
-      'disfarce é a ideia toda.',
+      'Um app de segurança pessoal disfarçado de calculadora que funciona de ' +
+      'verdade, com ícone e tudo. Um código secreto abre um cofre ou dispara ' +
+      'um alerta silencioso com localização e gravação; outro, o de coação, ' +
+      'abre um cofre falso convincente pra quem estiver te obrigando a ' +
+      'desbloquear o celular. Nada de botão vermelho de pânico entregando o ' +
+      'jogo: o disfarce é a proteção.',
     image: ghosty1,
     alt: 'O Ghosty rodando no emulador de Android ao lado do código em Kotlin: a tela do cofre, com um botão vermelho de Emergência que só responde se for segurado.',
     link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/Ghosty-App' },
+    craftId: 'ghosty',
     effect: 'grow',
     // Cairia em 'full' pelo ciclo — mas a captura é código denso, e o texto
     // branco por cima dela ficava ilegível (visto). 'flip' põe o texto no
@@ -821,15 +841,16 @@ export const CREATIONS: Entry[] = [
     title: 'project_cars',
     date: '',
     description:
-      'Dois carros em 3D, um colado na traseira do outro numa reta, para ver ' +
-      'de onde vem de verdade o ganho do vácuo quando os carros não têm o ' +
-      'mesmo tamanho. Nada é escrito à mão: o arrasto usa a área frontal ' +
-      'medida na malha enviada, cada face é colorida conforme o quanto ela ' +
-      'briga com o ar, e o carro de trás só ganha alívio na parte dele que ' +
-      'cabe dentro do rastro do carro da frente.',
+      'Jogando Forza 6, reparei no vácuo: o carro que vem colado na traseira ' +
+      'do outro ganha velocidade. Quis entender como isso funciona e fazer ' +
+      'as contas eu mesmo, então construí um simulador com dois carros em 3D ' +
+      'numa reta. Nada é escrito à mão: o arrasto usa a área frontal medida ' +
+      'na malha de cada carro, e o de trás só ganha alívio na parte dele que ' +
+      'cabe dentro do rastro do da frente.',
     image: projectCars1,
     alt: 'A simulação rodando: dois carros vermelhos numa pista escura, um bem à frente do outro, com o tempo decorrido, as duas velocidades e a distância entre eles na borda de baixo.',
     link: { label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/project-cars' },
+    craftId: 'project-cars',
     effect: 'slide',
     from: 'left',
     // Cairia em 'tower' pelo ciclo, e a captura é duas vezes mais larga que
@@ -850,16 +871,13 @@ export const CREATIONS: Entry[] = [
     // canva, antes de chegar, também é esta — o esboço, não o resultado.
     image: pixelart1,
     alt: 'Uma maçã em pixel art: um círculo vermelho liso, com uma mancha rosa clara onde deveria estar o brilho.',
-    link: { label: 'Ver a evolução completa', href: '/craft/creativity' },
     // 'pieces' fatiava UMA foto no espaço — a mesma técnica não serve pra
     // fatiar VÁRIAS no tempo. 'grow' é neutro o bastante pra não competir
     // com o que acontece depois que ela chega.
     effect: 'grow',
     // A mesma sequência do PIXEL_PIECES em data/craftCreative.ts (mesmos
     // arquivos, cronológica): no palco, a moldura vai passando por elas
-    // conforme se rola a pausa de leitura — ver `stageOp` em field.ts. A
-    // versão com legenda de cada peça continua em /craft/creativity, daí o
-    // link acima não sumir.
+    // conforme se rola a pausa de leitura — ver `stageOp` em field.ts.
     evolution: [
       {
         image: pixelart2,
@@ -975,7 +993,7 @@ export const CREATIONS: Entry[] = [
     description:
       'Sempre adorei jogar video games e, atualmente, devido ao meu ' +
       'trabalho, tive a oportunidade de comprar um Nintendo Switch 2 para ' +
-      'jogar os jogos de Pokémon que joguei no 3DS. Sou simplesmente ' +
+      'jogar os jogos de Pokémon. Sou simplesmente ' +
       'apaixonado pela franquia, tenho jogos, cartas de Pokémon e até ' +
       'pelúcias feitas pela minha namorada (pedi de presente para ela).',
     image: pokemonHallOfFame,

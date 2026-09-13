@@ -307,9 +307,8 @@ export const IMAGE = {
   QUALITY: 76,
 
   /** Quanto da largura da tela a foto ocupa, pro navegador escolher a
-   *  variante. 10% acima da moldura porque no palco a imagem é deitada 10%
-   *  maior que ela e anda por dentro (ver FIELD.INNER): a variante escolhida
-   *  tem que cobrir essa sobra, senão a sobra é pixel esticado. */
+   *  variante. Com folga acima da moldura, que cobre a sobra de FIELD.INNER
+   *  se ela voltar a ser usada. */
   SIZES: '(max-width: 46rem) 110vw, 51vw',
 
   /** A composição `full` cobre a tela em qualquer largura — mais a sobra. */
@@ -400,10 +399,11 @@ export const FIELD = {
    *  breakpoint do CSS da página (46rem), senão o celular acende acima dele. */
   MOBILE: { EVERY: 2, LIT_CAP: 0.35, QUERY: '(max-width: 46rem)' },
 
-  /** A foto de uma criação é DEITADA BLEED·2 mais alta que a moldura e anda
-   *  por dentro dela ao longo da criação — janela, e não zoom: só translada,
-   *  nunca estica pixel (e zoom re-rasterizaria a foto a cada quadro). */
-  INNER: { BLEED: 0.05 },
+  /** A foto de uma criação pode ser DEITADA BLEED·2 mais alta que a moldura e
+   *  andar por dentro dela ao longo da criação — janela, e não zoom. Fica em
+   *  0: com a foto mais alta que a moldura, o `cover` corta BLEED de cada
+   *  LADO também, e as fotos apareciam cortadas nas laterais. */
+  INNER: { BLEED: 0 },
 };
 
 /** A variante das fotos comuns do canva: pequena e com menos qualidade, porque
@@ -530,6 +530,10 @@ export const TYPE = {
   /** a descrição é "lavada": um degradê de máscara desce por ela (ver o CSS
    *  da página), com opacidade de reserva onde mask-image não existe */
   DESC: { IN: [0.52, 0.42], OUT: [0.08, 0.42] },
+  /** a foto parada de um intervalo abre ANTES do texto e sai DEPOIS dele
+   *  (mesma regra de COPY_GONE_BY): RISE é o quanto ela sobe (% da própria
+   *  altura) e ZOOM a escala de onde ela assenta */
+  PHOTO: { IN: [0.12, 0.6], OUT: [0.3, 0.55], RISE: 8, ZOOM: 1.08 },
 
   /** O texto inteiro sai até esta fração da saída — antes de a foto se
    *  soltar da moldura. Texto e foto nunca saem juntos. */

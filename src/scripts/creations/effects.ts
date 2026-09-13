@@ -32,6 +32,9 @@ export interface SlideParts {
   words: HTMLElement[];
   desc: HTMLElement | null;
   link: HTMLElement | null;
+  /** a foto parada de um intervalo (ver `photo` em `Interlude`) — a de uma
+   *  criação não passa por aqui, ela se encaixa vindo do canva */
+  photo: HTMLElement | null;
   /** o número gigante no plano do canva (ver TYPE.FOLIO) */
   folio: HTMLElement | null;
   /** null num intervalo (ver `Interlude` em data/creations.ts): sem foto não
@@ -173,6 +176,27 @@ export function slideTimeline(p: SlideParts, ph: Phases, base = ph.enter + ph.ho
       p.desc,
       { [outProp]: WASH ? 0 : 1 },
       { [outProp]: WASH ? 1 : 0, duration: wo.dur, ease: EASE.WASH, immediateRender: false },
+      wo.at,
+    );
+  }
+
+  // a foto de um intervalo: uma cortina que abre de baixo pra cima enquanto
+  // a foto assenta de um leve zoom, e na saída continua subindo — o mesmo
+  // sentido das palavras do título
+  if (p.photo) {
+    const P = TYPE.PHOTO;
+    const wi = win(P.IN, 0, E);
+    const wo = win(P.OUT, X0, X);
+    tl.fromTo(
+      p.photo,
+      { clipPath: 'inset(100% 0% 0% 0%)', scale: P.ZOOM, yPercent: P.RISE },
+      { clipPath: 'inset(0% 0% 0% 0%)', scale: 1, yPercent: 0, duration: wi.dur, ease: EASE.INK, immediateRender: true },
+      wi.at,
+    );
+    tl.fromTo(
+      p.photo,
+      { clipPath: 'inset(0% 0% 0% 0%)', yPercent: 0 },
+      { clipPath: 'inset(0% 0% 100% 0%)', yPercent: -P.RISE, duration: wo.dur, ease: EASE.LIFT, immediateRender: false },
       wo.at,
     );
   }

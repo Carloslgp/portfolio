@@ -72,11 +72,12 @@ export const SONGS: Song[] = [
     // e ficam a duas posições de distância, com 'End Credits' entre elas.
     cover: '/images/about_albuns_photos/1.webp',
     alt: 'Cover of EDEN’s i think you think too much of me: the title typed over and over in grey until the letters break apart',
-    // TODO(Carlos): texto seu. Isto é só marcação de lugar — está em PT-BR pra
-    // não passar batido num deploy: o resto da página é tudo em inglês.
     note: [
-      'DRAFT: the first paragraph about this song.',
-      'DRAFT: and the second, if it needs two — the modal accepts as many as necessary.',
+      'This song makes me want to live my life to the fullest, because it’s not about how long we live, but how much we enjoy it. I want people to remember me as someone who really enjoyed their life. At the same time, I don’t know if I’ll ever “sing like Sinatra”, or, in my case, “think like Turing”. But I want to give it everything I have. I really do.',
+      '“And if there is no god, I know the day I die, I lived through heaven / And that I gave it hell / And if it hurt, oh well, at least, that’s living”',
+      'In this part I feel like EDEN sums up the whole song. It’s just CINEMA. I don’t even want to have to explain it, but I will: I do everything I can, and when I die, I’ll know I’m proud of every choice I made. If it hurts, that’s part of life anyway.',
+      '“So I got ten minutes to be all or nothing to whoever wants to hear”',
+      'Sometimes I feel exactly like this. In an interview that really matters for my future, it’s just that: “I have ten minutes to be all or nothing.” And that is a very, very strange feeling.',
     ],
   },
   {
@@ -90,10 +91,11 @@ export const SONGS: Song[] = [
     youtube: 'Y34BhEOqzRY',
     cover: '/images/about_albuns_photos/4.webp',
     alt: 'Cover of EDEN’s End Credits: an empty small-town street under a pale sky, shot through a faded film border, with EDEN and END CREDITS printed over it',
-    // TODO(Carlos): idem — texto seu.
     note: [
-      'DRAFT: the first paragraph about this song.',
-      'DRAFT: and the second, if it needs two — the modal accepts as many as necessary.',
+      'To me, this song feels like working or fighting for something as hard as I can, and if it doesn’t work out, that’s ok: for a little while, I was happy. And it has Leah Kelly on it. She is the GOAT, her voice is just awesome.',
+      'I feel like this on a lot of days: not knowing the future, but still doing my best. I hate feeling anxious (I think everyone does), but that’s life anyway.',
+      '“You could wish away forever, but you’ll never find a thing like today”',
+      '“Rather burn out young than grow up fast / And we could be forever future-bound / ’Cause all I need is time”',
     ],
   },
   {
@@ -106,8 +108,8 @@ export const SONGS: Song[] = [
     cover: '/images/about_albuns_photos/1.webp',
     alt: 'Cover of EDEN’s i think you think too much of me: the title typed over and over in grey until the letters break apart',
     note: [
-      'The one that opened the door. Before it I listened to music; after it I started listening *to* music — to what was left out, to how much room a producer can leave empty and still fill the whole song.',
-      'It is the closest thing I have to a reference point for the atmospheres I keep failing to finish. Every time I sit at the KeyLab with no idea what I am doing, this is the shape my hands go looking for.',
+      'This is the one that opened the door for me. Before it, I just listened to music. After it, I started paying attention to how music is made: what gets left out, and how much empty space a producer can leave and still fill the whole song.',
+      'It’s still my reference for the sound I want to make. Every time I sit at my KeyLab with no idea what I’m doing, this is the feeling I’m trying to find.',
     ],
   },
   {
@@ -120,8 +122,8 @@ export const SONGS: Song[] = [
     cover: '/images/about_albuns_photos/2.webp',
     alt: 'Cover of EDEN’s vertigo: a pale blue sky with thin clouds and a small crescent moon',
     note: [
-      'Same artist, four years later, and almost nothing in common with the one above — which is the reason both are here. One is the sound; this one is the words.',
-      'It barely does anything musically, and that is the trick: it stays quiet long enough for the line to land, and then it does not overplay it. Lyrics before melody, always — this is my case in point.',
+      'This one feels more vulnerable than the other EDEN songs here, and I think that’s what gets me. It sounds like someone admitting they care, without trying to look cool about it. The title says it all: love is not wrong, and letting yourself feel it is brave.',
+      'After all the songs about giving everything and not knowing the future, this is the one that reminds me why I do it: the people I love. It’s the same thing I say at the end of this page, just with a much better voice than mine.',
     ],
   },
   {
@@ -134,8 +136,8 @@ export const SONGS: Song[] = [
     cover: '/images/about_albuns_photos/3.webp',
     alt: 'Cover of Syd Matters’ Someday We Will Foresee Obstacles: green and teal light with small comet-like streaks',
     note: [
-      'This one arrived attached to a place, the way songs do — they take a room hostage and never give it back. I cannot hear it without the room coming with it.',
-      'It is also the tidiest argument for the thing I keep saying about Zelda: the obstacle usually is not the obstacle. The title said it in 2005 and I only understood it much later.',
+      'This one is tied to Life is Strange for me. I can’t hear it without being back in Arcadia Bay, and that’s not a bad place to be. It’s also the song on my GitHub profile, and the “always listening to” there is not an exaggeration.',
+      'It’s also the best argument for something Zelda taught me: the obstacle usually isn’t the obstacle, it’s the angle. The album title said it back in 2005, and I only understood it much later.',
     ],
   },
 ];

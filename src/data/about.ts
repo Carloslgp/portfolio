@@ -48,9 +48,8 @@ type Paragraph = string;
  *
  *  `natural` desliga a moldura 3/2 e deixa a imagem no tamanho em que ela
  *  nasceu, centrada na coluna. É pra imagem que não é fotografia: a tirinha
- *  do fim tem 415px de origem, e esticá-la até os ~624px da coluna a deixa
- *  borrada. O corte dela já é 4/3 (o céu vazio de cima saiu no arquivo, não
- *  no CSS), mas os balões encostam nas bordas do que sobrou, então o `cover`
+ *  do fim tem 420px de origem, e esticá-la até os ~624px da coluna a deixaria
+ *  borrada. O corte dela já é 4/3, mas os balões ficam perto das bordas, então o `cover`
  *  da moldura ainda comeria fala — e a fala é a imagem inteira. As fotos
  *  continuam em `cover`, que é onde a moldura fixa ganha: elas têm pixel de
  *  sobra e nada de essencial encostado na borda. */
@@ -236,7 +235,7 @@ export const TOPICS: Topic[] = [
       // no tamanho dela (ver o tipo Photo lá em cima).
       {
         photo:
-          'Charlie Brown and Snoopy sitting on a dock. Charlie Brown: “Um dia, nós vamos morrer, Snoopy.” Snoopy: “Sim, mas todos os outros dias, a gente vai viver.”',
+          'Charlie Brown and Snoopy sitting on a dock. Charlie Brown: “Some day, we will all die, Snoopy!” Snoopy: “True, but on all the other days, we will not.”',
         src: '/images/about_main_photos/closing.webp',
         natural: true,
       },

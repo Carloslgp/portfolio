@@ -390,6 +390,7 @@ function partsOf(
     words: title ? splitHeading(title) : [],
     desc: q('[data-cc-desc]'),
     link: q('[data-cc-link]'),
+    photo: q('[data-cc-photo]'),
     folio: document.querySelector<HTMLElement>(`[data-cc-folio="${index}"]`),
     effect: interlude ? null : (slide.dataset.effect as Effect),
     from: slide.dataset.from === 'left' ? 'left' : 'right',

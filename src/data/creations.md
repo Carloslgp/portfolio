@@ -218,6 +218,7 @@ com um link pro GitHub e outro pra página Craft. Ele mora na mesma lista
   kicker: 'Projetos de programação',
   title: 'Só os principais',
   description: '…',
+  photo: { image: githubPerfil, alt: '…' }, // opcional
   links: [
     { label: 'Ver o meu GitHub', href: 'https://github.com/Carloslgp' },
     { label: 'Ir para a página Craft', href: '/craft/programming' },
@@ -225,7 +226,11 @@ com um link pro GitHub e outro pra página Craft. Ele mora na mesma lista
 },
 ```
 
-Sem foto, sem efeito, sem composição e sem número: ele rola no mesmo ritmo
+`photo` é opcional: uma foto parada ao lado do texto (no celular, em cima).
+Ela não vem do canva nem se encaixa numa moldura — entra e sai junto com o
+intervalo inteiro.
+
+Sem efeito, sem composição e sem número: ele rola no mesmo ritmo
 das criações (entrada, pausa de leitura, saída), mas a numeração ("Criação
 03", o contador, as âncoras `#criacao-NN`) pula ele — a âncora dele é o
 próprio `id`; enquanto ele está na tela, o contador lateral mostra "—". E a

@@ -22,6 +22,7 @@ import Layout from '../layouts/Layout.astro';
 import {
   CLOSING, CREATIONS, EFFECT_NAMES, FIELD_PHOTOS, KIND_LABEL, OPENING, UI, isInterlude,
 } from '../data/creations';
+import { CODE_PROJECTS } from '../data/craftCode';
 import { EFFECTS, FIELD, FIELD_IMAGE, IMAGE, LAYOUT, RIBBON, STAGE } from '../scripts/creations/config';
 import { layoutField } from '../scripts/creations/fieldLayout';
 import { extraHold, timing } from '../scripts/creations/timing';
@@ -75,6 +76,12 @@ entries.forEach(({ entry, number }) => {
       `Coleção de Criações: as criações ${prevPhoto.number} ("${prevPhoto.id}") e ${number} ("${creation.id}") ` +
         `usam o mesmo efeito "${creation.effect}" em sequência. Troque o efeito de uma delas ` +
         `em src/data/creations.ts.`,
+    );
+  }
+  if (creation.craftId && !CODE_PROJECTS.some((p) => p.id === creation.craftId)) {
+    throw new Error(
+      `Coleção de Criações: ${here} aponta \`craftId: "${creation.craftId}"\`, que não existe em ` +
+        `src/data/craftCode.ts. Use o \`id\` do mesmo projeto de lá.`,
     );
   }
   prevPhoto = { id: creation.id, number, effect: creation.effect };
@@ -140,10 +147,17 @@ const holds = CREATIONS.map((entry) =>
 // nenhuma seja cortada pra caber numa caixa fixa.
 const slides = await Promise.all(
   entries.map(async ({ entry, index, number }) => {
-    // Um intervalo não tem foto, composição nem número: só o texto e o lugar
-    // dele na rolagem. A âncora é o próprio id (ver `Interlude`).
+    // Um intervalo não tem composição nem número: o texto, a foto opcional ao
+    // lado e o lugar dele na rolagem. A âncora é o próprio id (ver `Interlude`).
     if (isInterlude(entry)) {
-      return { ...entry, index, number, anchor: entry.id };
+      const source = entry.photo;
+      const photo = source && (await getImage({
+        src: source.image,
+        widths: [...IMAGE.WIDTHS],
+        format: IMAGE.FORMAT,
+        quality: IMAGE.QUALITY,
+      }).then((img) => ({ src: img.src, srcset: img.srcSet.attribute, alt: source.alt })));
+      return { ...entry, index, number, anchor: entry.id, photo };
     }
     const creation = entry;
     const img = await getImage({
@@ -205,6 +219,10 @@ const slides = await Promise.all(
       layout,
       evolution,
       gallery,
+      // se a IA ajudou, lido da página Craft; undefined fora dos repositórios
+      ai: creation.craftId
+        ? CODE_PROJECTS.find((p) => p.id === creation.craftId)?.aiAssisted === true
+        : undefined,
       // a única coisa que a composição decide fora do CSS: a `full` leva a
       // foto a 100vw e as outras a cabem na moldura (ver IMAGE.SIZES /
       // SIZES_FULL). Precisa ser aqui porque quem escolhe a variante é o
@@ -492,28 +510,44 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
 
       {slides.map((s) => s.interlude ? (
         <section
-          class="cc-slide cc-interlude"
+          class:list={['cc-slide', 'cc-interlude', { 'has-photo': s.photo }]}
           id={s.anchor}
           data-cc-slide
           data-cc-interlude
           aria-labelledby={`${s.anchor}-titulo`}
         >
-          {/* Um intervalo (ver `Interlude` em data/creations.ts): só o texto,
-              centrado, com os mesmos ganchos de uma criação — o motor anima
-              rótulo, título, descrição e links do mesmo jeito. Sem
-              [data-cc-media]: não há foto pra encaixar, e o partsOf (main.ts)
-              reconhece o [data-cc-interlude]. Os links moram num bloco só, que
-              é o que a varredura do link revela. */}
-          <div class="cc-copy" data-cc-copy>
-            <p class="cc-kicker" data-cc-line data-cc-kicker>{s.kicker}</p>
-            <h2 class="cc-title" id={`${s.anchor}-titulo`} data-cc-line data-cc-title>{s.title}</h2>
-            <p class="cc-desc" data-cc-line data-cc-desc>{s.description}</p>
-            <div class="cc-interlude-links" data-cc-line data-cc-link>
-              {s.links.map((link) => (
-                <a class="cc-link" href={link.href} target="_blank" rel="noopener">
-                  {link.label}<svg class="cc-link-mark" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3.5 8.5l5-5M4.5 3.5h4v4" /></svg>
-                </a>
-              ))}
+          {/* Um intervalo (ver `Interlude` em data/creations.ts): o texto, com
+              os mesmos ganchos de uma criação — o motor anima rótulo, título,
+              descrição e links do mesmo jeito. Sem [data-cc-media]: a foto
+              opcional não se encaixa vindo do canva, e o partsOf (main.ts)
+              reconhece o [data-cc-interlude]. O [data-cc-copy] fica no bloco
+              que junta foto e texto, pra os dois derivarem juntos. Os links
+              moram num bloco só, que é o que a varredura do link revela. */}
+          <div class="cc-interlude-body" data-cc-copy>
+            {s.photo && (
+              <img
+                class="cc-interlude-photo"
+                data-cc-photo
+                src={s.photo.src}
+                srcset={s.photo.srcset}
+                sizes="(max-width: 46rem) 100vw, 50vw"
+                alt={s.photo.alt}
+                loading="lazy"
+                decoding="async"
+                draggable="false"
+              />
+            )}
+            <div class="cc-copy">
+              <p class="cc-kicker" data-cc-line data-cc-kicker>{s.kicker}</p>
+              <h2 class="cc-title" id={`${s.anchor}-titulo`} data-cc-line data-cc-title>{s.title}</h2>
+              <p class="cc-desc" data-cc-line data-cc-desc>{s.description}</p>
+              <div class="cc-interlude-links" data-cc-line data-cc-link>
+                {s.links.map((link) => (
+                  <a class="cc-link" href={link.href} target="_blank" rel="noopener">
+                    {link.label}<svg class="cc-link-mark" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3.5 8.5l5-5M4.5 3.5h4v4" /></svg>
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -552,7 +586,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
               simples. */}
           <div class="cc-copy" data-cc-copy>
             <p class="cc-kicker" data-cc-line data-cc-kicker>
-              {UI.item} {s.number} · {KIND_LABEL[s.kind]}{s.date && ` · ${s.date}`}{s.missingPhoto && <span class="cc-missing-tag">{UI.missingPhoto}</span>}
+              {UI.item} {s.number} · {KIND_LABEL[s.kind]}{s.date && ` · ${s.date}`}{s.ai !== undefined && ` · ${s.ai ? UI.ai.yes : UI.ai.no}`}{s.missingPhoto && <span class="cc-missing-tag">{UI.missingPhoto}</span>}
             </p>
             <h2 class="cc-title" id={`${s.anchor}-titulo`} data-cc-line data-cc-title>{s.title}</h2>
             <p class="cc-desc" data-cc-line data-cc-desc>{s.description}</p>
@@ -814,6 +848,16 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
      segue a do primeiro estágio), e cortar pixel art já composta esconde
      parte do desenho — o fundo cobre a folga que sobra dos lados. */
   .cc-card.is-featured.is-stage img {
+    object-fit: contain;
+    background: rgba(var(--ink-rgb), 0.06);
+    transition: background-color var(--theme-fade);
+  }
+
+  /* A galeria pelo mesmo motivo: a moldura tem a proporção da PRIMEIRA foto,
+     e com `cover` as outras perdiam as laterais (a de 1,78 numa moldura de
+     0,75 perdia mais da metade). Nenhuma galeria usa `full`, então a folga
+     nunca vira faixa em tela cheia. */
+  .cc-card.is-featured[data-gallery] img {
     object-fit: contain;
     background: rgba(var(--ink-rgb), 0.06);
     transition: background-color var(--theme-fade);
@@ -1560,6 +1604,59 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
 
   .cc-interlude-links .cc-link {
     margin-top: 0;
+  }
+
+  /* Com `photo`: a foto de um lado e o texto do outro, alinhado à esquerda.
+     No celular volta a ser uma coluna centrada, com a foto em cima — como
+     as criações. */
+  .cc-slide.cc-interlude.has-photo {
+    justify-items: stretch;
+  }
+
+  .has-photo .cc-interlude-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: center;
+    column-gap: clamp(2rem, 5vw, 5rem);
+    text-align: left;
+  }
+
+  .cc-interlude-photo {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid rgba(var(--ink-rgb), 0.14);
+    user-select: none;
+  }
+  .has-photo .cc-copy {
+    max-width: 30rem;
+  }
+
+  .has-photo .cc-title {
+    font-size: clamp(2.4rem, 4.4vw, 4.4rem);
+  }
+
+  .has-photo .cc-interlude-links {
+    justify-content: flex-start;
+  }
+
+  @media (max-width: 46rem) {
+    .has-photo .cc-interlude-body {
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: center;
+      row-gap: 1.3rem;
+      text-align: center;
+    }
+
+    .cc-interlude-photo {
+      width: auto;
+      max-width: 100%;
+      max-height: 30dvh;
+    }
+
+    .has-photo .cc-interlude-links {
+      justify-content: center;
+    }
   }
 
   /* ——— a lavagem ———

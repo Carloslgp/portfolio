@@ -29,6 +29,10 @@ export const SECTIONS = [
   { id: 'now',    label: 'Now',    texture: '/textures/now.jpg',    thumb: '/textures/thumbs/now.webp' },
 ] as const;
 
+// A seção que abre de frente quando a home nasce sem ser uma volta. Não é a
+// primeira da lista: a ordem acima é a do anel, e mudar isso giraria a fita.
+export const START_SECTION = 'about';
+
 // --- orçamento de GPU ---
 //
 // Tudo que muda de valor entre uma tela de mesa e um celular mora aqui, e a

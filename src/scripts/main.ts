@@ -3,7 +3,7 @@
 import Lenis from 'lenis';
 import gsap from 'gsap';
 import { Carousel } from '../components/carousel/Carousel';
-import { ABOUT, DEPART, SECTIONS } from '../components/carousel/config';
+import { ABOUT, DEPART, SECTIONS, START_SECTION } from '../components/carousel/config';
 import {
   PHOTOS_RETURN_KEY, SEAM_BACK_KEY, SEAM_ENTRY_KEY, SEAM_OVERSCAN,
 } from '../data/gallery';
@@ -161,22 +161,13 @@ export async function bootstrap() {
 
   // A ordem aqui é a coreografia da abertura, e cada passo espera o anterior:
   await carousel.init(canvas, lenis);   // fotos, fonte e shaders — atrás da cortina
-  if (returningFromPhotos) {
-    const photosIndex = SECTIONS.findIndex((section) => section.id === 'photos');
-    if (photosIndex >= 0) carousel.focusSectionInstant(photosIndex);
-  }
-  if (returningFromWork) {
-    const workIndex = SECTIONS.findIndex((section) => section.id === 'work');
-    if (workIndex >= 0) carousel.focusSectionInstant(workIndex);
-  }
-  if (returningFromNow) {
-    const nowIndex = SECTIONS.findIndex((section) => section.id === 'now');
-    if (nowIndex >= 0) carousel.focusSectionInstant(nowIndex);
-  }
-  if (returningFromCraft) {
-    const craftIndex = SECTIONS.findIndex((section) => section.id === 'craft');
-    if (craftIndex >= 0) carousel.focusSectionInstant(craftIndex);
-  }
+  // a volta nasce na seção de onde saiu; qualquer outra chegada, no About
+  const startId = returningFromPhotos ? 'photos'
+    : returningFromWork ? 'work'
+    : returningFromNow ? 'now'
+    : returningFromCraft ? 'craft'
+    : START_SECTION;
+  carousel.focusSectionInstant(SECTIONS.findIndex((section) => section.id === startId));
   carousel.run();                       // cena viva na pose de topo
   await gate;                           // a cortina não sai sem a escolha feita
   await hideLoader();                   // cortina sai, mostrando o anel de cima

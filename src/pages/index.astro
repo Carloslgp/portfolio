@@ -3,7 +3,7 @@
 import type { ImageMetadata } from 'astro';
 import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
-import { SECTIONS } from '../components/carousel/config';
+import { SECTIONS, START_SECTION } from '../components/carousel/config';
 import { SEAM_ASPECT, SEAM_BACK_KEY, SEAM_PHOTO, FULL } from '../data/gallery';
 import { WORK_SEAM } from '../scripts/workNavigation';
 import { NOW_SEAM, NOW_TZ } from '../scripts/nowNavigation';
@@ -18,7 +18,8 @@ import Reel from '../components/about/Reel.astro';
 import Songs from '../components/about/Songs.astro';
 import SocialLinks from '../components/SocialLinks.astro';
 
-const first = SECTIONS[0];
+// o card nasce na mesma seção que o anel põe de frente (ver main.ts)
+const first = SECTIONS.find((s) => s.id === START_SECTION) ?? SECTIONS[0];
 
 // ——— a foto da emenda com /photos ———
 //

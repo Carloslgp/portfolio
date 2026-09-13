@@ -1,0 +1,31 @@
+---
+// /simple/craft — o vestíbulo do Craft: as duas salas e o resto do site.
+// No site completo esta página é a cortina de marés; sem a transição, o que
+// sobra são as duas portas, que é o que ela é.
+import SimpleLayout from '../../layouts/SimpleLayout.astro';
+import { CRAFT_PAGE, simpleHref } from '../../data/simple';
+---
+
+<SimpleLayout title={CRAFT_PAGE.eyebrow} description={CRAFT_PAGE.description}>
+  <p class="kicker">{CRAFT_PAGE.eyebrow}</p>
+  <h1>{CRAFT_PAGE.title.line1} <em>{CRAFT_PAGE.title.line2}</em></h1>
+  <p class="lead">{CRAFT_PAGE.lead}</p>
+
+  <ul role="list" class="entries">
+    {CRAFT_PAGE.doors.map((door) => (
+      <li>
+        <h2><a href={simpleHref(door.href)}>{door.name}</a></h2>
+        <p>{door.note}</p>
+      </li>
+    ))}
+  </ul>
+
+  <div class="topic">
+    <p>{CRAFT_PAGE.footNote}</p>
+    <ul role="list" class="link-row">
+      {CRAFT_PAGE.footLinks.map((link) => (
+        <li><a href={simpleHref(link.href)}>{link.label}</a></li>
+      ))}
+    </ul>
+  </div>
+</SimpleLayout>

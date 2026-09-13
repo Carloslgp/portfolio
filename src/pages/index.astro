@@ -521,13 +521,14 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
         </button>
       </div>
 
-      <!-- Ainda sem função: o destino (versão simples, navegável por Tab) não
-           existe. Fica desabilitado e dizendo "em breve" de propósito — um
-           botão vivo que não leva a lugar nenhum seria pior justamente pra
-           quem depende dele. Pra ligar: trocar por <a href> pro site simples. -->
-      <button type="button" class="gate-help" data-gate-a11y disabled aria-disabled="true">
-        Need help navigating? <span>coming soon</span>
-      </button>
+      <!-- A porta pra versão simples (/simple): o mesmo conteúdo, sem animação e
+           navegável por teclado. É um link comum, e não um botão com script, de
+           propósito: ele funciona antes de o bundle chegar e mesmo que a cena 3D
+           nunca termine de carregar — que é justamente quando quem precisa dele
+           mais precisaria. -->
+      <a class="gate-help" href="/simple" data-gate-a11y>
+        Need help navigating? <span>Simple version</span>
+      </a>
     </div>
   </div>
 </Layout>
@@ -1100,20 +1101,29 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     line-height: 1.35;
     opacity: 0.55;
   }
+  /* A porta pra versão simples. Enquanto era um botão desativado, o cinza claro
+     dizia "ainda não"; agora é um link de verdade e precisa do contraste de
+     texto (4,5:1) — quem procura este link é justamente quem mais depende de
+     enxergá-lo. O sublinhado é o padrão do navegador pra link. */
   .gate-help {
-    background: none;
-    border: 0;
-    padding: 0;
-    font: inherit;
-    font-size: 0.72rem;
-    color: rgba(var(--ink-rgb), 0.45);
-    cursor: not-allowed;
+    font-size: 0.8rem;
+    color: rgba(var(--ink-rgb), 0.72);
   }
+  .gate-help:hover {
+    color: var(--ink);
+  }
+  .gate-help:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 4px;
+  }
+  /* inline-block: o rótulo tem borda própria, e assim o sublinhado do link não
+     atravessa ele */
   .gate-help span {
+    display: inline-block;
     margin-left: 0.35rem;
     padding: 0 0.3rem;
     border: 1px solid currentColor;
-    font-size: 0.62rem;
+    font-size: 0.66rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }

@@ -1,0 +1,172 @@
+---
+// /simple/now — a /now sem abas e sem cortina: "Now" e depois "Next", um
+// embaixo do outro, na ordem de PANELS. Tudo vem de data/now.ts.
+//
+// A hora de Curitiba continua viva, e não por enfeite: o texto de abertura
+// fala dela ("the actual clock in Curitiba"). Quem a escreve é o script curto
+// no fim da página, sem aria-live — a hora virar não é notícia pra ser
+// anunciada. Sem JavaScript fica só o lugar.
+import { getImage } from 'astro:assets';
+import SimpleLayout from '../../layouts/SimpleLayout.astro';
+import { HORIZONS, LEAD, NOW_NOTE, PANELS, PLACE, STRANDS, UPDATED } from '../../data/now';
+import type { Figure } from '../../data/now';
+import { NOW_TZ } from '../../scripts/nowNavigation';
+import { NOW_PAGE, simpleHref } from '../../data/simple';
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/** 'YYYY-MM' → "August 2026", como na /now. */
+function month(value: string): string {
+  const [year, m] = value.split('-');
+  return m ? `${MONTHS[Number(m) - 1]} ${year}` : year;
+}
+
+/** A MESMA variante que a /now pede (ver `shot` em now.astro). Opções
+ *  idênticas caem no mesmo arquivo gerado, então esta página não põe imagem
+ *  nova nenhuma no deploy. */
+async function shot(figure: Figure) {
+  const img = await getImage({
+    src: figure.src,
+    width: Math.min(768, figure.src.width),
+    format: 'webp',
+    quality: 80,
+  });
+
+  return {
+    src: img.src,
+    width: img.attributes.width ?? figure.src.width,
+    height: img.attributes.height ?? figure.src.height,
+    alt: figure.alt,
+    caption: figure.caption,
+  };
+}
+
+const strands = await Promise.all(
+  STRANDS.map(async (strand) => ({
+    strand,
+    figure: strand.figure ? await shot(strand.figure) : null,
+  })),
+);
+
+const horizons = await Promise.all(
+  HORIZONS.map(async (horizon) => ({
+    horizon,
+    figure: horizon.figure ? await shot(horizon.figure) : null,
+  })),
+);
+---
+
+<SimpleLayout title={NOW_PAGE.title} description={NOW_PAGE.description}>
+  <p class="kicker">{NOW_PAGE.eyebrow}</p>
+  <h1>{NOW_PAGE.title}</h1>
+  <p class="meta" data-now-stamp data-place={PLACE}>{PLACE}</p>
+  <p class="lead">{LEAD}</p>
+
+  {PANELS.map((panel) => (
+    <section class="topic" aria-labelledby={`panel-${panel.id}`}>
+      <h2 id={`panel-${panel.id}`}>{panel.label}</h2>
+      <p>{panel.note}</p>
+
+      <ol role="list" class="entries">
+        {panel.id === 'now'
+          ? strands.map(({ strand, figure }) => (
+              <li>
+                <article aria-labelledby={`strand-${strand.id}`}>
+                  <h3 id={`strand-${strand.id}`}>
+                    {strand.href ? <a href={strand.href}>{strand.title}</a> : strand.title}
+                  </h3>
+                  <p class="meta">
+                    {strand.label}{strand.since && ` · ${NOW_PAGE.since} ${month(strand.since)}`}
+                  </p>
+                  <p>{strand.body}</p>
+                  {figure && (
+                    <figure>
+                      <img
+                        src={figure.src}
+                        alt={figure.alt}
+                        width={figure.width}
+                        height={figure.height}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      {figure.caption && <figcaption>{figure.caption}</figcaption>}
+                    </figure>
+                  )}
+                </article>
+              </li>
+            ))
+          : horizons.map(({ horizon, figure }) => (
+              <li>
+                <article aria-labelledby={`horizon-${horizon.id}`}>
+                  <h3 id={`horizon-${horizon.id}`}>
+                    {horizon.href ? <a href={horizon.href}>{horizon.title}</a> : horizon.title}
+                  </h3>
+                  <p class="meta">
+                    {horizon.label}{horizon.when && ` · ${NOW_PAGE.by} ${month(horizon.when)}`}
+                  </p>
+                  <p>{horizon.body}</p>
+                  {horizon.ref && (
+                    <p class="meta">
+                      {NOW_PAGE.inspiredIn} <a href={horizon.ref.href}>{horizon.ref.label}</a>
+                    </p>
+                  )}
+                  {figure && (
+                    <figure>
+                      <img
+                        src={figure.src}
+                        alt={figure.alt}
+                        width={figure.width}
+                        height={figure.height}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      {figure.caption && <figcaption>{figure.caption}</figcaption>}
+                    </figure>
+                  )}
+                </article>
+              </li>
+            ))}
+      </ol>
+    </section>
+  ))}
+
+  <div class="topic">
+    <p>
+      {NOW_NOTE}{' '}
+      {NOW_PAGE.doors.map((door, index) => (
+        <Fragment>{index > 0 && ' · '}<a href={simpleHref(door.href)}>{door.label}</a></Fragment>
+      ))}
+    </p>
+    <p class="meta">
+      {NOW_PAGE.updated} <time datetime={UPDATED}>{month(UPDATED)}</time>. {NOW_PAGE.clockIsLive}
+    </p>
+  </div>
+
+  {/* O mesmo formato de hora e data do carimbo da /now. Reescreve só quando o
+      texto muda (a virada do minuto), e não a cada volta do intervalo. */}
+  <script is:inline define:vars={{ tz: NOW_TZ }}>
+    (function () {
+      var stamp = document.querySelector('[data-now-stamp]');
+      if (!stamp) return;
+      var place = stamp.getAttribute('data-place');
+      var hour = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true,
+      });
+      var day = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      });
+
+      function write() {
+        var at = new Date();
+        var text = hour.format(at) + ' in ' + place + ' · ' + day.format(at);
+        if (stamp.textContent !== text) stamp.textContent = text;
+      }
+
+      write();
+      setInterval(write, 15000);
+    })();
+  </script>
+</SimpleLayout>

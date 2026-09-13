@@ -1,0 +1,134 @@
+---
+// src/layouts/SimpleLayout.astro — a casca da versão simples (/simple).
+//
+// A versão simples é o site inteiro sem nada que se mexa: o mesmo conteúdo em
+// HTML comum, numa coluna só, com a rolagem do navegador e tudo alcançável
+// por Tab.
+//
+// Ela NÃO usa o Layout.astro, e não é gosto: cada peça dele existe por causa
+// da home 3D, e aqui atrapalharia justamente quem mais precisa desta versão.
+//   • o global.css põe `overflow: hidden` no body (a home é uma cena parada
+//     no lugar) e some com a barra de rolagem nativa;
+//   • o Lenis e a LiquidScrollbar trocam a rolagem do navegador por uma
+//     simulada;
+//   • o medidor de viewport só serve às emendas de tela cheia.
+// O que vem de lá é só o que não se mexe: os arquivos de fonte, o tema salvo
+// e a contagem de visitas.
+import '../styles/simple.css';
+import Analytics from '@vercel/analytics/astro';
+import { CONTACT, SIMPLE_NAV, fullHref } from '../data/simple';
+
+interface Props {
+  /** o nome da página. O <title> ganha a versão e o nome do site, pra quem
+   *  tem as duas versões abertas saber qual aba é qual */
+  title: string;
+  description?: string;
+  lang?: 'en' | 'pt';
+  /** `noindex` por padrão: é o mesmo conteúdo do site completo, e quem busca
+   *  pelo site deve cair nele — é de lá que esta versão é oferecida. A Coleção
+   *  de Criações passa `noindex, nofollow`, como a original. */
+  robots?: string;
+}
+
+const { title, description, lang = 'en', robots = 'noindex' } = Astro.props;
+
+// Os textos da própria casca. A Coleção de Criações é a única página em
+// português, e a casca fala a língua da página em que está.
+const TEXT = {
+  en: {
+    skip: 'Skip to content',
+    version: 'Simple version',
+    full: 'Full version',
+    nav: 'Pages',
+    contact: 'Let’s talk',
+  },
+  pt: {
+    skip: 'Pular para o conteúdo',
+    version: 'Versão simples',
+    full: 'Versão completa',
+    nav: 'Páginas',
+    contact: 'Vamos conversar',
+  },
+}[lang];
+
+const path = Astro.url.pathname.replace(/\/+$/, '') || '/';
+
+/** `page` na página em que se está; `true` na seção que a contém (as duas
+ *  salas do Craft acendem o Craft). A home só acende nela mesma — como todo
+ *  endereço daqui começa com /simple, senão ela acenderia em todas. */
+function current(href: string) {
+  if (path === href) return 'page';
+  if (href !== '/simple' && path.startsWith(`${href}/`)) return 'true';
+  return undefined;
+}
+---
+
+<html lang={lang}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{`${title} · ${TEXT.version} · Carlos Leonardo`}</title>
+    {description && <meta name="description" content={description} />}
+    <meta name="robots" content={robots} />
+    <link
+      rel="preload"
+      href="/fonts/inter-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    {/* O tema salvo pelo botão do site completo, antes do primeiro paint. Só
+        LÊ: aqui não há botão. Sem escolha salva vale a do sistema (ver
+        simple.css) — o site completo abre claro de qualquer jeito, mas quem
+        precisa de tela escura costuma ter pedido isso ao sistema. */}
+    <script is:inline>
+      try {
+        var theme = localStorage.getItem('theme');
+        if (theme === 'dark' || theme === 'light')
+          document.documentElement.dataset.theme = theme;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#conteudo">{TEXT.skip}</a>
+
+    <header class="site-header">
+      <div class="page-column site-bar">
+        <p class="site-name">Carlos Leonardo <span class="site-version">{TEXT.version}</span></p>
+        {/* noreferrer: a home decide entre a abertura inteira e o anel já
+            parado pelo referrer (main.ts → isInternalArrival), e quem sai
+            daqui pra versão completa está CHEGANDO nela. É o mesmo motivo do
+            link de volta da colecaocriacoes.astro. */}
+        <a class="site-full" href={fullHref(path)} rel="noreferrer">{TEXT.full}</a>
+      </div>
+
+      <nav class="page-column site-nav" aria-label={TEXT.nav}>
+        {/* Os nomes das páginas são em inglês mesmo na página em português,
+            e o `lang` diz isso ao leitor de tela. */}
+        <ul role="list" lang={lang === 'en' ? undefined : 'en'}>
+          {SIMPLE_NAV.map((page) => (
+            <li><a href={page.href} aria-current={current(page.href)}>{page.label}</a></li>
+          ))}
+        </ul>
+      </nav>
+    </header>
+
+    <main id="conteudo" class="page-column">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="page-column">
+        <h2>{TEXT.contact}</h2>
+        <ul role="list" class="link-row">
+          <li><a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a></li>
+          {CONTACT.profiles.map((profile) => (
+            <li><a href={profile.href}>{profile.name}</a></li>
+          ))}
+        </ul>
+      </div>
+    </footer>
+
+    <Analytics />
+  </body>
+</html>

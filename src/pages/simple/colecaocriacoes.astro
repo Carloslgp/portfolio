@@ -1,0 +1,206 @@
+---
+// /simple/colecaocriacoes — a Coleção de Criações sem palco: a abertura, as
+// criações e o intervalo na ordem de CREATIONS, e o fechamento. É a "versão
+// simples" que a colecaocriacoes.astro já desenha em baixa animação, sem o
+// canva do fundo e sem script nenhum.
+//
+// Como a original, fica fora de qualquer navegação e com noindex, nofollow:
+// chega-se nela pela URL. Os links internos do texto apontam pra versão
+// simples (ver `simpleHref`).
+import type { ImageMetadata } from 'astro';
+import { getImage } from 'astro:assets';
+import SimpleLayout from '../../layouts/SimpleLayout.astro';
+import { CLOSING, CREATIONS, KIND_LABEL, OPENING, UI, isInterlude } from '../../data/creations';
+import { CODE_PROJECTS } from '../../data/craftCode';
+import { IMAGE } from '../../scripts/creations/config';
+import { COLLECTION_PAGE, simpleHref } from '../../data/simple';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** A coluna inteira, e a miniatura das fileiras de evolução e de galeria. Os
+ *  dois só escolhem entre as larguras de IMAGE.WIDTHS, que já existem. */
+const SIZES = '(max-width: 44rem) 92vw, 41.5rem';
+const SIZES_TILE = '(max-width: 44rem) 45vw, 13rem';
+
+/** A variante da página completa, pedida com as mesmas opções: os mesmos
+ *  arquivos gerados. */
+async function variant(image: ImageMetadata) {
+  const img = await getImage({
+    src: image,
+    widths: [...IMAGE.WIDTHS],
+    format: IMAGE.FORMAT,
+    quality: IMAGE.QUALITY,
+  });
+  return { src: img.src, srcset: img.srcSet.attribute, width: image.width, height: image.height };
+}
+
+// A numeração conta só as criações, como na página completa: o intervalo ocupa
+// um lugar na lista, mas não leva número.
+let counted = 0;
+const numbered = CREATIONS.map((entry) => ({
+  entry,
+  number: isInterlude(entry) ? '' : pad(++counted),
+}));
+
+const blocks = await Promise.all(
+  numbered.map(async ({ entry, number }) => {
+    if (isInterlude(entry)) {
+      const photo = entry.photo
+        ? { ...(await variant(entry.photo.image)), alt: entry.photo.alt }
+        : null;
+      return { type: 'interlude' as const, entry, photo };
+    }
+
+    return {
+      type: 'creation' as const,
+      entry,
+      number,
+      // se a IA ajudou, lido da página Craft; undefined fora dos repositórios
+      ai: entry.craftId
+        ? CODE_PROJECTS.find((project) => project.id === entry.craftId)?.aiAssisted === true
+        : undefined,
+      image: await variant(entry.image),
+      evolution: await Promise.all(
+        (entry.evolution ?? []).map(async (step) => ({
+          ...(await variant(step.image)),
+          alt: step.alt,
+          date: step.date,
+        })),
+      ),
+      gallery: await Promise.all(
+        (entry.gallery ?? []).map(async (photo) => ({
+          ...(await variant(photo.image)),
+          alt: photo.alt,
+        })),
+      ),
+    };
+  }),
+);
+---
+
+<SimpleLayout title={COLLECTION_PAGE.title} lang="pt" robots="noindex, nofollow">
+  <p class="kicker">{OPENING.kicker}</p>
+  <h1>{OPENING.title.line1} <em>{OPENING.title.line2}</em></h1>
+  <p class="lead">{OPENING.lead}</p>
+
+  {blocks.map((block) =>
+    block.type === 'interlude' ? (
+      <section class="topic" id={block.entry.id} aria-labelledby={`${block.entry.id}-titulo`}>
+        <h2 id={`${block.entry.id}-titulo`}>
+          <span class="kicker">{block.entry.kicker}</span>{block.entry.title}
+        </h2>
+        <p>{block.entry.description}</p>
+        {block.photo && (
+          <img
+            class="shot"
+            src={block.photo.src}
+            srcset={block.photo.srcset}
+            sizes={SIZES}
+            alt={block.photo.alt}
+            width={block.photo.width}
+            height={block.photo.height}
+            loading="lazy"
+            decoding="async"
+          />
+        )}
+        <ul role="list" class="link-row">
+          {block.entry.links.map((link) => (
+            <li><a href={simpleHref(link.href)}>{link.label}</a></li>
+          ))}
+        </ul>
+      </section>
+    ) : (
+      <article
+        class="topic"
+        id={`criacao-${block.number}`}
+        aria-labelledby={`criacao-${block.number}-titulo`}
+      >
+        {/* O título vem primeiro e a linha "Criação NN · Tipo" logo depois:
+            quem navega pelos títulos chega no nome da criação, não no
+            número dela. */}
+        <h2 id={`criacao-${block.number}-titulo`}>{block.entry.title}</h2>
+        <p class="meta">
+          {UI.item} {block.number} · {KIND_LABEL[block.entry.kind]}{block.entry.date && ` · ${block.entry.date}`}{block.ai !== undefined && ` · ${block.ai ? UI.ai.yes : UI.ai.no}`}
+        </p>
+        {block.entry.missingPhoto && <p><strong>{UI.missingPhoto}</strong></p>}
+        <p>{block.entry.description}</p>
+        <img
+          class="shot"
+          src={block.image.src}
+          srcset={block.image.srcset}
+          sizes={SIZES}
+          alt={block.entry.alt}
+          width={block.image.width}
+          height={block.image.height}
+          loading={block.number === '01' ? 'eager' : 'lazy'}
+          decoding="async"
+        />
+
+        {block.evolution.length > 0 && (
+          <Fragment>
+            <h3>{UI.evolutionLabel}</h3>
+            <ol role="list" class="tiles">
+              {block.evolution.map((step) => (
+                <li>
+                  <figure>
+                    <img
+                      src={step.src}
+                      srcset={step.srcset}
+                      sizes={SIZES_TILE}
+                      alt={step.alt}
+                      width={step.width}
+                      height={step.height}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <figcaption>{step.date}</figcaption>
+                  </figure>
+                </li>
+              ))}
+            </ol>
+          </Fragment>
+        )}
+
+        {block.gallery.length > 0 && (
+          <Fragment>
+            <h3>{UI.galleryLabel}</h3>
+            <ul role="list" class="tiles">
+              {block.gallery.map((photo) => (
+                <li>
+                  <img
+                    src={photo.src}
+                    srcset={photo.srcset}
+                    sizes={SIZES_TILE}
+                    alt={photo.alt}
+                    width={photo.width}
+                    height={photo.height}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </li>
+              ))}
+            </ul>
+          </Fragment>
+        )}
+
+        {block.entry.link && (
+          <p><a href={simpleHref(block.entry.link.href)}>{block.entry.link.label}</a></p>
+        )}
+      </article>
+    ),
+  )}
+
+  <section class="topic" aria-labelledby="fechamento">
+    <p>{CLOSING.kicker}</p>
+    <h2 id="fechamento">{CLOSING.title}</h2>
+    <p>{CLOSING.text}</p>
+    <blockquote><p lang="en">{CLOSING.quote}</p></blockquote>
+    <nav aria-label={COLLECTION_PAGE.closingNav}>
+      <ul role="list" class="link-row">
+        {CLOSING.links.map((link) => (
+          <li><a href={simpleHref(link.href)}>{link.label}</a></li>
+        ))}
+      </ul>
+    </nav>
+  </section>
+</SimpleLayout>

@@ -1,0 +1,113 @@
+---
+// /simple/craft/programming — a sala de código: um projeto embaixo do outro,
+// o texto primeiro e as capturas depois. Na sala completa a captura divide a
+// linha com o texto e troca de lado a cada projeto; numa coluna só, quem manda
+// é a ordem de leitura.
+//
+// As capturas saem do getImage com as MESMAS opções da sala completa (SHOT em
+// pages/craft/programming.astro), então caem nos mesmos arquivos gerados. O
+// `sizes` é outro porque a coluna é outra, e ele só escolhe entre as larguras
+// que já existem.
+import { getImage } from 'astro:assets';
+import SimpleLayout from '../../../layouts/SimpleLayout.astro';
+import { CODE_PROJECTS, CODE_ROOM } from '../../../data/craftCode';
+import { PROGRAMMING_PAGE, simpleHref } from '../../../data/simple';
+
+const SHOT = {
+  WIDTHS: [420, 560, 840, 1120],
+  FORMAT: 'webp' as const,
+  QUALITY: 78,
+  SIZES: '(max-width: 44rem) 92vw, 41.5rem',
+};
+
+const projects = await Promise.all(
+  CODE_PROJECTS.map(async (project) => ({
+    project,
+    shots: await Promise.all(
+      (project.photos ?? []).map(async (photo) => {
+        const img = await getImage({
+          src: photo.src,
+          widths: SHOT.WIDTHS,
+          format: SHOT.FORMAT,
+          quality: SHOT.QUALITY,
+        });
+
+        return {
+          src: img.src,
+          srcset: img.srcSet.attribute,
+          width: photo.src.width,
+          height: photo.src.height,
+          alt: photo.alt,
+        };
+      }),
+    ),
+  })),
+);
+---
+
+<SimpleLayout title={PROGRAMMING_PAGE.title} description={PROGRAMMING_PAGE.description}>
+  <p class="kicker">{CODE_ROOM.eyebrow}</p>
+  <h1>{CODE_ROOM.title.line1} <em>{CODE_ROOM.title.line2}</em></h1>
+  <p class="lead">{CODE_ROOM.lead}</p>
+  <p>
+    {PROGRAMMING_PAGE.moreOn}{' '}
+    <a href={PROGRAMMING_PAGE.github.href}>{PROGRAMMING_PAGE.github.label}</a>.
+  </p>
+
+  <ol role="list" class="entries">
+    {projects.map(({ project, shots }) => (
+      <li>
+        <article id={`project-${project.id}`} aria-labelledby={`project-${project.id}-title`}>
+          <h2 id={`project-${project.id}-title`}>{project.title}</h2>
+          <p class="meta">{PROGRAMMING_PAGE.stack}: {project.stack.join(', ')}</p>
+          {project.aiAssisted && <p class="note">{PROGRAMMING_PAGE.aiNote}</p>}
+          <p>{project.description}</p>
+
+          {/* O rótulo visível é o da sala ("GitHub", "Live"); o nome do projeto
+              vai junto só pro leitor de tela, que lista os links da página fora
+              de contexto — e uma fileira de "GitHub" iguais não diz qual é
+              qual. */}
+          <ul role="list" class="link-row">
+            {project.repo && (
+              <li>
+                <a href={project.repo}>
+                  {CODE_ROOM.repoLabel}<span class="visually-hidden">: {project.title}</span>
+                </a>
+              </li>
+            )}
+            {project.live && (
+              <li>
+                <a href={project.live.href}>
+                  {project.live.label}<span class="visually-hidden">: {project.title}</span>
+                </a>
+              </li>
+            )}
+          </ul>
+
+          {shots.map((shot) => (
+            <img
+              class="shot"
+              src={shot.src}
+              srcset={shot.srcset}
+              sizes={SHOT.SIZES}
+              alt={shot.alt}
+              width={shot.width}
+              height={shot.height}
+              loading="lazy"
+              decoding="async"
+            />
+          ))}
+        </article>
+      </li>
+    ))}
+  </ol>
+
+  <div class="topic">
+    <p>{PROGRAMMING_PAGE.footNote}</p>
+    <ul role="list" class="link-row">
+      {PROGRAMMING_PAGE.footLinks.map((link) => (
+        <li><a href={simpleHref(link.href)}>{link.label}</a></li>
+      ))}
+    </ul>
+  </div>
+</SimpleLayout>

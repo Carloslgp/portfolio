@@ -1,0 +1,74 @@
+---
+// /simple/photos — o mural como uma grade comum: todas as fotos da pasta, na
+// ordem dos arquivos, cada uma com a mesma descrição que o mural dá a ela.
+//
+// As variantes são as MESMAS do mural (THUMB e THUMB_WIDE de data/gallery.ts,
+// pedidas com as mesmas opções), então esta página não põe imagem nova nenhuma
+// no deploy. E ela nunca usa o `.src` do import, que é o original de câmera
+// (ver o prunarImagensOrfas no astro.config.mjs).
+import type { ImageMetadata } from 'astro';
+import { getImage } from 'astro:assets';
+import SimpleLayout from '../../layouts/SimpleLayout.astro';
+import { PHOTO_META } from '../../data/photos';
+import { THUMB, THUMB_WIDE } from '../../data/gallery';
+import { PHOTOS_PAGE } from '../../data/simple';
+
+/** Duas colunas de ~20rem na coluna do texto; uma só no celular. */
+const SIZES = '(max-width: 38rem) 92vw, 20.5rem';
+
+const modules = import.meta.glob<{ default: ImageMetadata }>(
+  '../../assets/photos/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG}',
+  { eager: true },
+);
+
+const entries = Object.entries(modules).sort(([a], [b]) => a.localeCompare(b));
+
+const photos = await Promise.all(
+  entries.map(async ([path, mod]) => {
+    const src = mod.default;
+    const file = path.split('/').pop() ?? path;
+    const meta = PHOTO_META[file] ?? {};
+
+    const thumb = await getImage({ src, ...THUMB });
+    // a larga só existe pra foto maior que a miniatura — a mesma pergunta do mural
+    const wide = src.width > THUMB.width ? await getImage({ src, ...THUMB_WIDE }) : null;
+
+    return {
+      src: thumb.src,
+      srcset: wide
+        ? `${thumb.src} ${THUMB.width}w, ${wide.src} ${Math.min(THUMB_WIDE.width, src.width)}w`
+        : undefined,
+      width: src.width,
+      height: src.height,
+      // a mesma regra do mural: metadado > título > nome do arquivo limpo
+      alt: meta.alt ?? meta.title ?? file.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '),
+      caption: [meta.title, meta.place, meta.year].filter(Boolean).join(' · '),
+    };
+  }),
+);
+---
+
+<SimpleLayout title={PHOTOS_PAGE.title} description={PHOTOS_PAGE.notice}>
+  <h1>{PHOTOS_PAGE.title}</h1>
+  <p><strong>{PHOTOS_PAGE.noticeTitle}:</strong> {PHOTOS_PAGE.notice}</p>
+
+  <ul role="list" class="tiles is-large">
+    {photos.map((photo) => (
+      <li>
+        <figure>
+          <img
+            src={photo.src}
+            srcset={photo.srcset}
+            sizes={photo.srcset ? SIZES : undefined}
+            alt={photo.alt}
+            width={photo.width}
+            height={photo.height}
+            loading="lazy"
+            decoding="async"
+          />
+          {photo.caption && <figcaption>{photo.caption}</figcaption>}
+        </figure>
+      </li>
+    ))}
+  </ul>
+</SimpleLayout>

@@ -1,0 +1,87 @@
+---
+// /simple/work — a /work sem abas nem lightbox: os dois grupos um depois do
+// outro, e cada entrada com tudo à mostra, na mesma ordem em que a /work
+// mostra. O conteúdo é o de data/work.ts (a ordem dos grupos e das entradas
+// sai de `groups()`, a mesma de lá); as frases do markup são as cópias em
+// data/simple.ts.
+import SimpleLayout from '../../layouts/SimpleLayout.astro';
+import { groups, range } from '../../data/work';
+import { WORK_PAGE, simpleHref } from '../../data/simple';
+
+const sections = groups();
+---
+
+<SimpleLayout title={WORK_PAGE.title} description={WORK_PAGE.description}>
+  <p class="kicker">{WORK_PAGE.eyebrow}</p>
+  <h1>{WORK_PAGE.title}</h1>
+  <p class="lead">{WORK_PAGE.lead}</p>
+
+  {sections.map((section) => (
+    <section class="topic" aria-labelledby={`group-${section.id}`}>
+      <h2 id={`group-${section.id}`}>{section.label}</h2>
+
+      <ol role="list" class="entries">
+        {section.entries.map((entry) => {
+          const dates = range(entry);
+          const name = entry.org ?? entry.title;
+
+          return (
+            <li>
+              <article aria-labelledby={`entry-${entry.id}`}>
+                <h3 id={`entry-${entry.id}`}>{entry.title}</h3>
+                <p class="meta">
+                  {entry.org ?? WORK_PAGE.entryType[entry.kind]} ·{' '}
+                  <time datetime={dates.from.dt}>{dates.from.label}</time>
+                  {dates.to && <> – <time datetime={dates.to.dt}>{dates.to.label}</time></>}
+                  {dates.present && <> – {WORK_PAGE.present}</>}
+                </p>
+
+                {entry.badge && <p><span class="badge">{entry.badge}</span></p>}
+                {entry.summary && <p>{entry.summary}</p>}
+
+                {entry.photos && entry.photos.length > 0 && (
+                  <ul role="list" class="tiles" aria-label={`${WORK_PAGE.photosFrom} ${name}`}>
+                    {entry.photos.map((photo) => (
+                      <li>
+                        <img
+                          src={photo.src.src}
+                          alt={photo.alt}
+                          width={photo.src.width}
+                          height={photo.src.height}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {entry.impact && entry.impact.length > 0 && (
+                  <Fragment>
+                    <h4>{WORK_PAGE.impact}</h4>
+                    <ul>
+                      {entry.impact.map((line) => <li>{line}</li>)}
+                    </ul>
+                  </Fragment>
+                )}
+
+                {entry.stack && entry.stack.length > 0 && (
+                  <p class="meta">{WORK_PAGE.stack}: {entry.stack.join(', ')}</p>
+                )}
+
+                {entry.href && (
+                  <p><a href={entry.href}>{WORK_PAGE.visit} {name}</a></p>
+                )}
+              </article>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  ))}
+
+  <p class="topic">
+    {WORK_PAGE.craftNote}{' '}
+    <a href={simpleHref(WORK_PAGE.craftLink.href)}>{WORK_PAGE.craftLink.label}</a>.
+  </p>
+</SimpleLayout>

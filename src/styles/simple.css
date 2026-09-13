@@ -1,0 +1,527 @@
+/* src/styles/simple.css — a folha da versão simples (/simple).
+
+   Só as páginas de src/pages/simple/ carregam isto (pelo SimpleLayout), e elas
+   não carregam o global.css: nada daqui chega ao site completo, e nada de lá
+   chega aqui.
+
+   As escolhas que valem pra folha inteira:
+   • tamanhos em rem — o tamanho de letra escolhido no navegador manda em
+     tudo, e o zoom reflui a coluna em vez de cortá-la;
+   • nenhuma animação e nenhuma transição: esta é a versão pra quem não quer,
+     ou não pode, ter nada se mexendo na tela;
+   • link sempre sublinhado, e foco com anel grosso na cor do texto, que tem
+     contraste com o papel nos dois temas;
+   • o tema segue o do sistema, a não ser que o botão do site completo já
+     tenha escolhido um (ver o script no SimpleLayout). */
+
+/* As mesmas faces de Inter do global.css, nos mesmos arquivos: quem chega
+   pela home já as tem no cache. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  --paper: #ffffff;
+  --ink: #111111;
+  --muted: #545454; /* 7,5:1 sobre o papel claro */
+  --line: #cfcfcf;
+  --soft: #f2f2f2;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #0e0e10;
+    --ink: #f2f2f2;
+    --muted: #b5b5b5; /* 9:1 sobre o papel escuro */
+    --line: #3d3d42;
+    --soft: #1a1a1d;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --paper: #0e0e10;
+  --ink: #f2f2f2;
+  --muted: #b5b5b5;
+  --line: #3d3d42;
+  --soft: #1a1a1d;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.65;
+  overflow-wrap: break-word;
+}
+
+::selection {
+  background-color: var(--ink);
+  color: var(--paper);
+}
+
+/* ——— links e foco ——— */
+
+a {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  text-decoration-thickness: 0.16em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Fora da tela até receber foco, e nunca escondido de verdade: um
+   `display: none` tiraria o link da ordem de Tab, que é o único caminho até
+   ele. */
+.skip-link {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 1;
+  padding: 0.6rem 1rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(-300%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+/* só pro leitor de tela */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ——— a casca ——— */
+
+.page-column {
+  width: 100%;
+  max-width: 44rem;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+.site-header {
+  border-bottom: 1px solid var(--line);
+}
+
+.site-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  padding-top: 1rem;
+}
+
+.site-name {
+  margin: 0;
+  font-weight: 700;
+}
+
+.site-version {
+  margin-left: 0.4rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.site-full {
+  font-size: 0.95rem;
+}
+
+.site-nav {
+  padding-block: 0.4rem 0.9rem;
+}
+
+.site-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-nav li + li {
+  margin-top: 0;
+}
+
+/* a área de toque cresce na vertical sem mudar o desenho da linha */
+.site-nav a {
+  display: inline-block;
+  padding-block: 0.4rem;
+}
+
+.site-nav a[aria-current] {
+  font-weight: 700;
+  text-decoration-thickness: 0.2em;
+}
+
+main.page-column {
+  padding-block: 2.5rem 3.5rem;
+}
+
+.site-footer {
+  border-top: 1px solid var(--line);
+}
+
+.site-footer .page-column {
+  padding-block: 2rem 3rem;
+}
+
+.site-footer h2 {
+  margin-top: 0;
+  font-size: 1.3rem;
+}
+
+/* ——— texto ——— */
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 2.25rem 0 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 2.25rem;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 1.6rem;
+}
+
+h3 {
+  font-size: 1.3rem;
+}
+
+h4 {
+  font-size: 1.1rem;
+}
+
+.h1-rest {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+p,
+ul,
+ol,
+figure,
+blockquote,
+details {
+  margin: 0 0 1rem;
+}
+
+ul,
+ol {
+  padding-left: 1.4rem;
+}
+
+li + li {
+  margin-top: 0.35rem;
+}
+
+.lead {
+  font-size: 1.3rem;
+  line-height: 1.55;
+}
+
+.meta {
+  color: var(--muted);
+}
+
+.note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* O rótulo pequeno em caixa alta. Às vezes mora DENTRO de um título (ver as
+   páginas): quem navega pelos títulos ouve os dois juntos. */
+.kicker {
+  display: block;
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+blockquote {
+  padding-left: 1rem;
+  border-left: 3px solid var(--line);
+  font-style: italic;
+}
+
+/* ——— blocos e listas ——— */
+
+.topic {
+  margin-top: 3.5rem;
+  padding-top: 1.75rem;
+  border-top: 2px solid var(--ink);
+}
+
+.topic > :first-child,
+.topic > :first-child > h2:first-child {
+  margin-top: 0;
+}
+
+/* role="list" nas páginas devolve a semântica que o Safari tira de quem
+   perde os marcadores */
+.entries,
+.tiles,
+.link-row {
+  padding: 0;
+  list-style: none;
+}
+
+.entries > li {
+  margin: 0;
+  padding-block: 1.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.entries > li:first-child {
+  border-top: 0;
+}
+
+.entries > li > :first-child,
+.entries > li > article > :first-child {
+  margin-top: 0;
+}
+
+.link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+}
+
+.link-row li + li {
+  margin-top: 0;
+}
+
+.link-row a {
+  display: inline-block;
+  padding-block: 0.25rem;
+}
+
+/* ——— imagens ——— */
+
+img,
+video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Uma foto em pé na largura da coluna passaria de uma tela de altura. O teto
+   de altura encolhe a caixa, e o `contain` mantém a imagem inteira e sem
+   deformar dentro dela. A caixa continua reservada antes de a imagem chegar,
+   pela proporção dos atributos width/height. */
+main img {
+  max-height: 36rem;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+figure {
+  margin-block: 1.5rem;
+}
+
+figcaption {
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.shot {
+  margin-block: 1.25rem;
+}
+
+/* A moldura do About: 3/2 e `cover`, como lá. Ela reserva a altura antes de a
+   imagem chegar — as fotos de public/ não têm medida no build, e sem isto a
+   página pularia a cada uma que carrega, justo o que mais atrapalha quem lê
+   com a tela ampliada. */
+.frame {
+  overflow: hidden;
+  aspect-ratio: 3 / 2;
+  border-radius: 4px;
+  background: var(--soft);
+}
+
+.frame img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+.frame.is-wide {
+  aspect-ratio: 16 / 9;
+}
+
+/* os retratos: a moldura 4/5 dos cartões do About */
+.frame.is-portrait {
+  aspect-ratio: 4 / 5;
+}
+
+/* o `contain` deixa sobra em volta da imagem; na cor do papel ela some, num
+   cinza ela pareceria uma caixa vazia */
+.frame.is-contain {
+  background: none;
+}
+
+.frame.is-contain img {
+  object-fit: contain;
+}
+
+.frame.is-natural {
+  aspect-ratio: auto;
+  background: none;
+}
+
+.frame.is-natural img {
+  width: auto;
+  height: auto;
+  margin-inline: auto;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  align-items: start;
+  gap: 1rem;
+  margin-block: 1.5rem;
+}
+
+.tiles.is-large {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+}
+
+/* No celular a grade de miniaturas cairia pra uma coluna, e cinco retratos ou
+   onze desenhos um embaixo do outro empurram o texto duas telas pra baixo.
+   Duas colunas ainda deixam cada um grande o bastante pra ver. A grade grande
+   (as fotos, os jogos) continua numa só. */
+@media (max-width: 30rem) {
+  .tiles:not(.is-large) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.tiles > li {
+  margin: 0;
+}
+
+.tiles figure {
+  margin: 0;
+}
+
+.tiles img {
+  width: 100%;
+}
+
+/* desenho de poucos pixels cresce em blocos, sem borrar */
+.is-pixel img {
+  image-rendering: pixelated;
+}
+
+/* ——— as músicas ——— */
+
+details {
+  padding-inline: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+summary {
+  padding-block: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+details[open] > summary {
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.song-cover {
+  width: 10rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 30rem) {
+  h1 {
+    font-size: 1.9rem;
+  }
+
+  .lead {
+    font-size: 1.2rem;
+  }
+}

@@ -1,0 +1,63 @@
+---
+// /simple/craft/creativity — a sala do que não é código: a pixel art em ordem,
+// do primeiro desenho ao mais recente, e as duas portas pro que mora fora (o
+// canal e as fotos). Tudo vem de data/craftCreative.ts.
+//
+// Os desenhos são os arquivos originais, como na sala completa (o porquê está
+// lá: pixel art não passa pelo getImage), e crescem na tela sem borrar pelo
+// `image-rendering: pixelated` do simple.css.
+import SimpleLayout from '../../../layouts/SimpleLayout.astro';
+import { CREATIVE_ROOM, DOORS, PIXEL, PIXEL_PIECES } from '../../../data/craftCreative';
+import { CREATIVITY_PAGE, simpleHref } from '../../../data/simple';
+---
+
+<SimpleLayout title={CREATIVITY_PAGE.title} description={CREATIVITY_PAGE.description}>
+  <p class="kicker">{CREATIVE_ROOM.eyebrow}</p>
+  <h1>{CREATIVE_ROOM.title.line1} <em>{CREATIVE_ROOM.title.line2}</em></h1>
+  <p class="lead">{CREATIVE_ROOM.lead}</p>
+
+  <section class="topic" aria-labelledby="pixel-heading">
+    {/* O rótulo mora DENTRO do título: sozinho, "The first one is still
+        here." não diz de quê, e quem navega pelos títulos não ouve o que vem
+        antes deles. */}
+    <h2 id="pixel-heading"><span class="kicker">{PIXEL.label}</span>{PIXEL.heading}</h2>
+    <p>{PIXEL.intro}</p>
+
+    <ol role="list" class="tiles is-pixel">
+      {PIXEL_PIECES.map((piece, index) => (
+        <li>
+          <figure>
+            <img
+              src={piece.src.src}
+              width={piece.src.width}
+              height={piece.src.height}
+              alt={piece.alt}
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption><time datetime={piece.datetime}>{piece.date}</time>{index === 0 && `, ${CREATIVITY_PAGE.firstOne}`}</figcaption>
+          </figure>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="topic" aria-label={CREATIVITY_PAGE.elsewhere}>
+    {DOORS.map((door) => (
+      <article aria-labelledby={`door-${door.id}`}>
+        <h2 id={`door-${door.id}`}><span class="kicker">{door.label}</span>{door.title}</h2>
+        <p>{door.body}</p>
+        <p><a href={simpleHref(door.href)}>{door.linkLabel}</a></p>
+      </article>
+    ))}
+  </section>
+
+  <div class="topic">
+    <p>{CREATIVITY_PAGE.footNote}</p>
+    <ul role="list" class="link-row">
+      {CREATIVITY_PAGE.footLinks.map((link) => (
+        <li><a href={simpleHref(link.href)}>{link.label}</a></li>
+      ))}
+    </ul>
+  </div>
+</SimpleLayout>

@@ -1,0 +1,115 @@
+---
+// /simple — a home da versão simples: a apresentação e o About inteiro.
+//
+// No site completo esta é a home do anel 3D, e o About se abre por baixo dele.
+// Aqui o anel vira a navegação do topo (layouts/SimpleLayout.astro) e o About
+// é a própria página, na ordem de TOPICS em data/about.ts. Cada tipo de bloco
+// ganha a forma mais simples que ele tem em HTML:
+//
+//   • foto     → a imagem, na mesma moldura 3/2 do About (o `natural` e o
+//                `contain` valem aqui também);
+//   • vídeo    → o poster, que é o que o site completo mostra em baixa
+//                animação;
+//   • fita 3D  → uma grade de imagens, cada uma com o título embaixo;
+//   • músicas  → um <details> por música, com o texto inteiro dentro. Abre e
+//                fecha pelo teclado, sem script nenhum.
+import SimpleLayout from '../../layouts/SimpleLayout.astro';
+import { LEAD, TOPICS, isCarousel, isPhoto, isSongs } from '../../data/about';
+import { HOME, PORTRAITS } from '../../data/simple';
+---
+
+<SimpleLayout title="About" description={`${HOME.name} ${HOME.intro}`}>
+  <h1>{HOME.name} <span class="h1-rest">{HOME.intro}</span></h1>
+  <p class="lead">{LEAD}</p>
+
+  {/* Os retratos na moldura 4/5 dos cartões do About, cada um com o mesmo
+      enquadramento de lá. */}
+  <ul role="list" class="tiles">
+    {PORTRAITS.map((portrait) => (
+      <li class="frame is-portrait">
+        <img
+          src={portrait.src}
+          alt={portrait.alt}
+          width={portrait.width}
+          height={portrait.height}
+          style={`object-position:${portrait.position}`}
+          loading="lazy"
+          decoding="async"
+        />
+      </li>
+    ))}
+  </ul>
+
+  {TOPICS.map((topic) => (
+    <section class="topic" id={`about-${topic.id}`} aria-labelledby={`about-${topic.id}-title`}>
+      <h2 id={`about-${topic.id}-title`}>{topic.title}</h2>
+
+      {topic.blocks.map((block) => (
+        <Fragment>
+          {typeof block === 'string' && <p>{block}</p>}
+
+          {isPhoto(block) && (
+            (block.src ?? block.poster) ? (
+              <figure class:list={['frame', {
+                'is-contain': block.fit === 'contain',
+                'is-natural': block.natural,
+              }]}>
+                <img src={block.src ?? block.poster} alt={block.photo} loading="lazy" decoding="async" />
+              </figure>
+            ) : (
+              <p class="meta">{HOME.photoSlot} {block.photo}</p>
+            )
+          )}
+
+          {isCarousel(block) && (
+            <Fragment>
+              <h3>{block.carousel}</h3>
+              <ul role="list" class="tiles is-large">
+                {block.items.map((item) => (
+                  <li>
+                    <figure>
+                      <div class="frame is-wide">
+                        <img src={item.src} alt={item.alt} loading="lazy" decoding="async" />
+                      </div>
+                      <figcaption>{item.title}</figcaption>
+                    </figure>
+                  </li>
+                ))}
+              </ul>
+            </Fragment>
+          )}
+
+          {isSongs(block) && (
+            <Fragment>
+              <h3>{block.songs}</h3>
+              {block.items.map((song) => (
+                <details>
+                  <summary>{song.title} — {song.artist}</summary>
+                  <img
+                    class="song-cover"
+                    src={song.cover}
+                    alt={song.alt}
+                    width="640"
+                    height="640"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <p class="meta">{song.album} · {song.year}</p>
+                  {song.line && <p><em>“{song.line}”</em></p>}
+                  {song.note.map((paragraph) => <p>{paragraph}</p>)}
+                  {song.youtube && (
+                    <p>
+                      <a href={`https://www.youtube.com/watch?v=${song.youtube}`}>
+                        {HOME.playOnYouTube(song.title)}
+                      </a>
+                    </p>
+                  )}
+                </details>
+              ))}
+            </Fragment>
+          )}
+        </Fragment>
+      ))}
+    </section>
+  ))}
+</SimpleLayout>

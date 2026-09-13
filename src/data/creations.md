@@ -27,7 +27,7 @@ Tudo que está lá hoje é mock. Nenhum texto é real.
  │   │  (alt)   │   description continua...                │
  │   │          │   link.label ↗                           │ ← opcional
  │   └──────────┘                                          │
- │                                                  03/08 │ ← indicador (automático)
+ │                                                 03 / 08 │ ← contador (automático)
  └────────────────────────────────────────────────────────┘
    no celular a imagem fica em cima e o texto embaixo
 
@@ -40,15 +40,15 @@ Tudo que está lá hoje é mock. Nenhum texto é real.
  └────────────────────────────────────────────────────────┘
 ```
 
-A numeração ("01", "02"…), o total ("/ 08") e o indicador lateral saem da
-ordem da lista. Não há campo pra eles.
+A numeração ("01", "02"…) e o contador lateral ("03 / 08") saem da ordem da
+lista. Não há campo pra eles.
 
 ## Campos de uma criação
 
 | campo         | obrigatório | o que é                                                       |
 |---------------|-------------|---------------------------------------------------------------|
 | `id`          | sim         | chave estável (`'meu-projeto'`), só letras/números/hífen. Vira a âncora `#criacao-NN` e aparece nos erros do build |
-| `kind`        | sim         | `'photo'`, `'project'`, `'repo'` ou `'other'`. O rótulo de cada um está em `KIND_LABEL` |
+| `kind`        | sim         | `'photo'`, `'project'`, `'repo'`, `'bio'`, `'leadership'`, `'teaching'`, `'speech'`, `'art'`, `'hobby'` ou `'other'` — prefira o mais específico que servir, `'other'` é só pro que não se encaixa em nenhum. O rótulo de cada um está em `KIND_LABEL` |
 | `title`       | sim         | 2–4 palavras                                                  |
 | `date`        | sim         | texto livre, mostrado como está: `'2024'`, `'mai 2025'`, `'2019–2021'`. String vazia esconde |
 | `description` | sim         | até 3 frases. Mais que isso pode não caber num celular em pé |
@@ -57,6 +57,9 @@ ordem da lista. Não há campo pra eles.
 | `link`        | não         | `{ label: 'Ver no GitHub', href: 'https://…' }` — abre em aba nova |
 | `effect`      | sim         | a animação (ver abaixo)                                       |
 | `from`        | não         | só pro `slide`: `'left'` ou `'right'` (padrão)                |
+| `missingPhoto`| não         | `true` quando a foto de verdade ainda não chegou (ver abaixo) |
+| `evolution`   | não         | os estágios seguintes a `image`, pra criações que são um processo (ver abaixo) |
+| `gallery`     | não         | fotos extras do MESMO instante que `image`, trocadas por clique (ver abaixo) |
 
 ## Os efeitos
 
@@ -107,6 +110,121 @@ Efeito com nome errado também é recusado — o editor já autocompleta a lista
 - **Mudar os links do fechamento** → `CLOSING.links`. O link pra `/` recebe
   `rel="noreferrer"` automaticamente (é o que faz a home rodar a abertura
   inteira ao voltar).
+- **Marcar uma criação sem foto de verdade** → ela ainda PRECISA de um
+  `image` (é dele que o encaixe anima), então aponte pra
+  `src/assets/creations/foto-em-falta.webp` (a moldura reservada, já
+  importada no topo do arquivo) e ponha `missingPhoto: true`. A página
+  escreve um aviso "Fotos em falta" bem visível no kicker daquela criação —
+  ninguém confunde o placeholder com uma foto de verdade.
+- **A foto que faltava chegou** → jogar o arquivo em
+  `src/assets/creations/`, importar no topo do arquivo, trocar `image` pra
+  ele, apagar (ou pôr `false` em) `missingPhoto`, e conferir se o `alt` ainda
+  descreve a foto de verdade (ele já devia estar escrito pensando nela).
+
+## Uma criação que é um processo (`evolution`)
+
+Pra quando a criação não é um instante, mas uma jornada — hoje é o caso da
+pixel art. `image` é o PRIMEIRO estágio (o que chega do canva); `evolution`
+é a lista dos estágios seguintes, cada um com uma data curta:
+
+```ts
+image: pixelart1,       // o esboço — o que a moldura mostra ao chegar
+// …
+evolution: [
+  { image: pixelart2, date: '17 abr', alt: '…' },
+  // …
+  { image: pixelartBarrel, date: '9 jul', alt: '…' }, // o mais recente
+],
+```
+
+No palco, todos os estágios ocupam a MESMA moldura — não é uma foto a mais
+na tela, é a mesma foto mudando. Rolar a pausa de leitura da criação (a
+única fase em que dá pra rolar sem ela ir embora) avança de um estágio pro
+próximo; quem decide isso é o `stageOp` em `scripts/creations/field.ts`,
+puro função do tempo de rolagem, como todo o resto do motor. Antes da pausa é
+sempre o primeiro estágio; depois dela, sempre o último — é ele que sai e
+volta a ser miniatura no canva.
+
+A versão simples (sem rolagem presa: baixa animação, ou tela baixa demais)
+não tem como fazer a foto mudar sozinha, então ali `evolution` vira uma
+fileira sempre visível abaixo da descrição, cada foto com a data embaixo —
+ver `.cc-evolution` no CSS da página, escondida no palco de propósito (lá a
+moldura já conta a mesma história).
+
+A ordem da lista **é** a ordem que aparece — sempre cronológica, do mais
+antigo pro mais recente, pelo mesmo motivo do `PIXEL_PIECES` em
+`data/craftCreative.ts`: a evolução existe pra mostrar distância percorrida.
+
+Opcional — a maioria das criações não tem `evolution`, e não precisa. Repare
+que `effect` não pode ser `'pieces'` numa criação com `evolution`: as ripas
+fatiam UMA foto no espaço, e não fazem sentido fatiando várias no tempo.
+
+## Uma criação com mais de uma foto (`gallery`)
+
+Pra quando uma criação tem várias fotos do MESMO instante — hoje é o caso de
+'fazer-amigos' (4 fotos de amigos diferentes), 'acampar-com-amigos' (3) e
+'apaixonado-por-pokemon' (4: o Hall da Fama, o Pokédex, as cartas, as
+pelúcias). Ao contrário de `evolution` (instantes DIFERENTES, com data, que a
+rolagem avança sozinha), aqui quem escolhe qual foto ver é a pessoa lendo,
+clicando numa seta — a criação pode estar parada, sem rolagem nenhuma pra
+avançar. `image` continua sendo a PRIMEIRA foto (a que chega do canva);
+`gallery` é só o resto, sem data:
+
+```ts
+image: amigos1,
+alt: '…',
+gallery: [
+  { image: amigos2, alt: '…' },
+  { image: amigos3, alt: '…' },
+  { image: amigos4, alt: '…' },
+],
+```
+
+No palco, um par de setas aparece perto do fim da tela enquanto esta criação
+está ativa (fora da moldura — ver o comentário do markup em
+`colecaocriacoes.astro`, perto de `[data-cc-gallery-nav]` — porque uma
+composição `full` centraliza a foto com `transform`, e isso quebraria um
+`position: fixed` posicionado dentro dela) e troca qual foto está em cima —
+a MESMA pilha de elementos de `evolution`, só que a posição vem de um clique
+em vez do progresso da rolagem (`galleryPos` em `scripts/creations/field.ts`).
+
+Na versão simples, sem clique animado, as fotos extras viram uma fileira
+sempre visível abaixo da descrição — igual `evolution`, mas sem data (ver
+`.cc-gallery-strip` no CSS da página).
+
+Opcional — a maioria das criações não tem `gallery`. Repare que `effect` não
+pode ser `'pieces'` numa criação com `gallery` (mesmo motivo de `evolution`),
+e uma criação não pode ter `gallery` e `evolution` ao mesmo tempo — as duas
+disputariam a mesma moldura.
+
+## Um intervalo só de texto (`Interlude`)
+
+Nem toda tela da coleção é uma criação. Antes dos projetos de programação há
+um INTERVALO: uma tela só de texto avisando que ali estão só os principais,
+com um link pro GitHub e outro pra página Craft. Ele mora na mesma lista
+`CREATIONS`, no lugar exato em que aparece, e se distingue por
+`interlude: true`:
+
+```ts
+{
+  interlude: true,
+  id: 'projetos-de-programacao',
+  kicker: 'Projetos de programação',
+  title: 'Só os principais',
+  description: '…',
+  links: [
+    { label: 'Ver o meu GitHub', href: 'https://github.com/Carloslgp' },
+    { label: 'Ir para a página Craft', href: '/craft/programming' },
+  ],
+},
+```
+
+Sem foto, sem efeito, sem composição e sem número: ele rola no mesmo ritmo
+das criações (entrada, pausa de leitura, saída), mas a numeração ("Criação
+03", o contador, as âncoras `#criacao-NN`) pula ele — a âncora dele é o
+próprio `id`; enquanto ele está na tela, o contador lateral mostra "—". E a
+regra das vizinhas compara foto com foto: duas criações com o mesmo efeito,
+uma de cada lado de um intervalo, continuam sendo recusadas.
 
 ## O canva de fotos do fundo
 
@@ -149,8 +267,6 @@ E os outros números:
 - `DOCK.*` — o encaixe da foto: as curvas, o arco do caminho, a espera da
   saída (`RELEASE`);
 - `TYPE.*` — quando e como cada linha do texto se escreve e sai;
-- `JUMP.*` — o clique no indicador: perto a página desliza até lá, longe uma
-  folha com o número da criação cobre a troca;
 - `LAYOUT.MIN_STAGE_HEIGHT` — abaixo desta altura de tela a página mostra a
   versão simples (empilhada);
 - `FIELD.*` — o canva de fotos do fundo: `RATE` (velocidade em relação à
@@ -166,7 +282,7 @@ Sempre que o palco não faria sentido: sem JavaScript, com baixa animação
 (a escolha do portão do site, ou o `prefers-reduced-motion` do sistema pra
 quem entrou por link direto) ou em telas mais baixas que
 `LAYOUT.MIN_STAGE_HEIGHT` (celular deitado). As criações viram blocos
-empilhados, uma tela cada, com rolagem comum; o indicador continua
+empilhados, uma tela cada, com rolagem comum; o contador continua
 funcionando.
 
 ## Ver localmente

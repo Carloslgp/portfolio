@@ -34,7 +34,9 @@ export interface SlideParts {
   link: HTMLElement | null;
   /** o número gigante no plano do canva (ver TYPE.FOLIO) */
   folio: HTMLElement | null;
-  effect: Effect;
+  /** null num intervalo (ver `Interlude` em data/creations.ts): sem foto não
+   *  há encaixe, e o texto não tem de que lado vir */
+  effect: Effect | null;
   /** de que lado o `slide` vem */
   from: 'left' | 'right';
 }

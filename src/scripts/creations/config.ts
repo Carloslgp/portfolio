@@ -68,8 +68,8 @@ export const SCROLL = {
    *  de 120Hz. */
   SCRUB_TOUCH: 0.3,
 
-  /** Em que ponto da criação o salto do indicador pousa, em fração da pausa
-   *  de leitura: no MEIO dela a criação já entrou inteira e ainda não
+  /** Em que ponto da criação um link direto (#criacao-NN) pousa, em fração
+   *  da pausa de leitura: no MEIO dela a criação já entrou inteira e ainda não
    *  começou a sair, e há folga pros dois lados. */
   JUMP_INTO_HOLD: 0.5,
 
@@ -534,41 +534,13 @@ export const TYPE = {
   FOLIO: { FROM: 30, TO: -30, IN: [0.1, 0.5], OUT: [0.5, 0.5] },
 } as const;
 
-// ——— o indicador lateral (ver nav.ts) ———
+// ——— o contador lateral (ver nav.ts) ———
 export const NAV = {
-  /** O traço de cada criação cresce numa LENTE que desliza pelos traços com
-   *  a rolagem: FOCUS_REACH é o raio dela, em criações. */
-  FOCUS_REACH: 0.9,
   /** O contador rola de um número pro outro nesta fração de uma criação,
    *  centrada na fronteira entre as duas — onde o olho está livre, entre a
    *  saída de uma e a entrada da outra. */
   ROLL_WINDOW: 0.14,
-  /** O indicador se recolhe no fim desta fração da ÚLTIMA saída — some junto
+  /** O contador se recolhe no fim desta fração da ÚLTIMA saída — some junto
    *  com a última foto, antes de o palco soltar. */
   OUT: 0.3,
-};
-
-// ——— os saltos pelo indicador (ver main.ts → goTo) ———
-export const JUMP = {
-  /** Até esta distância (em criações) o salto DESLIZA de verdade e o encaixe
-   *  se vê; mais longe, uma "folha de capítulo" cobre a troca. */
-  GLIDE_MAX: 1.2,
-  /** segundos de deslizar por criação atravessada */
-  GLIDE_SECONDS: 2.2,
-  /** a folha: entrar, segurar, o número sair, a folha sair (segundos) */
-  VEIL_IN: 0.34,
-  VEIL_HOLD: 0.14,
-  VEIL_OUT: 0.55,
-  NUM_OUT: 0.34,
-  /** o número da folha entra subindo NUM_RISE% e sai subindo NUM_LIFT%; a
-   *  folha começa a sair OUT_OVERLAP s depois do número */
-  NUM_RISE: 60,
-  NUM_LIFT: 40,
-  NUM_DELAY: 0.06,
-  OUT_OVERLAP: 0.08,
-  /** Debaixo da folha a página pousa a ARRIVE_FROM da entrada e termina o
-   *  encaixe À VISTA, deslizando ARRIVE_SECONDS: quem pulou vê a foto
-   *  chegando, e não uma foto que já estava lá. */
-  ARRIVE_FROM: 0.7,
-  ARRIVE_SECONDS: 1.1,
 };

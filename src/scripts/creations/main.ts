@@ -29,7 +29,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { Effect } from '../../data/creations';
 import { viewportSize } from '../viewport';
-import { JUMP, RESTORE, SCROLL, STATIC } from './config';
+import { FIELD, RESTORE, SCROLL, STATIC } from './config';
 import { DOCKING, slideTimeline, type SlideParts } from './effects';
 import { createField } from './field';
 import { prepararEntrada } from './intro';
@@ -37,13 +37,11 @@ import { createIndicator } from './nav';
 import { closingTimeline, heroTimeline } from './opening';
 import { createSmooth, type Smooth } from './smooth';
 import { timing, type Timing } from './timing';
-import { EASE, revertSplits, splitHeading } from './type';
+import { revertSplits, splitHeading } from './type';
 
 gsap.registerPlugin(ScrollTrigger);
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const inOutSine = (x: number) => 0.5 - Math.cos(Math.PI * x) / 2;
-const outCubic = (x: number) => 1 - (1 - x) ** 3;
 
 export function initCreations() {
   const html = document.documentElement;
@@ -51,7 +49,6 @@ export function initCreations() {
   const hero = document.querySelector<HTMLElement>('[data-cc-hero]');
   const slides = [...document.querySelectorAll<HTMLElement>('[data-cc-slide]')];
   const nav = document.querySelector<HTMLElement>('[data-cc-nav]');
-  const items = [...document.querySelectorAll<HTMLAnchorElement>('[data-cc-nav-item]')];
   const closing = document.querySelector<HTMLElement>('[data-cc-closing-inner]');
   if (!stage || !hero || !slides.length) return;
 
@@ -59,7 +56,8 @@ export function initCreations() {
   let onActive: (index: number) => void = () => {};
   const indicator = createIndicator({
     nav,
-    items,
+    // o número que a página escreveu em cada slide — vazio num intervalo
+    labels: slides.map((slide) => slide.dataset.ccNumber ?? ''),
     sr: document.querySelector<HTMLElement>('[data-cc-nav-current]'),
     roll: document.querySelector<HTMLElement>('[data-cc-roll]'),
     onActive: (i) => onActive(i),
@@ -69,8 +67,7 @@ export function initCreations() {
   //
   // As criações são blocos empilhados e a página rola normalmente. O que
   // resta ao script é dizer qual está na tela: uma faixa fina no meio do
-  // viewport, e quem a cruza é a ativa. Os traços do indicador são âncoras
-  // de verdade (#criacao-NN), então o salto é do navegador.
+  // viewport, e quem a cruza é a ativa.
   const staticMode = () => {
     const margin = ((1 - STATIC.ACTIVE_BAND) / 2) * 100;
     const io = new IntersectionObserver(
@@ -135,7 +132,7 @@ export function initCreations() {
     // guardam referência às palavras
     const parts = slides.map((slide, i) => {
       const p = partsOf(slide, i);
-      if (!(p.effect in DOCKING)) throw new Error(`unknown effect "${p.effect}" on creation ${pad(i + 1)}`);
+      if (p.effect !== null && !(p.effect in DOCKING)) throw new Error(`unknown effect "${p.effect}" on slide ${pad(i + 1)}`);
       return p;
     });
 
@@ -159,6 +156,71 @@ export function initCreations() {
       : null;
     driver?.measure();
 
+    // ——— a galeria (fotos extras da MESMA criação, ver `gallery` em
+    // data/creations.ts) ———
+    //
+    // As barras moram FORA do palco (ver o comentário no markup — um
+    // position:fixed dentro de algo com transform não fica preso à TELA), daí
+    // o document.querySelectorAll em vez do stage.querySelectorAll do resto
+    // do arquivo. Só a da criação ATIVA aparece (`.is-active`, ligada abaixo
+    // no mesmo `onActive` que já avisa qual criação está na tela) — a posição
+    // em si troca com um tween comum, e cada quadro dele chama
+    // driver.setGallery (que mora em field.ts só porque é lá que a opacidade
+    // de cada foto é escrita).
+    const galleryNavs = driver
+      ? [...document.querySelectorAll<HTMLElement>('[data-cc-gallery-nav]')].map((navEl) => {
+          const k = Number(navEl.dataset.ccGalleryNav);
+          const count = Math.max(1, Number(navEl.dataset.ccGalleryCount) || 1);
+          const label = navEl.querySelector<HTMLElement>('[data-cc-gallery-label]');
+          const proxy = { pos: 0 };
+          let current = 0;
+          const goToPhoto = (index: number) => {
+            current = ((index % count) + count) % count;
+            if (label) label.textContent = `${current + 1} / ${count}`;
+            gsap.to(proxy, {
+              pos: current,
+              duration: 0.4,
+              ease: 'power2.inOut',
+              overwrite: true,
+              onUpdate: () => driver.setGallery(k, proxy.pos),
+            });
+          };
+          navEl.querySelector('[data-cc-gallery-prev]')?.addEventListener('click', () => goToPhoto(current - 1));
+          navEl.querySelector('[data-cc-gallery-next]')?.addEventListener('click', () => goToPhoto(current + 1));
+          return { k, el: navEl, frame: parts[k]?.frame ?? null, x: 0, y: 0 };
+        })
+      : [];
+    let activeGallery: (typeof galleryNavs)[number] | null = null;
+
+    // A barra fica colada na FOTO, e não no pé da tela: longe dela ninguém
+    // lia as setas como "trocar esta foto". Ela continua fixa e fora do palco
+    // (ver acima), então a posição vem da moldura medida a cada quadro — a
+    // moldura deriva na pausa (HOLD.CRUISE) e a barra vai junto. No desktop, logo
+    // abaixo da moldura. No celular o texto vem logo abaixo da foto, então
+    // ela entra por DENTRO da borda de baixo da foto em vez de cobrir o
+    // título. Nas molduras que sangram a tela (full, tower), ela para no pé
+    // da tela, onde já ficava.
+    const phone = window.matchMedia(FIELD.MOBILE.QUERY);
+    const placeGallery = () => {
+      const gal = activeGallery;
+      if (!gal?.frame) return;
+      const r = gal.frame.getBoundingClientRect();
+      const box = gal.el.getBoundingClientRect();
+      const { width: vw, height: vh } = viewportSize();
+      const gap = 12;
+      const edge = 16;
+      const wantY = phone.matches ? r.bottom - box.height - gap : r.bottom + gap;
+      const y = Math.max(edge, Math.min(wantY, vh - box.height - 26));
+      const x = Math.max(edge, Math.min(r.left + r.width / 2 - box.width / 2, vw - box.width - edge));
+      // box já inclui o translate atual: tirar ele dá a origem da caixa do fixed
+      const nx = Math.round(x - (box.left - gal.x));
+      const ny = Math.round(y - (box.top - gal.y));
+      if (nx === gal.x && ny === gal.y) return;
+      gal.x = nx;
+      gal.y = ny;
+      gal.el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
+    };
+
     held.smooth = createSmooth();
     const lenis = held.smooth?.lenis ?? null;
 
@@ -177,12 +239,15 @@ export function initCreations() {
     };
     onActive = (i) => {
       for (let k = Math.max(0, i); k <= i + SCROLL.DECODE_AHEAD; k++) aquecer(k);
+      for (const gal of galleryNavs) gal.el.classList.toggle('is-active', gal.k === i);
+      activeGallery = galleryNavs.find((gal) => gal.k === i) ?? null;
     };
 
     const render = () => {
       const t = master.time();
       driver?.apply(t);
       indicator.at(t, T);
+      placeGallery();
       nav?.classList.toggle('is-done', t >= T.total - 1e-4);
     };
     master.eventCallback('onUpdate', render);
@@ -192,11 +257,11 @@ export function initCreations() {
     // A página cuida da própria restauração: a do navegador acontecia antes
     // de o pin existir, numa página ainda curta, e caía no lugar errado. A
     // posição vai em TELAS (sobrevive a uma janela redimensionada). Um link
-    // #criacao-NN leva à pausa daquela criação.
+    // pra um slide (#criacao-NN, ou o id de um intervalo) leva à pausa dele.
     try {
       if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     } catch {}
-    const resumeAt = pontoDeRetorno(T);
+    const resumeAt = pontoDeRetorno(T, slides);
     if (resumeAt === null) window.scrollTo(0, 0);
 
     const intro =
@@ -249,77 +314,6 @@ export function initCreations() {
     };
     const cut = (t: number) => cutY(toTop(t));
 
-    // ——— os saltos pelo indicador ———
-    //
-    // Perto (até JUMP.GLIDE_MAX criações): a página DESLIZA até lá e o
-    // encaixe se vê de verdade — o salto é a própria página, mais depressa.
-    // Longe: uma folha de papel com o número da criação cobre a troca, a
-    // página pousa perto do destino debaixo dela e termina o encaixe à vista.
-    // É uma transição de interface no relógio, mas o quadro de chegada é o
-    // mesmo de quem rolasse até lá. O foco vai pro título da criação, pra
-    // quem navega por teclado não perder o lugar.
-    const veil = document.querySelector<HTMLElement>('[data-cc-veil]');
-    const veilNum = document.querySelector<HTMLElement>('[data-cc-veil-num]');
-    const titles = parts.map((p) => p.title);
-    let jumping = false;
-    const goTo = (t: number, i?: number) => {
-      if (jumping) return;
-      const focus = () => {
-        if (i !== undefined) titles[i]?.focus({ preventScroll: true });
-      };
-      const dist = Math.abs(t - master.time()) / T.SPC;
-      if (lenis && dist <= JUMP.GLIDE_MAX) {
-        lenis.scrollTo(toTop(t), {
-          duration: JUMP.GLIDE_SECONDS * Math.max(0.5, dist),
-          easing: inOutSine,
-          onComplete: focus,
-        });
-        return;
-      }
-      if (!veil || !veilNum) {
-        cut(t);
-        focus();
-        return;
-      }
-      jumping = true;
-      lenis?.stop();
-      veilNum.textContent = i !== undefined ? pad(i + 1) : '';
-      const land = lenis && i !== undefined ? T.start(i) + T.phases.enter * JUMP.ARRIVE_FROM : t;
-      gsap
-        .timeline({
-          onComplete: () => {
-            jumping = false;
-            focus();
-          },
-        })
-        .fromTo(veil, { autoAlpha: 0 }, { autoAlpha: 1, duration: JUMP.VEIL_IN, ease: EASE.WASH })
-        .fromTo(
-          veilNum,
-          { yPercent: JUMP.NUM_RISE, opacity: 0 },
-          { yPercent: 0, opacity: 1, duration: JUMP.VEIL_IN, ease: EASE.INK },
-          JUMP.NUM_DELAY,
-        )
-        .add(() => {
-          lenis?.start();
-          cut(land);
-          if (lenis && land !== t) {
-            lenis.scrollTo(toTop(t), { duration: JUMP.ARRIVE_SECONDS, easing: outCubic });
-          }
-        }, `+=${JUMP.VEIL_HOLD}`)
-        .to(veilNum, { yPercent: -JUMP.NUM_LIFT, opacity: 0, duration: JUMP.NUM_OUT, ease: EASE.LIFT })
-        .to(veil, { autoAlpha: 0, duration: JUMP.VEIL_OUT, ease: EASE.WASH }, `<${JUMP.OUT_OVERLAP}`);
-    };
-
-    // O href (#criacao-NN) continua lá pra quem abre em nova aba ou copia o
-    // link — por isso os modificadores passam direto.
-    items.forEach((item, i) => {
-      item.addEventListener('click', (event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        goTo(T.holdOf(i), i);
-      });
-    });
-
     window.addEventListener('pagehide', () => {
       try {
         sessionStorage.setItem(RESTORE.KEY, (window.scrollY / viewportSize().height).toFixed(4));
@@ -351,13 +345,15 @@ export function initCreations() {
   }
 }
 
-/** Pra onde a página volta ao carregar, se não for o topo: a pausa de uma
- *  criação (link #criacao-NN) ou a posição guardada ao sair (reload, voltar
- *  do histórico), em telas. */
-function pontoDeRetorno(T: Timing): { kind: 'time' | 'screens'; value: number } | null {
-  const deep = /^#criacao-(\d{2})$/.exec(location.hash);
-  if (deep) {
-    const i = Number(deep[1]) - 1;
+/** Pra onde a página volta ao carregar, se não for o topo: a pausa do slide
+ *  do link (#criacao-NN, ou o id de um intervalo) ou a posição guardada ao
+ *  sair (reload, voltar do histórico), em telas. O slide é achado pelo id, e
+ *  não pelo número da âncora: um intervalo ocupa um lugar na rolagem sem ter
+ *  número, então a "criação 15" já não é o 15º slide. */
+function pontoDeRetorno(T: Timing, slides: HTMLElement[]): { kind: 'time' | 'screens'; value: number } | null {
+  const target = location.hash.slice(1);
+  if (target) {
+    const i = slides.findIndex((slide) => slide.id === target);
     if (i >= 0 && i < T.n) return { kind: 'time', value: T.holdOf(i) };
   }
   try {
@@ -370,26 +366,30 @@ function pontoDeRetorno(T: Timing): { kind: 'time' | 'screens'; value: number } 
   return null;
 }
 
-/** As peças de uma criação, achadas pelos data-attributes do markup. A
- *  moldura é obrigatória — é nela que a foto do canva se encaixa, e é melhor
- *  falhar aqui (e cair na versão simples) do que encaixar em `null`. O título
- *  é dividido em palavras aqui (ver type.ts). */
-function partsOf(slide: HTMLElement, index: number): SlideParts & { frame: HTMLElement; title: HTMLElement | null } {
+/** As peças de um slide, achadas pelos data-attributes do markup. Numa
+ *  criação a moldura é obrigatória — é nela que a foto do canva se encaixa, e
+ *  é melhor falhar aqui (e cair na versão simples) do que encaixar em `null`.
+ *  Um intervalo ([data-cc-interlude]) não tem moldura nem efeito. O título é
+ *  dividido em palavras aqui (ver type.ts). */
+function partsOf(
+  slide: HTMLElement,
+  index: number,
+): SlideParts & { frame: HTMLElement | null } {
   const q = (sel: string) => slide.querySelector<HTMLElement>(sel);
+  const interlude = slide.hasAttribute('data-cc-interlude');
   const frame = q('[data-cc-media]');
-  if (!frame) throw new Error(`creation "${slide.id}" has no [data-cc-media]`);
+  if (!frame && !interlude) throw new Error(`creation "${slide.id}" has no [data-cc-media]`);
   const title = q('[data-cc-title]');
   return {
     root: slide,
     frame,
-    title,
     copyBox: q('[data-cc-copy]'),
     kicker: q('[data-cc-kicker]'),
     words: title ? splitHeading(title) : [],
     desc: q('[data-cc-desc]'),
     link: q('[data-cc-link]'),
     folio: document.querySelector<HTMLElement>(`[data-cc-folio="${index}"]`),
-    effect: slide.dataset.effect as Effect,
+    effect: interlude ? null : (slide.dataset.effect as Effect),
     from: slide.dataset.from === 'left' ? 'left' : 'right',
   };
 }

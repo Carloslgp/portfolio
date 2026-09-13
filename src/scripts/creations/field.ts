@@ -43,8 +43,9 @@ export interface FieldInput {
   cards: HTMLElement[];
   /** as fotos das criações ([data-cc-featured]), ripas inclusas */
   featured: HTMLElement[];
-  /** as molduras a medir, uma por criação, na ordem */
-  frames: HTMLElement[];
+  /** as molduras a medir, uma por slide, na ordem — null num intervalo, que
+   *  não tem foto (ver `Interlude` em data/creations.ts) */
+  frames: (HTMLElement | null)[];
   /** o vão entre as linhas do título, onde a fita da abertura corre */
   ribbon: HTMLElement | null;
   timing: Timing;
@@ -59,6 +60,12 @@ export interface FieldDriver {
   /** avança a animação de ENTRADA, de 0 a 1 (ver RIBBON no config). Em 1 ela
    *  acabou e o canva volta a ser função só da rolagem. */
   setIntro(i: number): void;
+  /** pra uma criação com `gallery` (ver data/creations.ts): põe a POSIÇÃO
+   *  visível da galeria da criação `k` (0 é `image`, 1 é a primeira foto de
+   *  `gallery`, e por aí vai) e reaplica no MESMO t. Aceita fração — é assim
+   *  que o main.ts anima a troca com um tween (ver o comentário de
+   *  `galleryPos` abaixo); um clique isolado pode só chamar com o inteiro. */
+  setGallery(k: number, pos: number): void;
 }
 
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
@@ -108,6 +115,17 @@ export function createField(input: FieldInput): FieldDriver {
     k: num(el.dataset.ccFeatured),
     strip: num(el.dataset.strip),
     strips: Math.max(1, num(el.dataset.strips, 1)),
+    /** só pra criação de pixel art (ver `evolution` em data/creations.ts):
+     *  em qual ESTÁGIO da evolução este elemento está, de `stages` no total.
+     *  Onde `strip` fatia UMA foto no espaço, `stage` fatia N fotos no
+     *  TEMPO — todos os estágios de uma criação ocupam a mesma moldura, e
+     *  quem decide qual se vê é só a opacidade (ver `stageOp` em apply). */
+    stage: num(el.dataset.stage),
+    stages: Math.max(1, num(el.dataset.stages, 1)),
+    /** true pra `gallery` (fotos do MESMO instante, escolhidas por clique) —
+     *  false (o padrão) é `evolution` (instantes diferentes, avançados pela
+     *  rolagem). Só importa quando `stages > 1`; ver `galleryPos` abaixo. */
+    gallery: el.dataset.gallery === '1',
     effect: el.dataset.effect as Effect,
     from: (el.dataset.from === 'left' ? 'left' : 'right') as 'left' | 'right',
     ratio: num(el.dataset.ratio, 1),
@@ -175,6 +193,11 @@ export function createField(input: FieldInput): FieldDriver {
     // a deriva vai de +a a -b em torno do meio da pausa; o pior lado é o maior
     const reach = HOLD.CRUISE * Math.max(ph.enter + ph.hold / 2, ph.hold / 2 + ph.exit) * VH;
     const boxes = frames.map((frame, i) => {
+      if (!frame) {
+        covers[i] = 0;
+        cruiseCap[i] = 1;
+        return null;
+      }
       const r = frame.getBoundingClientRect();
       // a parte da moldura que cai DENTRO da tela, sobre a área da tela
       const dentro =
@@ -230,6 +253,16 @@ export function createField(input: FieldInput): FieldDriver {
    *  (reload no meio, salto por link) já nasça montada. */
   let intro = 1;
   let lastT = 0;
+
+  /** A posição visível da GALERIA de cada criação (ver `gallery` em
+   *  data/creations.ts), por índice `k` — a outra exceção a "tudo é função da
+   *  rolagem", igual `intro` acima: quem manda é o clique nas setas, não o
+   *  scroll. Ausente = posição 0 (a foto de `image`). O main.ts anima a troca
+   *  com um tween chamando `setGallery` a cada quadro dele, então o valor
+   *  pode ser fracionário — é a mesma conta de `near` que já faz o
+   *  cross-fade contínuo da evolução, só que a posição vem de fora em vez de
+   *  vir do tempo de leitura. */
+  const galleryPos = new Map<number, number>();
 
   const montaAt = () => smooth(clamp(intro / RIBBON.MONTA));
   const juntaAt = () => smooth(clamp((intro - RIBBON.PARADA) / (RIBBON.JUNTA - RIBBON.PARADA)));
@@ -521,7 +554,33 @@ export function createField(input: FieldInput): FieldDriver {
 
       // no canva ela é uma foto acesa como as outras; com a luz, é a criação
       // — opaca antes de estar grande, pra nunca haver uma foto grande fantasma
-      const op = lerp(FIELD.LIT * breath, 1, wLight).toFixed(3);
+      let opNum = lerp(FIELD.LIT * breath, 1, wLight);
+
+      // A EVOLUÇÃO (ou a GALERIA): quando há mais de um estágio, alguém
+      // decide qual se vê. Na evolução é rolar a pausa de leitura (a única
+      // fase em que dá pra rolar sem a criação inteira ir embora) — o mesmo
+      // scroll que já revela o texto vira também a página do álbum, sempre
+      // no primeiro estágio antes da pausa e no último depois dela. Na
+      // galeria é o clique nas setas, via `galleryPos` (ver o comentário
+      // dela lá em cima) — a criação inteira já pode estar parada, então não
+      // há scroll nenhum pra ler. Os dois casos terminam na MESMA conta:
+      // `pos` é a posição CONTÍNUA na fila de estágios, e cada estágio pesa o
+      // triângulo de largura 2 centrado nele — só o vizinho mais próximo tem
+      // peso > 0, então nunca dois estágios distantes aparecem misturados.
+      if (s.stages > 1) {
+        let pos: number;
+        if (s.gallery) {
+          pos = galleryPos.get(s.k) ?? 0;
+        } else {
+          const u = t - st;
+          const progress = clamp((u - ph.enter) / ph.hold);
+          pos = progress * (s.stages - 1);
+        }
+        const near = smooth(clamp(1 - Math.abs(pos - s.stage)));
+        opNum *= near;
+      }
+
+      const op = opNum.toFixed(3);
       if (op !== s.op) {
         s.op = op;
         s.el.style.opacity = op;
@@ -559,5 +618,13 @@ export function createField(input: FieldInput): FieldDriver {
     apply(lastT);
   };
 
-  return { measure, apply, setIntro };
+  /** Move a posição da GALERIA da criação `k` e redesenha no mesmo t (ver o
+   *  comentário de `galleryPos` lá em cima). Fora do scroll — por isso
+   *  reaplica explicitamente, do mesmo jeito que `setIntro`. */
+  const setGallery = (k: number, pos: number) => {
+    galleryPos.set(k, pos);
+    apply(lastT);
+  };
+
+  return { measure, apply, setIntro, setGallery };
 }

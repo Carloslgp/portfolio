@@ -20,7 +20,7 @@
 import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
 import {
-  CLOSING, CREATIONS, EFFECT_NAMES, FIELD_PHOTOS, KIND_LABEL, OPENING, UI,
+  CLOSING, CREATIONS, EFFECT_NAMES, FIELD_PHOTOS, KIND_LABEL, OPENING, UI, isInterlude,
 } from '../data/creations';
 import { EFFECTS, FIELD, FIELD_IMAGE, IMAGE, LAYOUT, RIBBON, STAGE } from '../scripts/creations/config';
 import { layoutField } from '../scripts/creations/fieldLayout';
@@ -35,28 +35,73 @@ const pad = (n: number) => String(n).padStart(2, '0');
 // inteira está à mão. A mensagem diz QUAL criação e O QUE fazer, porque quem
 // vai ler é quem acabou de reordenar a lista, não quem escreveu isto.
 const known = new Set<string>(EFFECT_NAMES);
+
+// A numeração ("Criação 03", o contador, as âncoras #criacao-NN) conta só as
+// CRIAÇÕES: um intervalo (ver `Interlude` em data/creations.ts) ocupa um lugar
+// na rolagem, mas não é uma criação e não leva número. Contada aqui, uma vez,
+// pra conferência e markup lerem o mesmo número.
+let counted = 0;
+const entries = CREATIONS.map((entry, index) => ({
+  entry,
+  index,
+  number: isInterlude(entry) ? '' : pad(++counted),
+}));
+const total = pad(counted);
+
 const ids = new Set<string>();
-CREATIONS.forEach((creation, i) => {
-  const here = `a criação ${pad(i + 1)} ("${creation.id}")`;
+let prevPhoto: { id: string; number: string; effect: string } | null = null;
+entries.forEach(({ entry, number }) => {
+  if (ids.has(entry.id)) {
+    throw new Error(
+      `Coleção de Criações: o id "${entry.id}" aparece duas vezes na lista. ` +
+        `Cada criação (e cada intervalo) precisa de um id próprio (src/data/creations.ts).`,
+    );
+  }
+  ids.add(entry.id);
+  if (isInterlude(entry)) return;
+
+  const creation = entry;
+  const here = `a criação ${number} ("${creation.id}")`;
   if (!known.has(creation.effect)) {
     throw new Error(
       `Coleção de Criações: ${here} usa o efeito "${creation.effect}", que não existe. ` +
         `Os efeitos são: ${EFFECT_NAMES.join(', ')} (src/data/creations.ts).`,
     );
   }
-  if (ids.has(creation.id)) {
+  // Um intervalo entre as duas NÃO as separa: as fotos continuam se
+  // encaixando uma depois da outra, só com uma tela de texto no meio.
+  if (prevPhoto && prevPhoto.effect === creation.effect) {
     throw new Error(
-      `Coleção de Criações: ${here} repete um id que já existe na lista. ` +
-        `Cada criação precisa de um id próprio (src/data/creations.ts).`,
-    );
-  }
-  ids.add(creation.id);
-  const prev = CREATIONS[i - 1];
-  if (prev && prev.effect === creation.effect) {
-    throw new Error(
-      `Coleção de Criações: as criações ${pad(i)} ("${prev.id}") e ${pad(i + 1)} ("${creation.id}") ` +
+      `Coleção de Criações: as criações ${prevPhoto.number} ("${prevPhoto.id}") e ${number} ("${creation.id}") ` +
         `usam o mesmo efeito "${creation.effect}" em sequência. Troque o efeito de uma delas ` +
         `em src/data/creations.ts.`,
+    );
+  }
+  prevPhoto = { id: creation.id, number, effect: creation.effect };
+  // 'pieces' fatia UMA foto no espaço (N ripas da mesma imagem); `evolution`
+  // fatia VÁRIAS fotos no tempo, na mesma moldura. As duas ideias usam o
+  // mesmo `data-cc-featured` no DOM (ver o motor em field.ts) e não têm como
+  // conviver: `strips` e `stages` brigariam pelos mesmos elementos.
+  if (creation.evolution && creation.effect === 'pieces') {
+    throw new Error(
+      `Coleção de Criações: ${here} tem \`evolution\` e usa o efeito "pieces". As duas coisas ` +
+        `fatiam a moldura de jeitos incompatíveis — troque o \`effect\` em src/data/creations.ts.`,
+    );
+  }
+  // `gallery` (fotos do MESMO instante, trocadas por clique) usa a mesma
+  // pilha de elementos que `evolution` (fotos de instantes DIFERENTES,
+  // trocadas pela rolagem) — as duas por cima da mesma criação não fazem
+  // sentido, e nenhuma das duas convive com 'pieces' pelo motivo acima.
+  if (creation.gallery && creation.effect === 'pieces') {
+    throw new Error(
+      `Coleção de Criações: ${here} tem \`gallery\` e usa o efeito "pieces". As duas coisas ` +
+        `fatiam a moldura de jeitos incompatíveis — troque o \`effect\` em src/data/creations.ts.`,
+    );
+  }
+  if (creation.gallery && creation.evolution) {
+    throw new Error(
+      `Coleção de Criações: ${here} tem \`gallery\` e \`evolution\` juntos — as duas dividem a ` +
+        `mesma moldura de jeitos incompatíveis. Escolha uma em src/data/creations.ts.`,
     );
   }
 });
@@ -87,7 +132,13 @@ CREATIONS.forEach((creation, i) => {
 // moldura, então uma foto deitada e uma em pé cabem na mesma tela sem que
 // nenhuma seja cortada pra caber numa caixa fixa.
 const slides = await Promise.all(
-  CREATIONS.map(async (creation, index) => {
+  entries.map(async ({ entry, index, number }) => {
+    // Um intervalo não tem foto, composição nem número: só o texto e o lugar
+    // dele na rolagem. A âncora é o próprio id (ver `Interlude`).
+    if (isInterlude(entry)) {
+      return { ...entry, index, number, anchor: entry.id };
+    }
+    const creation = entry;
     const img = await getImage({
       src: creation.image,
       widths: [...IMAGE.WIDTHS],
@@ -100,16 +151,53 @@ const slides = await Promise.all(
     // de encaixe só mede a moldura que sair disso.
     const layout = creation.layout ?? STAGE.CYCLE[index % STAGE.CYCLE.length];
 
+    // Os estágios seguintes da evolução (só existe em quem tem `evolution`,
+    // ver data/creations.ts): mesma pipeline do herói — cada estágio ocupa a
+    // MESMA moldura dele, no palco, então precisa da mesma qualidade.
+    const evolution = creation.evolution
+      ? await Promise.all(
+          creation.evolution.map(async (step) => {
+            const stepImg = await getImage({
+              src: step.image,
+              widths: [...IMAGE.WIDTHS],
+              format: IMAGE.FORMAT,
+              quality: IMAGE.QUALITY,
+            });
+            return { src: stepImg.src, srcset: stepImg.srcSet.attribute, date: step.date, alt: step.alt };
+          }),
+        )
+      : undefined;
+
+    // As fotos extras de uma `gallery` (ver data/creations.ts): mesma
+    // pipeline da evolução, sem data — são do mesmo instante, não de instantes
+    // diferentes.
+    const gallery = creation.gallery
+      ? await Promise.all(
+          creation.gallery.map(async (photo) => {
+            const photoImg = await getImage({
+              src: photo.image,
+              widths: [...IMAGE.WIDTHS],
+              format: IMAGE.FORMAT,
+              quality: IMAGE.QUALITY,
+            });
+            return { src: photoImg.src, srcset: photoImg.srcSet.attribute, alt: photo.alt };
+          }),
+        )
+      : undefined;
+
     return {
       ...creation,
+      interlude: false as const,
       index,
-      number: pad(index + 1),
-      anchor: `criacao-${pad(index + 1)}`,
+      number,
+      anchor: `criacao-${number}`,
       src: img.src,
       srcset: img.srcSet.attribute,
       ratio: creation.image.width / creation.image.height,
       from: creation.from ?? 'right',
       layout,
+      evolution,
+      gallery,
       // a única coisa que a composição decide fora do CSS: a `full` leva a
       // foto a 100vw e as outras a cabem na moldura (ver IMAGE.SIZES /
       // SIZES_FULL). Precisa ser aqui porque quem escolhe a variante é o
@@ -119,7 +207,11 @@ const slides = await Promise.all(
   }),
 );
 
-const total = pad(CREATIONS.length);
+// Só as criações, sem os intervalos: são elas que têm foto, fólio e lugar no
+// canva. `total` (quantas criações) já saiu da contagem lá em cima.
+type Slide = (typeof slides)[number];
+type CreationSlide = Extract<Slide, { interlude: false }>;
+const creationSlides = slides.filter((s): s is CreationSlide => !s.interlude);
 const pieceIndexes = Array.from({ length: EFFECTS.PIECES.COUNT }, (_, k) => k);
 
 // O canva de fotos ao fundo: posições e tamanhos das fotos comuns vêm prontos
@@ -271,11 +363,78 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
             />
           </figure>
         ))}
-        {slides.map((s) => (
+        {creationSlides.map((s) => (
           <span class="cc-folio" data-cc-folio={s.index} data-layout={s.layout}>{s.number}</span>
         ))}
-        {slides.map((s) =>
-          (s.effect === 'pieces' ? pieceIndexes : [0]).map((k) => (
+        {creationSlides.map((s) => {
+          // A criação que é um PROCESSO (ver `evolution` em data/creations.ts,
+          // hoje só a de pixel art): em vez de fatiar UMA foto no espaço
+          // (`pieces`, abaixo), aqui são VÁRIAS fotos empilhadas na mesma
+          // moldura, cada uma seu próprio estágio — o field.ts decide qual se
+          // vê pela opacidade, avançando um estágio por vez conforme se rola
+          // a pausa de leitura. `--ratio` é sempre o da primeira foto (a que
+          // chega do canva): é o tamanho da moldura, as outras só cabem nela.
+          if (s.evolution) {
+            const stages = [{ src: s.src, srcset: s.srcset }, ...s.evolution];
+            return stages.map((stage, i) => (
+              <figure
+                class="cc-card is-featured is-stage"
+                data-cc-featured={s.index}
+                data-stage={i}
+                data-stages={stages.length}
+                data-effect={s.effect}
+                data-from={s.from}
+                data-layout={s.layout}
+                data-ratio={s.ratio.toFixed(4)}
+                style={`--ratio:${s.ratio.toFixed(4)}`}
+              >
+                <img
+                  src={stage.src}
+                  srcset={stage.srcset}
+                  sizes={s.sizes}
+                  alt=""
+                  loading="eager"
+                  fetchpriority={i === 0 ? 'auto' : 'low'}
+                  decoding="async"
+                  draggable="false"
+                />
+              </figure>
+            ));
+          }
+          // A criação com mais de uma FOTO DO MESMO INSTANTE (ver `gallery`
+          // em data/creations.ts): a mesma pilha de `evolution` acima, só que
+          // `data-gallery` avisa o field.ts pra NÃO avançar sozinho pela
+          // rolagem — quem escolhe o estágio visível é o clique nas setas
+          // (ver [data-cc-gallery-nav] mais abaixo e o main.ts).
+          if (s.gallery) {
+            const photos = [{ src: s.src, srcset: s.srcset }, ...s.gallery];
+            return photos.map((photo, i) => (
+              <figure
+                class="cc-card is-featured"
+                data-cc-featured={s.index}
+                data-stage={i}
+                data-stages={photos.length}
+                data-gallery="1"
+                data-effect={s.effect}
+                data-from={s.from}
+                data-layout={s.layout}
+                data-ratio={s.ratio.toFixed(4)}
+                style={`--ratio:${s.ratio.toFixed(4)}`}
+              >
+                <img
+                  src={photo.src}
+                  srcset={photo.srcset}
+                  sizes={s.sizes}
+                  alt=""
+                  loading="eager"
+                  fetchpriority={i === 0 ? 'auto' : 'low'}
+                  decoding="async"
+                  draggable="false"
+                />
+              </figure>
+            ));
+          }
+          return (s.effect === 'pieces' ? pieceIndexes : [0]).map((k) => (
             <figure
               class:list={['cc-card', 'is-featured', { 'is-strip': s.effect === 'pieces' }]}
               data-cc-featured={s.index}
@@ -298,8 +457,8 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
                 draggable="false"
               />
             </figure>
-          )),
-        )}
+          ));
+        })}
       </div>
 
       <header class="cc-hero" data-cc-hero>
@@ -324,11 +483,39 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
         <p class="cc-hint" data-cc-hero-hint aria-hidden="true"><span>{OPENING.hint}</span></p>
       </header>
 
-      {slides.map((s) => (
+      {slides.map((s) => s.interlude ? (
+        <section
+          class="cc-slide cc-interlude"
+          id={s.anchor}
+          data-cc-slide
+          data-cc-interlude
+          aria-labelledby={`${s.anchor}-titulo`}
+        >
+          {/* Um intervalo (ver `Interlude` em data/creations.ts): só o texto,
+              centrado, com os mesmos ganchos de uma criação — o motor anima
+              rótulo, título, descrição e links do mesmo jeito. Sem
+              [data-cc-media]: não há foto pra encaixar, e o partsOf (main.ts)
+              reconhece o [data-cc-interlude]. Os links moram num bloco só, que
+              é o que a varredura do link revela. */}
+          <div class="cc-copy" data-cc-copy>
+            <p class="cc-kicker" data-cc-line data-cc-kicker>{s.kicker}</p>
+            <h2 class="cc-title" id={`${s.anchor}-titulo`} data-cc-line data-cc-title>{s.title}</h2>
+            <p class="cc-desc" data-cc-line data-cc-desc>{s.description}</p>
+            <div class="cc-interlude-links" data-cc-line data-cc-link>
+              {s.links.map((link) => (
+                <a class="cc-link" href={link.href} target="_blank" rel="noopener">
+                  {link.label} <span aria-hidden="true">{UI.linkMark}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : (
         <section
           class="cc-slide"
           id={s.anchor}
           data-cc-slide
+          data-cc-number={s.number}
           data-effect={s.effect}
           data-from={s.from}
           data-layout={s.layout}
@@ -354,14 +541,66 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
 
           {/* Cada peça do texto tem o próprio gancho, porque cada uma se revela
               de um jeito (ver TYPE no config); o data-cc-line fica pra versão
-              simples. O título aceita foco (tabindex -1) pra quem salta pelo
-              indicador com o teclado aterrissar nele. */}
+              simples. */}
           <div class="cc-copy" data-cc-copy>
             <p class="cc-kicker" data-cc-line data-cc-kicker>
-              {UI.item} {s.number} · {KIND_LABEL[s.kind]}{s.date && ` · ${s.date}`}
+              {UI.item} {s.number} · {KIND_LABEL[s.kind]}{s.date && ` · ${s.date}`}{s.missingPhoto && <span class="cc-missing-tag">{UI.missingPhoto}</span>}
             </p>
-            <h2 class="cc-title" id={`${s.anchor}-titulo`} data-cc-line data-cc-title tabindex="-1">{s.title}</h2>
+            <h2 class="cc-title" id={`${s.anchor}-titulo`} data-cc-line data-cc-title>{s.title}</h2>
             <p class="cc-desc" data-cc-line data-cc-desc>{s.description}</p>
+            {/* O fallback da versão simples: sem rolagem presa, não há como a
+                foto ir mudando sozinha (isso é só do palco, ver o
+                cc-card.is-stage no canva) — então aqui a evolução vira uma
+                fileira sempre visível, e o CSS a esconde no palco pra não
+                duplicar o que a moldura já está fazendo. */}
+            {s.evolution && (
+              <div class="cc-evolution" data-cc-line>
+                <p class="cc-evolution-label">{UI.evolutionLabel}</p>
+                <ol class="cc-evolution-strip">
+                  {s.evolution.map((step) => (
+                    <li>
+                      <figure>
+                        <img
+                          src={step.src}
+                          srcset={step.srcset}
+                          sizes="4rem"
+                          alt={step.alt}
+                          loading="lazy"
+                          decoding="async"
+                          draggable="false"
+                        />
+                        <figcaption>{step.date}</figcaption>
+                      </figure>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+            {/* O mesmo fallback, pra `gallery` (ver o comentário acima): sem
+                clique animado a versão simples não tem como trocar a foto
+                sozinha, então aqui as fotos extras viram uma fileira sempre
+                visível — sem data, porque são do MESMO instante, não de
+                instantes diferentes. */}
+            {s.gallery && (
+              <div class="cc-gallery-strip" data-cc-line>
+                <p class="cc-gallery-strip-label">{UI.galleryLabel}</p>
+                <ul class="cc-gallery-strip-list">
+                  {s.gallery.map((photo) => (
+                    <li>
+                      <img
+                        src={photo.src}
+                        srcset={photo.srcset}
+                        sizes="6rem"
+                        alt={photo.alt}
+                        loading="lazy"
+                        decoding="async"
+                        draggable="false"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {s.link && (
               <a class="cc-link" data-cc-line data-cc-link href={s.link.href} target="_blank" rel="noopener">
                 {s.link.label} <span aria-hidden="true">{UI.linkMark}</span>
@@ -378,6 +617,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
         <p class="eyebrow">{CLOSING.kicker}</p>
         <h2>{CLOSING.title}</h2>
         <p class="lead">{CLOSING.text}</p>
+        <p class="cc-closing-quote">{CLOSING.quote}</p>
         <nav aria-label="Voltar pro resto do site">
           {CLOSING.links.map((link) => (
             <a href={link.href} rel={link.href === '/' ? 'noreferrer' : undefined}>{link.label}</a>
@@ -387,40 +627,32 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
     </footer>
   </main>
 
-  {/* O indicador: um traço por criação e o contador. Os traços são âncoras de
-      verdade — na versão simples o navegador as resolve sozinho, e no palco o
-      script troca o destino pela posição de scroll da criação.
-
-      O contador tem duas camadas: o número que o leitor de tela anuncia
+  {/* O contador ("03 / 28"): o número que o leitor de tela anuncia
       (escondido, e só muda quando a criação muda) e a coluna que se VÊ, que
-      rola de um número pro outro (ver nav.ts). */}
-  <nav class="cc-nav" data-cc-nav aria-label={UI.nav}>
+      rola de um número pro outro (ver nav.ts). Um intervalo não tem número:
+      enquanto ele está na tela a coluna mostra "—". */}
+  <div class="cc-nav" data-cc-nav>
     <p class="cc-nav-count">
       <span class="cc-sr" data-cc-nav-current aria-live="polite">—</span>
-      <span class="cc-roll" aria-hidden="true"><span class="cc-roll-col" data-cc-roll>{['—', ...slides.map((s) => s.number)].map((label) => <span>{label}</span>)}</span></span><span class="cc-nav-sep" aria-hidden="true">/</span><span>{total}</span>
+      <span class="cc-roll" aria-hidden="true"><span class="cc-roll-col" data-cc-roll>{['—', ...slides.map((s) => s.number || '—')].map((label) => <span>{label}</span>)}</span></span><span class="cc-nav-sep" aria-hidden="true">/</span><span>{total}</span>
     </p>
-    <ol>
-      {slides.map((s) => (
-        <li>
-          <a
-            href={`#${s.anchor}`}
-            data-cc-nav-item
-            aria-label={`${UI.jump} ${s.number} de ${total}: ${s.title}`}
-          >
-            <span class="cc-nav-num" aria-hidden="true">{s.number}</span>
-            <span class="cc-nav-mark" aria-hidden="true"></span>
-          </a>
-        </li>
-      ))}
-    </ol>
-  </nav>
-
-  {/* A folha de capítulo: o que cobre um salto LONGO pelo indicador (ver
-      main.ts → goTo). Papel, e o número da criação de destino. */}
-  <div class="cc-veil" data-cc-veil aria-hidden="true">
-    <span class="eyebrow">{UI.item}</span>
-    <span class="cc-veil-num" data-cc-veil-num></span>
   </div>
+
+  {/* As setas da galeria (ver `gallery` em data/creations.ts), uma barra por
+      criação que tem mais de uma foto. FORA do palco (que é cheio de
+      transform: a `full` centraliza a foto com translate, e um transform em
+      qualquer ancestral vira o "containing block" de um position:fixed,
+      quebrando a promessa de ficar preso à TELA) — aqui, soltas no fim do
+      documento, cada uma realmente fica onde `position:fixed` diz. O main.ts
+      mostra só a da criação ativa (ver onActive lá) e liga o clique nas
+      setas. */}
+  {creationSlides.filter((s) => s.gallery).map((s) => (
+    <div class="cc-gallery-nav" data-cc-gallery-nav={s.index} data-cc-gallery-count={(s.gallery?.length ?? 0) + 1}>
+      <button type="button" class="cc-gallery-btn" data-cc-gallery-prev aria-label="Foto anterior">‹</button>
+      <span class="cc-gallery-label" data-cc-gallery-label>{`1 / ${(s.gallery?.length ?? 0) + 1}`}</span>
+      <button type="button" class="cc-gallery-btn" data-cc-gallery-next aria-label="Próxima foto">›</button>
+    </div>
+  ))}
 </Layout>
 
 <script>
@@ -565,6 +797,18 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
       0 calc((var(--n) - 1 - var(--k)) / var(--n) * 100% + var(--gap, 0) * 1px) 0
         calc(var(--k) / var(--n) * 100% + var(--gap, 0) * 1px)
     );
+  }
+
+  /* os estágios da evolução: N fotos EMPILHADAS na mesma moldura — o field.ts
+     decide qual se vê trocando só a opacidade (`stageOp`), então aqui não há
+     nada pra recortar. `contain`, e não `cover` como o resto da página: cada
+     estágio tem a SUA proporção (algumas bem mais largas que a moldura, que
+     segue a do primeiro estágio), e cortar pixel art já composta esconde
+     parte do desenho — o fundo cobre a folga que sobra dos lados. */
+  .cc-card.is-featured.is-stage img {
+    object-fit: contain;
+    background: rgba(var(--ink-rgb), 0.06);
+    transition: background-color var(--theme-fade);
   }
 
   /* O VÉU da composição `full` mora NA FOTO. Ele existe pro texto branco ler
@@ -838,6 +1082,67 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
     user-select: none;
   }
 
+  /* ——— as setas da galeria (só o palco) ———
+     Fixas, e não dentro da moldura: a `full` centraliza a foto com
+     `translate`, e um transform em qualquer ancestral vira o "containing
+     block" de um `position:fixed` — a barra ficaria presa a essa foto enorme
+     e centralizada, não à tela (ver o comentário do markup, no fim da
+     página). Por isso o markup delas mora solto, fora do palco, e só a da
+     criação ATIVA aparece (`.is-active`, ligado pelo main.ts do mesmo jeito
+     que o contador sabe qual criação está na tela). O lugar, logo abaixo da
+     foto, é o main.ts que escreve (ver `placeGallery` lá) — daí o top/left
+     zerados aqui. Escondidas na versão simples: lá não há canva pra trocar,
+     e `.cc-gallery-strip` mostra as fotos extras de outro jeito (ver o CSS
+     dela). */
+  .cc-gallery-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 5;
+    display: none;
+    align-items: center;
+    gap: 0.55rem;
+    will-change: transform;
+  }
+
+  :global(html[data-creations='stage']) .cc-gallery-nav.is-active {
+    display: flex;
+  }
+
+  .cc-gallery-btn {
+    display: grid;
+    place-items: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+
+  .cc-gallery-btn:hover,
+  .cc-gallery-btn:focus-visible {
+    background: rgba(0, 0, 0, 0.65);
+  }
+
+  .cc-gallery-label {
+    min-width: 3.4rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 0.66rem;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* ═══ AS COMPOSIÇÕES ═══════════════════════════════════════════════════
      A forma que cada criação toma no palco. Os nomes e o que cada um quer
      dizer estão em data/creations.ts → LAYOUT_NAMES; a ordem em que aparecem
@@ -1010,17 +1315,29 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
     transition: color var(--theme-fade);
   }
 
+  /* O aviso de "Fotos em falta" (ver `missingPhoto` em data/creations.ts):
+     mora DENTRO do kicker de propósito, e não como elemento à parte — assim
+     ele herda a mesma varredura (clip-path) que já revela o kicker inteiro,
+     sem precisar de mais uma peça no motor de tipografia (ver
+     scripts/creations/effects.ts → wipe). O laço tracejado ecoa a moldura
+     reservada da própria foto-placeholder, e a tinta cheia (contra os 48% do
+     resto do kicker) é o que faz o aviso realmente se notar. */
+  .cc-missing-tag {
+    display: inline-block;
+    margin-left: 0.6em;
+    padding: 0.16em 0.6em;
+    border: 1px dashed rgba(var(--ink-rgb), 0.5);
+    border-radius: 999px;
+    color: rgba(var(--ink-rgb), 0.85);
+    transition: color var(--theme-fade), border-color var(--theme-fade);
+  }
+
   .cc-title {
     font-family: "Playfair Display", Georgia, serif;
     font-size: clamp(2.4rem, 4.4vw, 4.6rem);
     font-weight: 600;
     line-height: 0.96;
     letter-spacing: -0.04em;
-  }
-
-  /* o foco chega aqui por salto (ver main.ts → goTo): anel só pra teclado */
-  .cc-title:focus:not(:focus-visible) {
-    outline: none;
   }
 
   /* ——— as palavras mascaradas (ver type.ts) ———
@@ -1058,6 +1375,121 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
     transition: color var(--theme-fade);
   }
 
+  /* ——— a fita de evolução (só a versão simples) ———
+     Só existe na criação de pixel art (ver `evolution` em data/creations.ts):
+     uma fileira pequena de miniaturas mais antigas, cada uma com a data
+     embaixo, terminando na foto que a moldura já mostra. Rola na horizontal
+     se não couber — mais fácil que decidir quantas cabem em cada tela.
+
+     No PALCO ela some: lá a própria moldura já vai passando pelos estágios
+     conforme se rola (ver .cc-card.is-stage, mais abaixo, e o `stageOp` em
+     field.ts) — mostrar a fita também seria contar a mesma história duas
+     vezes. Esta fileira é só o que a versão simples tem pra oferecer no
+     lugar da rolagem presa que ela não roda. */
+  .cc-evolution {
+    margin-top: clamp(1.2rem, 2.6vh, 1.8rem);
+  }
+
+  :global(html[data-creations='stage']) .cc-evolution {
+    display: none;
+  }
+
+  .cc-evolution-label {
+    margin-bottom: 0.6rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.64rem;
+    font-weight: 650;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-evolution-strip {
+    display: flex;
+    gap: 0.55rem;
+    list-style: none;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cc-evolution-strip li {
+    flex: none;
+  }
+
+  .cc-evolution-strip figure {
+    margin: 0;
+    display: grid;
+    gap: 0.35rem;
+    justify-items: center;
+  }
+
+  .cc-evolution-strip img {
+    display: block;
+    width: 3.4rem;
+    height: 3.4rem;
+    object-fit: cover;
+    border-radius: 3px;
+    background: rgba(var(--ink-rgb), 0.06);
+    transition: background-color var(--theme-fade);
+  }
+
+  .cc-evolution-strip figcaption {
+    color: rgba(var(--ink-rgb), 0.55);
+    font-size: 0.56rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    transition: color var(--theme-fade);
+  }
+
+  /* ——— a fileira de galeria (só a versão simples) ———
+     O mesmo fallback de `.cc-evolution` acima, pra `gallery` (ver
+     data/creations.ts): sem data embaixo, porque as fotos são do MESMO
+     instante — a moldura já mostra a primeira, esta fileira é só o resto. No
+     PALCO ela some: lá quem troca a foto são as setas dentro da própria
+     moldura (`.cc-gallery-nav`, logo abaixo). */
+  .cc-gallery-strip {
+    margin-top: clamp(1.2rem, 2.6vh, 1.8rem);
+  }
+
+  :global(html[data-creations='stage']) .cc-gallery-strip {
+    display: none;
+  }
+
+  .cc-gallery-strip-label {
+    margin-bottom: 0.6rem;
+    color: rgba(var(--ink-rgb), 0.48);
+    font-size: 0.64rem;
+    font-weight: 650;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: color var(--theme-fade);
+  }
+
+  .cc-gallery-strip-list {
+    display: flex;
+    gap: 0.55rem;
+    list-style: none;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cc-gallery-strip-list li {
+    flex: none;
+  }
+
+  .cc-gallery-strip-list img {
+    display: block;
+    width: 4.6rem;
+    height: 4.6rem;
+    object-fit: cover;
+    border-radius: 3px;
+    background: rgba(var(--ink-rgb), 0.06);
+    transition: background-color var(--theme-fade);
+  }
+
   .cc-link {
     display: inline-block;
     margin-top: 1.6rem;
@@ -1073,6 +1505,36 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
   .cc-link:hover,
   .cc-link:focus-visible {
     text-decoration-color: currentColor;
+  }
+
+  /* ——— o intervalo (ver `Interlude` em data/creations.ts) ———
+     Uma tela só de texto, sem moldura: uma coluna, centrada. É o mesmo bloco
+     no palco e na versão simples — o que muda entre as duas é só o que já
+     muda pra toda criação. */
+  .cc-slide.cc-interlude {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+  }
+
+  .cc-interlude .cc-copy {
+    max-width: 36rem;
+  }
+
+  .cc-interlude .cc-title {
+    font-size: clamp(2.8rem, 6vw, 5.6rem);
+  }
+
+  .cc-interlude-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 1.8rem;
+    margin-top: 1.6rem;
+  }
+
+  .cc-interlude-links .cc-link {
+    margin-top: 0;
   }
 
   /* ——— a lavagem ———
@@ -1144,6 +1606,22 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
     max-width: 28rem;
   }
 
+  /* A última linha do roteiro, sozinha no arquivo original (uma linha em
+     branco a separa do parágrafo acima) — por isso é um parágrafo à parte
+     aqui também, e não uma frase colada no final do `.lead`. Itálico: é uma
+     citação, não mais uma frase da prosa — e sem aspas, porque o roteiro
+     também não usa nenhuma ali. */
+  .cc-closing-quote {
+    max-width: 26rem;
+    margin-top: clamp(1.4rem, 3vh, 2rem);
+    color: rgba(var(--ink-rgb), 0.68);
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: clamp(1.05rem, 1.8vw, 1.3rem);
+    font-style: italic;
+    line-height: 1.5;
+    transition: color var(--theme-fade);
+  }
+
   .cc-closing nav {
     display: flex;
     flex-wrap: wrap;
@@ -1166,20 +1644,17 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
     text-decoration-color: currentColor;
   }
 
-  /* ——— o indicador ———
+  /* ——— o contador ———
      A opacidade sai de variáveis: --nav-alpha, que a saída da abertura leva
      de 0 a 1, e --nav-out, que o fim da última criação leva de 1 a 0 (ver
-     main.ts). No palco nada aqui tem transição: tudo é função da rolagem, e
+     nav.ts). No palco nada aqui tem transição: tudo é função da rolagem, e
      transição correria atrás dela. Na versão simples as variáveis não
-     existem e valem 1. */
+     existem e valem 1. Mora logo abaixo do botão de tema, do mesmo lado. */
   .cc-nav {
     position: fixed;
-    top: 50%;
+    top: calc(4.75rem + env(safe-area-inset-top));
     right: calc(1.5rem + var(--viewport-right));
     z-index: 6;
-    display: grid;
-    justify-items: end;
-    gap: 1rem;
     opacity: var(--nav-alpha, 1);
     transition: opacity 0.3s ease;
   }
@@ -1256,111 +1731,6 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
     transition: transform 0.6s cubic-bezier(0.33, 0, 0.12, 1);
   }
 
-  .cc-nav ol {
-    display: grid;
-    gap: 0.55rem;
-    justify-items: end;
-    list-style: none;
-  }
-
-  .cc-nav a {
-    --p: 0;
-    --f: 0;
-    display: grid;
-    grid-auto-flow: column;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.2rem 0;
-    color: rgba(var(--ink-rgb), 0.5);
-    text-decoration: none;
-    transition: color var(--theme-fade);
-  }
-
-  .cc-nav-num {
-    font-size: 0.62rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.1em;
-    opacity: 0;
-    transition: opacity 0.25s ease;
-  }
-
-  /* no palco o número acende com a lente (--f) */
-  :global(html[data-creations='stage']) .cc-nav-num {
-    opacity: var(--f, 0);
-    transition: none;
-  }
-
-  .cc-nav a:hover .cc-nav-num,
-  .cc-nav a:focus-visible .cc-nav-num,
-  .cc-nav a[aria-current] .cc-nav-num {
-    opacity: 1;
-  }
-
-  /* O traço: um trilho fino, e por cima o preenchimento (--p) — quanto
-     daquela criação já passou. O traço cresce com a LENTE (--f) que desliza
-     pelos traços com a rolagem; em repouso ele tem --tick-min do tamanho
-     cheio (os 1.4rem de sempre, de 2.6). Cresce por scaleX a partir da
-     direita, e não por largura: largura é layout a cada quadro. */
-  .cc-nav-mark {
-    --tick-min: 0.54;
-    position: relative;
-    width: 2.6rem;
-    height: 2px;
-    overflow: hidden;
-    background: rgba(var(--ink-rgb), 0.2);
-    transform: scaleX(calc(var(--tick-min) + (1 - var(--tick-min)) * var(--f, 0)));
-    transform-origin: right center;
-    transition: transform 0.3s ease, background-color var(--theme-fade);
-  }
-
-  :global(html[data-creations='stage']) .cc-nav-mark {
-    transition: background-color var(--theme-fade);
-  }
-
-  .cc-nav-mark::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--ink);
-    transform: scaleX(var(--p));
-    transform-origin: left center;
-    transition: background-color var(--theme-fade);
-  }
-
-  /* ——— a folha de capítulo (os saltos longos, ver main.ts → goTo) ———
-     Papel por cima da página e por baixo do cromo (z 5 contra 6), com o
-     número da criação de destino. Só no palco. */
-  .cc-veil {
-    display: none;
-  }
-
-  :global(html[data-creations='stage']) .cc-veil {
-    position: fixed;
-    top: var(--viewport-top);
-    left: var(--viewport-left);
-    width: var(--viewport-w);
-    height: var(--viewport-h);
-    z-index: 5;
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    background: var(--paper);
-    color: var(--ink);
-    visibility: hidden;
-    pointer-events: none;
-    transition: background-color var(--theme-fade), color var(--theme-fade);
-  }
-
-  .cc-veil-num {
-    font-family: "Playfair Display", Georgia, serif;
-    font-size: clamp(6rem, 18vw, 14rem);
-    font-style: italic;
-    font-weight: 400;
-    line-height: 0.85;
-    letter-spacing: -0.05em;
-  }
-
   /* ——— o cromo sobre foto ———
      "‹ Voltar", o botão de tema e o indicador lateral são tinta escura no
      tema claro. Uma composição que cobre a tela de foto os apaga.
@@ -1391,8 +1761,8 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
     border-color: rgba(255, 255, 255, 0.24);
   }
 
-  /* o indicador são traços de 2px: pastilha ficaria maior que o conteúdo, e
-     uma sombra própria já dá a eles a borda escura que falta no claro */
+  /* o contador não ganha pastilha (ficaria maior que o número): uma sombra
+     própria já dá a ele a borda escura que falta no claro */
   :global(html[data-over-photo]) .cc-nav {
     filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.75));
   }
@@ -1572,6 +1942,56 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
       line-height: 1.55;
     }
 
+    .cc-evolution {
+      margin-top: 0.7rem;
+    }
+
+    .cc-evolution-label {
+      margin-bottom: 0.4rem;
+      font-size: 0.58rem;
+    }
+
+    .cc-evolution-strip {
+      gap: 0.4rem;
+    }
+
+    .cc-evolution-strip img {
+      width: 2.6rem;
+      height: 2.6rem;
+    }
+
+    .cc-evolution-strip figcaption {
+      font-size: 0.5rem;
+    }
+
+    .cc-gallery-strip {
+      margin-top: 0.7rem;
+    }
+
+    .cc-gallery-strip-label {
+      margin-bottom: 0.4rem;
+      font-size: 0.58rem;
+    }
+
+    .cc-gallery-strip-list {
+      gap: 0.4rem;
+    }
+
+    .cc-gallery-strip-list img {
+      width: 3.6rem;
+      height: 3.6rem;
+    }
+
+    .cc-gallery-btn {
+      width: 1.9rem;
+      height: 1.9rem;
+      font-size: 1rem;
+    }
+
+    .cc-gallery-label {
+      font-size: 0.6rem;
+    }
+
     .cc-link {
       margin-top: 1rem;
       font-size: 0.8rem;
@@ -1601,20 +2021,6 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
 
     .cc-nav {
       right: calc(0.9rem + var(--viewport-right));
-      gap: 0.7rem;
-    }
-
-    .cc-nav ol {
-      gap: 0.45rem;
-    }
-
-    .cc-nav-num {
-      display: none;
-    }
-
-    .cc-nav-mark {
-      --tick-min: 0.556;
-      width: 1.8rem;
     }
 
     .cc-roll {
@@ -1653,6 +2059,21 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
       font-size: 0.86rem;
       line-height: 1.5;
     }
+
+    /* o rótulo sai (a fita já se explica pelas datas) e as miniaturas
+       encolhem mais um degrau — é a tela mais apertada que existe */
+    .cc-evolution {
+      margin-top: 0.5rem;
+    }
+
+    .cc-evolution-label {
+      display: none;
+    }
+
+    .cc-evolution-strip img {
+      width: 2.2rem;
+      height: 2.2rem;
+    }
   }
 
   /* janela larga e baixa (notebook com a janela encolhida) */
@@ -1676,8 +2097,6 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
      pelo script do <head>; aqui só se cortam as transições de enfeite */
   :global(html[data-motion='reduced']) .cc-hint::after,
   :global(html[data-motion='reduced']) .cc-nav,
-  :global(html[data-motion='reduced']) .cc-nav-mark,
-  :global(html[data-motion='reduced']) .cc-nav-num,
   :global(html[data-motion='reduced']) .cc-roll-col,
   :global(html[data-motion='reduced']) .theme svg,
   :global(html[data-motion='reduced']) .back,
@@ -1690,8 +2109,6 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
   @media (prefers-reduced-motion: reduce) {
     .cc-hint::after,
     .cc-nav,
-    .cc-nav-mark,
-    .cc-nav-num,
     .cc-roll-col,
     .theme svg,
     .back,

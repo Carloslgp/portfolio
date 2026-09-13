@@ -26,6 +26,15 @@ import pixelart2 from '../assets/craft/creativity/pixelart_2.webp';
 import pixelart3 from '../assets/craft/creativity/pixelart_3.webp';
 import pixelart4 from '../assets/craft/creativity/pixelart_4.webp';
 import pixelart5 from '../assets/craft/creativity/pixelart_5.webp';
+// As seis que vieram depois do barril. Moram em src/assets/creations/ (onde
+// chegaram) e a Coleção de Criações usa os mesmos arquivos. A ordem é do mais
+// simples pro mais trabalhado, não a do número do arquivo.
+import pixelartSlime from '../assets/creations/pixelart_6.png';
+import pixelartWolf from '../assets/creations/pixelart_4.png';
+import pixelartMushroom from '../assets/creations/pixelart_1.png';
+import pixelartClownfish from '../assets/creations/pixelart_5.png';
+import pixelartWhale from '../assets/creations/pixelart_2.png';
+import pixelartFox from '../assets/creations/pixelart_3.png';
 
 /** Os textos fixos da sala. Mesmo papel do CODE_ROOM na sala de código. */
 export const CREATIVE_ROOM = {
@@ -130,6 +139,67 @@ export const PIXEL_PIECES: PixelPiece[] = [
       'A barrel. Wood, metal, rust, and a light source that finally stays ' +
       'where I put it.',
   },
+  // Estas seis foram exportadas no mesmo dia, então o carimbo do arquivo não
+  // serve nem de pista (ver o comentário de `date`): as datas são
+  // aproximadas, e a ordem é a do mais simples pro mais trabalhado.
+  {
+    id: 'slime',
+    src: pixelartSlime,
+    date: '21 July 2026',
+    datetime: '2026-07-21',
+    alt:
+      'A green slime with a small face, shaded in three greens with a darker ' +
+      'green outline.',
+    caption:
+      'A slime. The first time the outline took the colour of the thing ' +
+      'instead of plain black.',
+  },
+  {
+    id: 'wolf',
+    src: pixelartWolf,
+    date: '2 August 2026',
+    datetime: '2026-08-02',
+    alt: 'A grey wolf lying down with its ears up and a pale muzzle, painted in four greys.',
+    caption:
+      'A wolf lying down. Four greys doing the work of fur, which is fewer ' +
+      'than I thought it would take.',
+  },
+  {
+    id: 'mushroom',
+    src: pixelartMushroom,
+    date: '11 August 2026',
+    datetime: '2026-08-11',
+    alt: 'A mushroom with a red cap covered in white spots, on a pale grey stem.',
+    caption: 'A spotted mushroom. The spots had to bend with the cap, or it read as a sticker.',
+  },
+  {
+    id: 'clownfish',
+    src: pixelartClownfish,
+    date: '19 August 2026',
+    datetime: '2026-08-19',
+    alt: 'An orange clownfish with white stripes edged in black.',
+    caption: 'A clownfish, small on purpose. At this size every stripe is a decision.',
+  },
+  {
+    id: 'whale',
+    src: pixelartWhale,
+    date: '28 August 2026',
+    datetime: '2026-08-28',
+    alt: 'A blue whale blowing a spout of water, with a pale belly and a dark outline.',
+    caption:
+      'A whale and its spout. Clean edges, and a highlight that finally ' +
+      'makes a body look round.',
+  },
+  {
+    id: 'fox',
+    src: pixelartFox,
+    date: '6 September 2026',
+    datetime: '2026-09-06',
+    alt: 'An orange fox sitting upright, with a white chest and a white tip on its tail.',
+    caption:
+      'A fox. The most recent one, and the first where the shading, the fur ' +
+      'and the pose all hold together.',
+  },
 ];
 
 /** O texto que abre e o que fecha a faixa. Ficam fora da lista porque falam
@@ -154,7 +224,7 @@ export const PIXEL = {
    *  primeira a rolar até a segunda é cobrar pedágio por uma resposta que já
    *  estava pronta. */
   note:
-    'Five pieces is a sample, not the set. There is a lot more pixel art ' +
+    'Eleven pieces is a sample, not the set. There is a lot more pixel art ' +
     'than fits on one page, and the first picture here is nowhere near ' +
     'where I am now: I got a great deal better at this, and I am still ' +
     'going. To see the rest of it you have to go to the collection.',

@@ -44,6 +44,17 @@ import pixelart2 from '../assets/craft/creativity/pixelart_2.webp';
 import pixelart3 from '../assets/craft/creativity/pixelart_3.webp';
 import pixelart4 from '../assets/craft/creativity/pixelart_4.webp';
 import pixelartBarrel from '../assets/craft/creativity/pixelart_5.webp';
+// As seis que vieram depois do barril, em src/assets/creations/. A ordem na
+// fita (`evolution` de 'aprender-pixel-art') é do mais simples pro mais
+// trabalhado, e NÃO a do número do arquivo. Os prints foram tirados todos no
+// mesmo dia, então nem o arquivo nem o número dizem quando cada uma foi feita:
+// as datas lá embaixo são aproximadas.
+import pixelartSlime from '../assets/creations/pixelart_6.png';
+import pixelartWolf from '../assets/creations/pixelart_4.png';
+import pixelartMushroom from '../assets/creations/pixelart_1.png';
+import pixelartClownfish from '../assets/creations/pixelart_5.png';
+import pixelartWhale from '../assets/creations/pixelart_2.png';
+import pixelartFox from '../assets/creations/pixelart_3.png';
 import pokemonHallOfFame from '../assets/now/pokemon-hall-of-fame.webp';
 import feetInStream from '../assets/photos/feet-in-stream.webp';
 
@@ -868,7 +879,37 @@ export const CREATIONS: Entry[] = [
       {
         image: pixelartBarrel,
         date: '9 jul',
-        alt: 'O barril de madeira, o estado mais recente da jornada.',
+        alt: 'Um barril de madeira visto de frente, com aduelas avermelhadas presas por cintas de metal.',
+      },
+      {
+        image: pixelartSlime,
+        date: '21 jul',
+        alt: 'Uma gosma verde com uma carinha, em três tons de verde e contorno verde-escuro.',
+      },
+      {
+        image: pixelartWolf,
+        date: '2 ago',
+        alt: 'Um lobo cinza deitado, de orelhas em pé e focinho claro, pintado em quatro tons de cinza.',
+      },
+      {
+        image: pixelartMushroom,
+        date: '11 ago',
+        alt: 'Um cogumelo de chapéu vermelho com pintas brancas, sobre um pé cinza-claro.',
+      },
+      {
+        image: pixelartClownfish,
+        date: '19 ago',
+        alt: 'Um peixe-palhaço laranja com listras brancas contornadas de preto.',
+      },
+      {
+        image: pixelartWhale,
+        date: '28 ago',
+        alt: 'Uma baleia azul soltando um jato de água, com a barriga clara e o contorno escuro.',
+      },
+      {
+        image: pixelartFox,
+        date: '6 set',
+        alt: 'Uma raposa laranja sentada, de peito e ponta da cauda brancos: o estado mais recente da jornada.',
       },
     ],
   },

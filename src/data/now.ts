@@ -86,7 +86,7 @@ export const PLACE = 'Curitiba, Brazil';
 
 export const LEAD =
   'The first tab was true the last time I touched this page. The second one has ' +
-  'not happened yet. The time above them is not decoration — it is the actual ' +
+  'not happened yet. The time above them is not decoration: it is the actual ' +
   'clock in Curitiba, which is where I am while you read this.';
 
 /** As duas abas, na ordem em que a página as desenha.
@@ -179,7 +179,7 @@ export const STRANDS: Strand[] = [
     href: 'https://github.com/Carloslgp/Ghosty-App',
     body:
       'An Android app in Kotlin that hides in plain sight: it wears the face ' +
-      'of an ordinary app — it can imitate several — and keeps an emergency ' +
+      'of an ordinary app (it can imitate several) and keeps an emergency ' +
       'button underneath. The triggers call the police and open a live voice ' +
       'stream to emergency contacts. Only the front end exists so far, which ' +
       'is where I am.',
@@ -238,40 +238,6 @@ export const STRANDS: Strand[] = [
         'The @sudocarlos channel page, six videos in: two Python course ' +
         'episodes and one on computer architecture.',
     },
-  },
-];
-
-/** As coisas mais leves, que também são verdade agora. Uma linha cada: elas
- *  existem pra página não terminar em cargo, porque a pessoa não termina em
- *  cargo. Vêm do About, e não são um resumo dele — são o recorte do que está
- *  ATIVO neste momento. */
-export interface Aside {
-  id: string;
-  label: string;
-  body: string;
-}
-
-export const ASIDES: Aside[] = [
-  {
-    id: 'bonsai',
-    label: 'Growing',
-    body:
-      'A gardenia bonsai, a year in. I’m still losing the argument about who’s ' +
-      'in charge.',
-  },
-  {
-    id: 'sound',
-    label: 'Playing',
-    body:
-      'An Arturia KeyLab, chasing atmospheres somewhere between C418 and EDEN. ' +
-      '“Finished song” remains aspirational.',
-  },
-  {
-    id: 'reading',
-    label: 'Learning',
-    body:
-      'The data side of things, mostly by being handed problems slightly larger ' +
-      'than what I know. It works.',
   },
 ];
 

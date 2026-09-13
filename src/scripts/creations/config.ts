@@ -73,6 +73,17 @@ export const SCROLL = {
    *  começou a sair, e há folga pros dois lados. */
   JUMP_INTO_HOLD: 0.5,
 
+  /** A pausa de leitura de uma criação com `evolution` (hoje, a pixel art)
+   *  cresce pra caber os estágios: este tanto de rolagem, em telas, por troca
+   *  de desenho. 0.5 são uns 5 dentes de roda por desenho — com a pausa comum
+   *  eram onze desenhos em menos de uma tela, e nenhum ficava tempo bastante
+   *  pra ser visto. As outras criações não mudam (ver timing.ts → extraHold). */
+  SCREENS_PER_STAGE: 0.5,
+
+  /** Quanto de cada trecho da evolução é troca de desenho; no resto a moldura
+   *  fica PARADA no desenho. Mais baixo = trocas mais secas. */
+  STAGE_FADE: 0.3,
+
   /** Quantas criações à frente da atual têm a foto decodificada antes de
    *  chegar. Uma: a foto de uma composição `full` decodificada ocupa 15–20MB,
    *  e aquecer as oito seria memória jogada fora num celular. */

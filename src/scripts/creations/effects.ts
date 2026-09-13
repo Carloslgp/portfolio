@@ -78,8 +78,11 @@ const CLIP_HIDDEN = 'inset(-40% 108% -40% -8%)';
 const CLIP_SHOWN = 'inset(-40% -8% -40% -8%)';
 const CLIP_GONE = 'inset(-40% -8% -40% 108%)';
 
-/** O texto de uma criação, e a deriva dele. */
-export function slideTimeline(p: SlideParts, ph: Phases): Timeline {
+/** O texto de uma criação, e a deriva dele. `base` é o trecho de uma criação
+ *  comum (T.SPC): numa de pausa esticada a deriva se espalha pelo trecho
+ *  inteiro em vez de crescer com ele — o texto sobe o mesmo tanto de uma
+ *  comum, só que mais devagar. */
+export function slideTimeline(p: SlideParts, ph: Phases, base = ph.enter + ph.hold + ph.exit): Timeline {
   const tl = gsap.timeline();
   frame(tl, p.root, ph);
 
@@ -96,10 +99,11 @@ export function slideTimeline(p: SlideParts, ph: Phases): Timeline {
   // --viewport-h divergem com a barra de endereço.
   if (p.copyBox) {
     const mid = E + ph.hold / 2;
+    const drift = HOLD.CRUISE * Math.min(1, base / span);
     tl.fromTo(
       p.copyBox,
-      { y: () => HOLD.CRUISE * mid * vh() },
-      { y: () => -HOLD.CRUISE * (span - mid) * vh(), duration: span, ease: 'none', immediateRender: true },
+      { y: () => drift * mid * vh() },
+      { y: () => -drift * (span - mid) * vh(), duration: span, ease: 'none', immediateRender: true },
       0,
     );
 

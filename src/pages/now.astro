@@ -17,7 +17,7 @@ import { getImage } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
 import NowFigure from '../components/NowFigure.astro';
 import { NOW_SEAM, NOW_TZ } from '../scripts/nowNavigation';
-import { ASIDES, HORIZONS, LEAD, NOW_NOTE, PANELS, PLACE, STRANDS, UPDATED } from '../data/now';
+import { HORIZONS, LEAD, NOW_NOTE, PANELS, PLACE, STRANDS, UPDATED } from '../data/now';
 import type { Figure } from '../data/now';
 
 const MONTHS = [
@@ -285,37 +285,26 @@ const horizons = await Promise.all(
                 </p>
 
                 {panel.id === 'now' ? (
-                  <>
-                    <ol class="strands">
-                      {strands.map(({ strand, figure }, row) => (
-                        <li
-                          class:list={['strand', step(index, row) !== null && 'is-arriving']}
-                          style={`--row:${row + 1}${step(index, row) !== null ? `;--i:${step(index, row)}` : ''}`}
-                        >
-                          <p class="strand-label">{strand.label}</p>
-                          <div class="strand-body">
-                            <h2>
-                              {strand.href
-                                ? <a href={strand.href} target="_blank" rel="noopener noreferrer">{strand.title}</a>
-                                : strand.title}
-                            </h2>
-                            {strand.since && <p class="strand-since">Since {month(strand.since)}</p>}
-                            <p>{strand.body}</p>
-                            <NowFigure figure={figure} eager={row === 0} />
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-
-                    <ul class="asides">
-                      {ASIDES.map((aside, row) => (
-                        <li class="aside" style={`--row:${STRANDS.length + 1 + row}`}>
-                          <span class="aside-label">{aside.label}</span>
-                          <span class="aside-body">{aside.body}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
+                  <ol class="strands">
+                    {strands.map(({ strand, figure }, row) => (
+                      <li
+                        class:list={['strand', step(index, row) !== null && 'is-arriving']}
+                        style={`--row:${row + 1}${step(index, row) !== null ? `;--i:${step(index, row)}` : ''}`}
+                      >
+                        <p class="strand-label">{strand.label}</p>
+                        <div class="strand-body">
+                          <h2>
+                            {strand.href
+                              ? <a href={strand.href} target="_blank" rel="noopener noreferrer">{strand.title}</a>
+                              : strand.title}
+                          </h2>
+                          {strand.since && <p class="strand-since">Since {month(strand.since)}</p>}
+                          <p>{strand.body}</p>
+                          <NowFigure figure={figure} eager={row === 0} />
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
                 ) : horizons.length > 0 ? (
                   <ol class="strands">
                     {horizons.map(({ horizon, figure }, row) => (
@@ -1027,39 +1016,6 @@ const horizons = await Promise.all(
     transition: color var(--theme-fade);
   }
 
-  /* ——— as coisas leves ———
-     Uma linha cada, e sem borda: elas não são fios abertos, são o rodapé da
-     pessoa. Empilhar com o mesmo peso dos de cima daria a uma bonsai a mesma
-     importância de um emprego. */
-  .asides {
-    margin-top: 2.4rem;
-    padding-top: 1.6rem;
-    border-top: 1px solid rgba(var(--ink-rgb), 0.1);
-    list-style: none;
-    transition: border-color var(--theme-fade);
-  }
-
-  .aside {
-    display: grid;
-    grid-template-columns: 7.5rem minmax(0, 1fr);
-    gap: 0 1.5rem;
-    padding: 0.42rem 0;
-    color: rgba(var(--ink-rgb), 0.6);
-    font-size: 0.86rem;
-    line-height: 1.55;
-    transition: color var(--theme-fade);
-  }
-
-  .aside-label {
-    color: rgba(var(--ink-rgb), 0.42);
-    font-size: 0.68rem;
-    font-weight: 650;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    padding-top: 0.2rem;
-    transition: color var(--theme-fade);
-  }
-
   /* ——— a troca de painel ———
      O rail desliza inteiro, mas um retângulo rígido voando pro lado lê como
      cartão sendo empurrado, não como página trocando. Então as linhas do painel
@@ -1082,8 +1038,7 @@ const horizons = await Promise.all(
   }
 
   .now-panel.is-entering .panel-note,
-  .now-panel.is-entering .strand,
-  .now-panel.is-entering .aside {
+  .now-panel.is-entering .strand {
     animation: row-settle 460ms cubic-bezier(0.2, 0.86, 0.24, 1) backwards;
     animation-delay: calc(min(var(--row, 0), 7) * 30ms + 40ms);
   }
@@ -1335,14 +1290,12 @@ const horizons = await Promise.all(
     /* Uma coluna: 7.5rem de rótulo mais o texto não cabem num telefone sem
        espremer o corpo a quatro palavras por linha. O verbo vira uma linha
        própria acima do título, que é como ele já se lê. */
-    .strand,
-    .aside {
+    .strand {
       grid-template-columns: minmax(0, 1fr);
       gap: 0.3rem;
     }
 
-    .strand-label,
-    .aside-label {
+    .strand-label {
       padding-top: 0;
     }
 
@@ -1379,8 +1332,7 @@ const horizons = await Promise.all(
     }
 
     .now-panel.is-entering .panel-note,
-    .now-panel.is-entering .strand,
-    .now-panel.is-entering .aside {
+    .now-panel.is-entering .strand {
       animation: none;
     }
   }

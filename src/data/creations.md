@@ -151,6 +151,12 @@ fileira sempre visível abaixo da descrição, cada foto com a data embaixo —
 ver `.cc-evolution` no CSS da página, escondida no palco de propósito (lá a
 moldura já conta a mesma história).
 
+Uma criação com `evolution` também rola MAIS que as outras: a pausa de
+leitura dela cresce meia tela por troca de desenho (`SCROLL.SCREENS_PER_STAGE`
+no config), e em cada trecho a moldura fica parada no desenho e só troca no
+meio dele (`SCROLL.STAGE_FADE`). As outras criações não mudam de tamanho — ver
+`extraHold` em `scripts/creations/timing.ts`.
+
 A ordem da lista **é** a ordem que aparece — sempre cronológica, do mais
 antigo pro mais recente, pelo mesmo motivo do `PIXEL_PIECES` em
 `data/craftCreative.ts`: a evolução existe pra mostrar distância percorrida.

@@ -33,9 +33,9 @@
 // das <img> dentro delas) a cada quadro — medido: 9,5ms por quadro com a CPU
 // a 4x. Opacidade não herda; cada foto paga só por si.
 import type { Effect } from '../../data/creations';
-import { DOCK, EFFECTS, FIELD, HOLD, RIBBON } from './config';
+import { DOCK, EFFECTS, FIELD, HOLD, RIBBON, SCROLL } from './config';
 import { DOCKING, settle, smooth } from './effects';
-import type { Timing } from './timing';
+import type { Phases, Timing } from './timing';
 
 export interface FieldInput {
   field: HTMLElement;
@@ -77,7 +77,10 @@ const num = (v: string | undefined, fallback = 0) => {
 
 export function createField(input: FieldInput): FieldDriver {
   const { field, frames, timing: T } = input;
-  const ph = T.phases;
+  /** a deriva da criação k (ver HOLD.CRUISE). Numa de pausa esticada ela se
+   *  espalha pelo trecho inteiro em vez de crescer com ele — a MESMA conta do
+   *  slideTimeline no effects.ts, senão foto e texto se separariam. */
+  const driftOf = (k: number) => HOLD.CRUISE * Math.min(1, T.SPC / T.lengthOf(k));
 
   const common = input.cards.map((el) => {
     const depth = num(el.dataset.depth, 0.5);
@@ -190,9 +193,10 @@ export function createField(input: FieldInput): FieldDriver {
       c.tf = '';
     });
 
-    // a deriva vai de +a a -b em torno do meio da pausa; o pior lado é o maior
-    const reach = HOLD.CRUISE * Math.max(ph.enter + ph.hold / 2, ph.hold / 2 + ph.exit) * VH;
     const boxes = frames.map((frame, i) => {
+      // a deriva vai de +a a -b em torno do meio da pausa; o pior lado é o maior
+      const p = T.phasesOf(i);
+      const reach = driftOf(i) * Math.max(p.enter + p.hold / 2, p.hold / 2 + p.exit) * VH;
       if (!frame) {
         covers[i] = 0;
         cruiseCap[i] = 1;
@@ -302,19 +306,20 @@ export function createField(input: FieldInput): FieldDriver {
 
   /** O andamento da saída depois da espera (DOCK.RELEASE): 0 enquanto o texto
    *  sai, e de 0 a 1 no resto da saída. u é o tempo dentro do trecho. */
-  const released = (u: number) =>
-    clamp(((u - ph.enter - ph.hold) / ph.exit - DOCK.RELEASE) / (1 - DOCK.RELEASE));
+  const released = (u: number, p: Phases) =>
+    clamp(((u - p.enter - p.hold) / p.exit - DOCK.RELEASE) / (1 - DOCK.RELEASE));
 
   /** O peso de um canal da criação k em t: 0 no canva, 1 na moldura. Sobe na
    *  janela dele dentro da entrada, fica em 1 na pausa e desce na saída pela
    *  janela ESPELHADA — quem chega por último sai primeiro. */
   const channel = (k: number, t: number, w: readonly [number, number]) => {
     const u = t - T.start(k);
-    if (u <= 0 || u >= T.SPC) return 0;
+    if (u <= 0 || u >= T.lengthOf(k)) return 0;
+    const p = T.phasesOf(k);
     const span = w[1] - w[0];
-    if (u < ph.enter) return easeIn(clamp((u / ph.enter - w[0]) / span));
-    if (u < ph.enter + ph.hold) return 1;
-    const v = released(u);
+    if (u < p.enter) return easeIn(clamp((u / p.enter - w[0]) / span));
+    if (u < p.enter + p.hold) return 1;
+    const v = released(u, p);
     return 1 - easeOut(clamp((v - (1 - w[1])) / span));
   };
 
@@ -323,10 +328,11 @@ export function createField(input: FieldInput): FieldDriver {
    *  onda da saída é o espelho da da entrada. */
   const rawWeight = (k: number, t: number) => {
     const u = t - T.start(k);
-    if (u <= 0 || u >= T.SPC) return 0;
-    if (u < ph.enter) return u / ph.enter;
-    if (u < ph.enter + ph.hold) return 1;
-    return 1 - released(u);
+    if (u <= 0 || u >= T.lengthOf(k)) return 0;
+    const p = T.phasesOf(k);
+    if (u < p.enter) return u / p.enter;
+    if (u < p.enter + p.hold) return 1;
+    return 1 - released(u, p);
   };
 
   const apply = (t: number) => {
@@ -336,7 +342,7 @@ export function createField(input: FieldInput): FieldDriver {
     // A presença da criação no palco (o canal de luz dela) decide a
     // respiração do canva e se a passagem está aberta. Suave nas duas
     // pontas — sem as quinas lineares de antes.
-    const a = t < T.H || t >= T.total ? -1 : Math.floor((t - T.H) / T.SPC);
+    const a = t < T.H || t >= T.total ? -1 : Math.floor(T.slotAt(t));
     const presence = a < 0 ? 0 : channel(a, t, DOCK.WIN.light);
     const breath = 1 - (1 - FIELD.BREATH_MIN) * presence;
     const passage = 1 - presence;
@@ -437,6 +443,7 @@ export function createField(input: FieldInput): FieldDriver {
         continue;
       }
       const st = T.start(s.k);
+      const phk = T.phasesOf(s.k);
       const wPos = channel(s.k, t, DOCK.WIN.pos);
       const wSize = channel(s.k, t, DOCK.WIN.size);
       const wTurn = channel(s.k, t, DOCK.WIN.turn);
@@ -448,8 +455,8 @@ export function createField(input: FieldInput): FieldDriver {
       // estaria — ele andou a pausa inteira, e a foto teria que correr
       // centenas de px num dente pra alcançá-lo. A troca de âncora acontece
       // com wPos = 1, onde a âncora não pesa nada: sem salto.
-      const tAlign = st + ph.enter * DOCK.LEAD;
-      const tFree = st + ph.enter + ph.hold + ph.exit * DOCK.RELEASE;
+      const tAlign = st + phk.enter * DOCK.LEAD;
+      const tFree = st + phk.enter + phk.hold + phk.exit * DOCK.RELEASE;
       const anchor = t < tFree ? tAlign : tFree;
       const from = dock.offset(s.from);
       const canvasCx = s.cx + from.dx * W;
@@ -457,7 +464,7 @@ export function createField(input: FieldInput): FieldDriver {
 
       // a moldura deriva devagar a criação inteira (zero no meio da pausa);
       // o texto faz a MESMA conta no effects.ts
-      const cruise = HOLD.CRUISE * (st + ph.enter + ph.hold / 2 - t) * VH * cruiseCap[s.k];
+      const cruise = driftOf(s.k) * (st + phk.enter + phk.hold / 2 - t) * VH * cruiseCap[s.k];
       const fx = s.cx;
       const fy = s.cy + cruise;
 
@@ -572,9 +579,16 @@ export function createField(input: FieldInput): FieldDriver {
         if (s.gallery) {
           pos = galleryPos.get(s.k) ?? 0;
         } else {
+          // Um desenho de cada vez: a pausa é dividida em trechos iguais, um
+          // por troca, e em cada trecho a moldura FICA no desenho e só troca
+          // no miolo dele (SCROLL.STAGE_FADE do trecho). Um avanço contínuo
+          // deixava sempre dois desenhos misturados, e nenhum parava tempo
+          // bastante pra ser visto.
           const u = t - st;
-          const progress = clamp((u - ph.enter) / ph.hold);
-          pos = progress * (s.stages - 1);
+          const x = clamp((u - phk.enter) / phk.hold) * (s.stages - 1);
+          const seg = Math.min(s.stages - 2, Math.floor(x));
+          const f = SCROLL.STAGE_FADE;
+          pos = seg + smooth(clamp((x - seg - (1 - f) / 2) / f));
         }
         const near = smooth(clamp(1 - Math.abs(pos - s.stage)));
         opNum *= near;
@@ -600,7 +614,7 @@ export function createField(input: FieldInput): FieldDriver {
       // moldura sobe — uma janela, com o que está atrás dela mais longe. Só
       // translação: nada estica.
       if (s.img) {
-        const life = clamp((t - st) / T.SPC);
+        const life = clamp((t - st) / T.lengthOf(s.k));
         const pan = ((2 * life - 1) * FIELD.INNER.BLEED * h).toFixed(2);
         if (pan !== s.pan) {
           s.pan = pan;

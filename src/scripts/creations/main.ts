@@ -126,7 +126,9 @@ export function initCreations() {
     // embaixo, ANTES do primeiro quadro da entrada.
     ScrollTrigger.config({ ignoreMobileResize: true, autoRefreshEvents: 'visibilitychange,resize' });
 
-    const T = timing(slides.length);
+    // a pausa a mais de cada slide, escrita no build (data-cc-hold): só a
+    // criação com `evolution` tem, ver timing.ts → extraHold
+    const T = timing(slides.map((slide) => Number(slide.dataset.ccHold) || 0));
 
     // os títulos são divididos ANTES de as timelines serem montadas: elas
     // guardam referência às palavras
@@ -138,7 +140,7 @@ export function initCreations() {
 
     const master = gsap.timeline({ paused: true });
     master.add(heroTimeline(hero, T.H), 0);
-    parts.forEach((p, i) => master.add(slideTimeline(p, T.phases), T.start(i)));
+    parts.forEach((p, i) => master.add(slideTimeline(p, T.phasesOf(i), T.SPC), T.start(i)));
     master.set({}, {}, T.total);
 
     const field = stage.querySelector<HTMLElement>('[data-cc-field]');

@@ -60,16 +60,18 @@ function shuffle<T>(list: T[], next: () => number): T[] {
 
 /** Altura do canva em alturas de tela: o que o plano MAIS RÁPIDO percorre ao
  *  longo da página inteira, mais a tela que já está visível no fim. O
- *  andamento (warp) não muda a conta: ele termina onde começou. */
-export function canvasHeight(creations: number): number {
+ *  andamento (warp) não muda a conta: ele termina onde começou. `creations` é
+ *  o mesmo argumento do timing(): a contagem, ou a pausa a mais de cada uma. */
+export function canvasHeight(creations: number | readonly number[]): number {
   return FIELD.RATE * (1 + FIELD.DEPTH) * timing(creations).total + 1;
 }
 
 /**
  * @param photos    quantas fotos há em FIELD_PHOTOS (a lista repete)
- * @param creations quantas criações a página tem (define a altura do canva)
+ * @param creations quantas criações a página tem — ou a pausa a mais de cada
+ *                  uma (ver timing.ts → extraHold). Define a altura do canva
  */
-export function layoutField(photos: number, creations: number): FieldCard[] {
+export function layoutField(photos: number, creations: number | readonly number[]): FieldCard[] {
   if (!photos) return [];
   const next = rng(FIELD.SEED);
   const minRows = Math.ceil(canvasHeight(creations) / FIELD.ROW_VH);

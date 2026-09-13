@@ -461,9 +461,9 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
         <div class="about-cta">
           <h3>Let’s talk</h3>
           <div class="cta-actions">
-            <a class="btn btn-solid" href="mailto:carloslgp3585@gmail.com">Send a message</a>
-            <button type="button" class="btn btn-glass" disabled>Download resume</button>
+            <a class="btn btn-solid" href="mailto:carloslgp3585@gmail.com">Get in touch</a>
           </div>
+          <a class="cta-email" href="mailto:carloslgp3585@gmail.com">carloslgp3585@gmail.com</a>
           <nav class="cta-social" aria-label="Social profiles">
             <SocialLinks />
           </nav>
@@ -1892,10 +1892,6 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     cursor: pointer;
     transition: opacity 0.2s, background 0.2s;
   }
-  .btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
   .btn-solid {
     background: var(--ink);
     color: var(--paper);
@@ -1906,13 +1902,22 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   .btn-solid:hover {
     opacity: 0.85;
   }
-  .btn-glass {
+  /* o endereço escrito, embaixo do botão: sem app de e-mail configurado o
+     mailto não abre nada, e aí quem quer falar ainda consegue copiar */
+  .cta-email {
+    display: inline-block;
+    margin-top: 1rem;
+    color: rgba(var(--ink-rgb), 0.65);
+    font-size: 0.9rem;
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--ink-rgb), 0.25);
+    text-underline-offset: 3px;
+    transition: color var(--theme-fade), text-decoration-color 0.2s;
+  }
+  .cta-email:hover,
+  .cta-email:focus-visible {
     color: var(--ink);
-    background: rgba(90, 90, 90, 0.12);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(var(--ink-rgb), 0.12);
-    transition: opacity 0.2s, background 0.2s, color var(--theme-fade), border-color var(--theme-fade);
+    text-decoration-color: currentColor;
   }
 
   /* ——— telas estreitas: card ancora à esquerda, toggle à direita ———

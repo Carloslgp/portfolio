@@ -24,7 +24,7 @@ import {
 } from '../data/creations';
 import { EFFECTS, FIELD, FIELD_IMAGE, IMAGE, LAYOUT, RIBBON, STAGE } from '../scripts/creations/config';
 import { layoutField } from '../scripts/creations/fieldLayout';
-import { timing } from '../scripts/creations/timing';
+import { extraHold, timing } from '../scripts/creations/timing';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -106,12 +106,19 @@ entries.forEach(({ entry, number }) => {
   }
 });
 
+// A pausa a mais de cada slide, em telas: só a criação com `evolution` tem,
+// pra caber os estágios dela (ver timing.ts → extraHold). Vai pro cliente como
+// data-cc-hold, e o canva e a conferência logo abaixo usam a mesma lista.
+const holds = CREATIONS.map((entry) =>
+  !isInterlude(entry) && entry.evolution ? extraHold(entry.evolution.length + 1) : 0,
+);
+
 // O andamento do canva (FIELD.TEMPO) desacelera o fundo na leitura e o
 // acelera nas passagens. Forte demais, a desaceleração passaria do zero e o
 // fundo andaria PRA TRÁS em algum trecho — rolar pra baixo e ver as fotos
 // descendo. Não é um erro que se veja olhando o número, então o build confere.
 {
-  const T = timing(CREATIONS.length);
+  const T = timing(holds);
   const steps = 2000;
   let before = T.warp(0);
   for (let k = 1; k <= steps; k++) {
@@ -226,7 +233,7 @@ const pieceIndexes = Array.from({ length: EFFECTS.PIECES.COUNT }, (_, k) => k);
 const fieldSources = await Promise.all(
   FIELD_PHOTOS.map((photo) => getImage({ src: photo, ...FIELD_IMAGE })),
 );
-const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
+const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
   .map((card) => ({
     ...card,
     src: fieldSources[card.photo].src,
@@ -516,6 +523,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
           id={s.anchor}
           data-cc-slide
           data-cc-number={s.number}
+          data-cc-hold={holds[s.index] || undefined}
           data-effect={s.effect}
           data-from={s.from}
           data-layout={s.layout}

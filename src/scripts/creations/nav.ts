@@ -59,12 +59,14 @@ export function createIndicator({ nav, labels, sr, roll, onActive }: IndicatorIn
       // contador sumido a página inteira). Como função de t não há o que
       // ficar preso.
       const alpha = round3(clamp((t - OPENING.NAV[0] * T.H) / (OPENING.NAV[1] * T.H)));
-      const out = round3(clamp((T.total - t) / (T.phases.exit * NAV.OUT)));
+      const out = round3(clamp((T.total - t) / (T.phasesOf(T.n - 1).exit * NAV.OUT)));
       if (alpha !== lastAlpha) nav?.style.setProperty('--nav-alpha', String((lastAlpha = alpha)));
       if (out !== lastOut) nav?.style.setProperty('--nav-out', String((lastOut = out)));
 
-      // o número mais próximo e o quanto já rolou pra ele, só dentro da janela
-      const k = (t - T.H) / T.SPC;
+      // o número mais próximo e o quanto já rolou pra ele, só dentro da janela.
+      // Contado em criações (slotAt), e não em telas: a de pausa esticada é
+      // mais longa, e o número tem que virar na fronteira dela, não antes.
+      const k = T.slotAt(t);
       const c = Math.round(k);
       const u = clamp((k - c + NAV.ROLL_WINDOW / 2) / NAV.ROLL_WINDOW);
       setRoll(round3(Math.min(N - 1, Math.max(-1, c - 1 + smooth(u)))));

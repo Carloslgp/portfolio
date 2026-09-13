@@ -21,6 +21,9 @@ import { HOME, PORTRAITS } from '../../data/simple';
 <SimpleLayout title="About" description={`${HOME.name} ${HOME.intro}`}>
   <h1>{HOME.name} <span class="h1-rest">{HOME.intro}</span></h1>
   <p class="lead">{LEAD}</p>
+  {/* Quem entra direto por /simple não passa pelo portão, onde o aviso mora no
+      site completo. */}
+  <p class="meta">{HOME.ai}</p>
 
   {/* Os retratos na moldura 4/5 dos cartões do About, cada um com o mesmo
       enquadramento de lá. */}

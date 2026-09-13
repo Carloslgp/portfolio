@@ -669,6 +669,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
             <a href={link.href} rel={link.href === '/' ? 'noreferrer' : undefined}>{link.label}</a>
           ))}
         </nav>
+        <p class="cc-closing-ai">{CLOSING.ai}</p>
       </div>
     </footer>
   </main>
@@ -1782,6 +1783,17 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, holds)
   .cc-closing nav a:hover,
   .cc-closing nav a:focus-visible {
     text-decoration-color: currentColor;
+  }
+
+  /* O aviso de uso de IA: o último parágrafo da página, abaixo dos links. Não
+     entra no closingTimeline — fica parado e visível, como a citação. */
+  .cc-closing-ai {
+    max-width: 28rem;
+    margin-top: clamp(2rem, 5vh, 3rem);
+    color: rgba(var(--ink-rgb), 0.68);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    transition: color var(--theme-fade);
   }
 
   /* ——— o contador ———

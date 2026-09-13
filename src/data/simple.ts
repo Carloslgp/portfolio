@@ -73,11 +73,13 @@ export const CONTACT = {
 
 // ——— as páginas ———
 
-/** Cópia do index.astro: a linha do topo da home e o rótulo da moldura sem
- *  foto; e do components/about/Songs.astro, o nome do botão do player. */
+/** Cópia do index.astro: a linha do topo da home, o aviso de uso de IA do
+ *  portão e o rótulo da moldura sem foto; e do components/about/Songs.astro, o
+ *  nome do botão do player. */
 export const HOME = {
   name: 'Carlos Leonardo',
   intro: 'is a developer from Brazil.',
+  ai: "AI use: Claude (Anthropic), via Claude Code, was used only to develop this site's code.",
   photoSlot: 'Photo —',
   playOnYouTube: (title: string) => `Play ${title} on YouTube`,
 } as const;

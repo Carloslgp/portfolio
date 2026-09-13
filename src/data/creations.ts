@@ -387,6 +387,10 @@ export const CLOSING = {
     'isso fecho com o meu índice de rendimento acadêmico, que é 9,3 ' +
     'atualmente.',
   quote: 'I\'ve spread myself under your feet, tread softly.',
+  // O aviso de uso de IA, pequeno, no pé do fechamento — depois dos links.
+  ai:
+    'Uso de inteligência artificial: o Claude (Anthropic), pelo Claude Code, ' +
+    'foi utilizado apenas para desenvolver o código deste site.',
   links: [
     { label: 'Voltar pro início', href: '/' },
     { label: 'GitHub', href: 'https://github.com/Carloslgp' },

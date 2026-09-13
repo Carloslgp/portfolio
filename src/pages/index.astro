@@ -530,6 +530,12 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
       <a class="gate-help" href="/simple" data-gate-a11y>
         Need help navigating? <span>Simple version</span>
       </a>
+
+      <!-- O aviso de uso de IA. Mora no portão porque ele é a primeira tela de
+           toda visita nova: ninguém entra no site sem passar por esta linha. -->
+      <p class="gate-ai">
+        AI use: Claude (Anthropic), via Claude Code, was used only to develop this site's code.
+      </p>
     </div>
   </div>
 </Layout>
@@ -1128,6 +1134,16 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
+  /* Compacto de propósito: o portão já ocupa quase a tela inteira de um celular
+     em pé, e o gap cheio do .gate empurraria o fim dele pra fora. O contraste é
+     o mesmo da .gate-help (4,5:1). */
+  .gate-ai {
+    max-width: 30rem;
+    margin-top: -0.5rem;
+    color: rgba(var(--ink-rgb), 0.72);
+    font-size: 0.68rem;
+    line-height: 1.4;
+  }
 
   /* Escolheu baixa animação: as transições puramente decorativas do DOM saem
      junto com as do canvas. O seletor mora no <html> (ver scripts/motion.ts),
@@ -1579,6 +1595,7 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
   .bg-portfolio,
   .loader-track,
   .gate-help,
+  .gate-ai,
   .lead,
   .about-body p,
   .slot-note,
@@ -1945,6 +1962,20 @@ const seam = seamModule ? await getImage({ src: seamModule.default, ...FULL }) :
     .bg-portfolio {
       padding-top: calc(3rem + 4vh);   /* abre espaço pro .intro, que pode quebrar em 2 linhas */
       font-size: 17vw;
+    }
+
+    /* Em pé, o portão empilha os botões e chega a ~20rem de altura. A 54% da
+       tela ele passava do pé nos celulares baixos (ou com as barras do navegador
+       à mostra), e o pé dele — onde fica o aviso de IA — caía embaixo do botão
+       de tema, que fica acima da cortina. O clamp() sobe portão e trilho só o
+       necessário pra liberar os ~4,5rem dos botões do pé, mas nunca acima da
+       palavra PORTFOLIO (o piso é o fim dela: 3rem + 4vh de respiro + 17vw de
+       altura). Em tela alta, fica tudo onde estava. */
+    .loader-track {
+      top: clamp(calc(4rem + 4vh + 17vw), 46%, calc(100% - 28rem - env(safe-area-inset-bottom)));
+    }
+    .gate {
+      top: clamp(calc(5rem + 4vh + 17vw), 54%, calc(100% - 25rem - env(safe-area-inset-bottom)));
     }
 
     .card {

@@ -37,6 +37,7 @@ Tudo que está lá hoje é mock. Nenhum texto é real.
  │                   title                                 │
  │                   text                                  │
  │        links[0]  links[1]  links[2]  ...                │
+ │                   ai                                    │ ← aviso de uso de IA, pequeno
  └────────────────────────────────────────────────────────┘
 ```
 

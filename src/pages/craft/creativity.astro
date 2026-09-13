@@ -7,16 +7,14 @@
 //
 // POR QUE A FORMA AQUI NÃO É A DE LÁ. A sala de código é uma lista numerada
 // com a mesma linha repetida catorze vezes, e está certa: são catorze coisas
-// da mesma natureza. Aqui são três de naturezas diferentes, e a página dá uma
-// forma pra cada uma em vez de achatar as três numa lista:
+// da mesma natureza. Aqui são duas de naturezas diferentes, e a página dá uma
+// forma pra cada uma em vez de achatar as duas numa lista:
 //
 //   1. A FAIXA da pixel art. É a única coisa que mora nesta sala, e o que ela
 //      tem a dizer é uma progressão no tempo. Vira uma cronologia vertical,
 //      com um fio ligando os desenhos, do primeiro ao mais recente.
 //   2. As PORTAS. O canal e o mural moram fora (YouTube, /photos). Duas
 //      colunas curtas que dizem o que tem do outro lado e saem da frente.
-//   3. O FECHAMENTO. Sozinho no fim, porque é de outra ordem: leva pra
-//      Coleção de Criações, que é a pessoa e não o trabalho.
 //
 // A pixel art é o único lugar do site que NÃO passa pelo getImage, e isso é
 // medido, não preguiça: ver o comentário de .shot img lá embaixo.
@@ -26,7 +24,6 @@ import {
   PIXEL,
   PIXEL_PIECES,
   DOORS,
-  CLOSING,
 } from '../../data/craftCreative';
 ---
 
@@ -72,21 +69,10 @@ import {
               <time datetime={piece.datetime}>{piece.date}</time>
               {index === 0 && <span class="shot-badge">the first one</span>}
             </p>
-            <p class="shot-caption">{piece.caption}</p>
           </div>
         </li>
       ))}
     </ol>
-
-    <div class="pixel-note" data-craft-row>
-      <p>{PIXEL.note}</p>
-      <p class="pixel-go">
-        <a href={PIXEL.noteLink.href}>
-          {PIXEL.noteLink.label}
-          <span aria-hidden="true">→</span>
-        </a>
-      </p>
-    </div>
   </section>
 
   <section class="doors" aria-label="Things that live elsewhere">
@@ -109,18 +95,6 @@ import {
       </article>
     ))}
   </section>
-
-  <aside class="closing" aria-labelledby="closing-heading" data-craft-row>
-    <p class="kicker">{CLOSING.kicker}</p>
-    <h2 id="closing-heading">{CLOSING.title}</h2>
-    <p class="closing-text">{CLOSING.text}</p>
-    <p class="closing-go">
-      <a href={CLOSING.link.href}>
-        {CLOSING.link.label}
-        <span aria-hidden="true">→</span>
-      </a>
-    </p>
-  </aside>
 </CraftRoom>
 
 <script>
@@ -132,7 +106,7 @@ import {
 </script>
 
 <style>
-  /* --- peças comuns aos três blocos -------------------------------------- */
+  /* --- peças comuns aos dois blocos -------------------------------------- */
   .kicker {
     color: rgba(var(--ink-rgb), 0.42);
     font-size: 0.66rem;
@@ -143,8 +117,7 @@ import {
   }
 
   .pixels h2,
-  .doors h2,
-  .closing h2 {
+  .doors h2 {
     margin-top: 0.55rem;
     font-family: "Playfair Display", Georgia, serif;
     font-weight: 600;
@@ -178,12 +151,9 @@ import {
     transition: color var(--theme-fade);
   }
 
-  /* O teto de 48rem é a soma das partes (11 do quadro + 2 do vão + 35 da
-     legenda), e não um número escolhido: sem ele a linha se estica pelos
-     68rem da sala, a legenda para nos 32rem dela e sobram uns 23rem de vazio
-     à direita de cada item. A faixa passava a parecer encostada na margem
-     esquerda em vez de ser um bloco. Com o teto, ela fica do tamanho do que
-     tem dentro e alinha com o cabeçalho de 34rem logo acima. */
+  /* O teto de 48rem segura a faixa como um bloco: sem ele a linha se estica
+     pelos 68rem da sala, e cada item — só o quadro e a data — fica perdido
+     encostado na margem esquerda. */
   .timeline {
     position: relative;
     max-width: 48rem;
@@ -280,48 +250,6 @@ import {
     transition: color var(--theme-fade), border-color var(--theme-fade);
   }
 
-  .shot-caption {
-    max-width: 32rem;
-    margin-top: 0.55rem;
-    font-size: 0.95rem;
-    line-height: 1.6;
-  }
-
-  .pixel-note {
-    max-width: 34rem;
-    margin-top: clamp(2rem, 5vh, 3rem);
-    color: rgba(var(--ink-rgb), 0.62);
-    font-size: 0.88rem;
-    line-height: 1.62;
-    transition: color var(--theme-fade);
-  }
-
-  /* O link sai na cor cheia da tinta enquanto o parágrafo acima fica em 0.62:
-     é o contraste que faz dele um destino e não a continuação da frase. Ele
-     NÃO compete com o fechamento lá embaixo — aquele é maior, em Playfair e
-     sozinho num bloco; este é uma saída lateral do tamanho do assunto dela. */
-  .pixel-go {
-    margin-top: 0.85rem;
-  }
-
-  .pixel-go a {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    color: var(--ink);
-    font-weight: 500;
-    text-decoration: underline;
-    text-underline-offset: 0.28em;
-    text-decoration-thickness: 1px;
-    text-decoration-color: rgba(var(--ink-rgb), 0.25);
-    transition: color var(--theme-fade), text-decoration-color 0.25s ease;
-  }
-
-  .pixel-go a:hover,
-  .pixel-go a:focus-visible {
-    text-decoration-color: currentColor;
-  }
-
   /* --- 2. as portas ------------------------------------------------------- */
   .doors {
     display: grid;
@@ -358,8 +286,7 @@ import {
     padding-top: 1rem;
   }
 
-  .door-link a,
-  .closing-go a {
+  .door-link a {
     display: inline-flex;
     align-items: baseline;
     gap: 0.4rem;
@@ -373,38 +300,8 @@ import {
   }
 
   .door-link a:hover,
-  .door-link a:focus-visible,
-  .closing-go a:hover,
-  .closing-go a:focus-visible {
+  .door-link a:focus-visible {
     text-decoration-color: currentColor;
-  }
-
-  /* --- 3. o fechamento ---------------------------------------------------- */
-  .closing {
-    margin-top: clamp(3.5rem, 9vh, 6rem);
-    padding-top: 1.45rem;
-    border-top: 1px solid rgba(var(--ink-rgb), 0.13);
-    transition: border-color var(--theme-fade);
-  }
-
-  /* Mais largo que as portas e com o tipo maior: é o último gesto da página,
-     e ele precisa parecer uma saída, não um terceiro item. */
-  .closing h2 {
-    font-size: clamp(1.6rem, 3.2vw, 2.4rem);
-  }
-
-  .closing-text {
-    max-width: 38rem;
-    margin-top: 0.9rem;
-    color: rgba(var(--ink-rgb), 0.68);
-    font-size: clamp(0.92rem, 1.3vw, 1.02rem);
-    line-height: 1.62;
-    transition: color var(--theme-fade);
-  }
-
-  .closing-go {
-    margin-top: 1.4rem;
-    font-size: 1.05rem;
   }
 
   /* --- estreito ----------------------------------------------------------- */

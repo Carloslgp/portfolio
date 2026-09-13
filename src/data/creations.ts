@@ -50,7 +50,7 @@ import pixelartBarrel from '../assets/craft/creativity/pixelart_5.webp';
 // mesmo dia, então nem o arquivo nem o número dizem quando cada uma foi feita:
 // as datas lá embaixo são aproximadas.
 import pixelartSlime from '../assets/creations/pixelart_6.png';
-import pixelartWolf from '../assets/creations/pixelart_4.png';
+import pixelartBadger from '../assets/creations/pixelart_4.png';
 import pixelartMushroom from '../assets/creations/pixelart_1.png';
 import pixelartClownfish from '../assets/creations/pixelart_5.png';
 import pixelartWhale from '../assets/creations/pixelart_2.png';
@@ -905,9 +905,9 @@ export const CREATIONS: Entry[] = [
         alt: 'Uma gosma verde com uma carinha, em três tons de verde e contorno verde-escuro.',
       },
       {
-        image: pixelartWolf,
+        image: pixelartBadger,
         date: '2 ago',
-        alt: 'Um lobo cinza deitado, de orelhas em pé e focinho claro, pintado em quatro tons de cinza.',
+        alt: 'Um texugo cinza deitado, com uma faixa clara no rosto, pintado em quatro tons de cinza.',
       },
       {
         image: pixelartMushroom,

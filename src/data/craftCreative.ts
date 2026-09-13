@@ -6,8 +6,8 @@
 //
 // O QUE MUDA EM RELAÇÃO À SALA DE CÓDIGO, e por que a forma daqui é outra:
 // lá são catorze coisas da mesma natureza, e por isso uma lista numerada com
-// a mesma linha repetida catorze vezes é a forma certa. Aqui são três coisas
-// de naturezas DIFERENTES, e tratá-las como três itens de uma lista seria
+// a mesma linha repetida catorze vezes é a forma certa. Aqui são duas coisas
+// de naturezas DIFERENTES, e tratá-las como dois itens de uma lista seria
 // mentir sobre elas:
 //
 //   • a pixel art MORA aqui. É a única que a sala mostra de verdade, e o que
@@ -15,10 +15,8 @@
 //     datada, do primeiro desenho ao mais recente, e não um item de lista.
 //   • o canal e as fotos moram FORA (YouTube, /photos). São portas, não
 //     conteúdo, e uma porta que finge ser vitrine só atrasa quem ia clicar.
-//   • a Coleção de Criações fecha a página. É a passagem do que cabe num
-//     portfólio pro que não cabe.
 //
-// Ou seja: a sala tem três formas porque tem três naturezas. É de propósito.
+// Ou seja: a sala tem duas formas porque tem duas naturezas. É de propósito.
 import type { ImageMetadata } from 'astro';
 
 import pixelart1 from '../assets/craft/creativity/pixelart_1.webp';
@@ -30,7 +28,7 @@ import pixelart5 from '../assets/craft/creativity/pixelart_5.webp';
 // chegaram) e a Coleção de Criações usa os mesmos arquivos. A ordem é do mais
 // simples pro mais trabalhado, não a do número do arquivo.
 import pixelartSlime from '../assets/creations/pixelart_6.png';
-import pixelartWolf from '../assets/creations/pixelart_4.png';
+import pixelartBadger from '../assets/creations/pixelart_4.png';
 import pixelartMushroom from '../assets/creations/pixelart_1.png';
 import pixelartClownfish from '../assets/creations/pixelart_5.png';
 import pixelartWhale from '../assets/creations/pixelart_2.png';
@@ -63,9 +61,6 @@ export interface PixelPiece {
   /** a máquina lê esta, e é ela que vira o datetime do <time>. Se a de cima
    *  mudar, esta muda junto. */
   datetime: string;
-  /** uma ou duas frases sobre o que esta peça ensinou. É o que transforma a
-   *  faixa numa progressão em vez de cinco quadrinhos enfileirados. */
-  caption: string;
 }
 
 /** A faixa da pixel art, do primeiro desenho ao mais recente.
@@ -84,9 +79,6 @@ export const PIXEL_PIECES: PixelPiece[] = [
     alt:
       'A red apple drawn as a rough circle of flat red, with a pale pink ' +
       'patch where the highlight should be and a dark wedge along the bottom.',
-    caption:
-      'The first one. A red circle with a pale patch where I guessed the ' +
-      'light should sit.',
   },
   {
     id: 'apple-next-day',
@@ -96,9 +88,6 @@ export const PIXEL_PIECES: PixelPiece[] = [
     alt:
       'The same apple redrawn: a dark outline, a green leaf and stem, ' +
       'shading stepped down the right side, on a chequered grey background.',
-    caption:
-      'The same apple, one day later, once I understood what an outline and ' +
-      'a cast shadow are actually for.',
   },
   {
     id: 'light-study',
@@ -108,9 +97,6 @@ export const PIXEL_PIECES: PixelPiece[] = [
     alt:
       'An orange sphere beside a blue cylinder, each with a smooth ramp from ' +
       'lit to shaded and a soft shadow pooled on the ground.',
-    caption:
-      'A sphere and a cylinder. Nothing to look at, everything to learn: ' +
-      'where light lands, where it leaves, where it comes back.',
   },
   {
     id: 'stone-tile',
@@ -120,9 +106,6 @@ export const PIXEL_PIECES: PixelPiece[] = [
     alt:
       'A grey cobblestone tile, stones of several shapes packed together ' +
       'with thin green growth in the gaps between them.',
-    caption:
-      'A stone tile that repeats without a seam. All of the work is in ' +
-      'hiding the edges.',
   },
   {
     id: 'barrel',
@@ -135,9 +118,6 @@ export const PIXEL_PIECES: PixelPiece[] = [
     alt:
       'A wooden barrel seen head on, reddish staves bound by grey metal ' +
       'bands, lit from the upper left.',
-    caption:
-      'A barrel. Wood, metal, rust, and a light source that finally stays ' +
-      'where I put it.',
   },
   // Estas seis foram exportadas no mesmo dia, então o carimbo do arquivo não
   // serve nem de pista (ver o comentário de `date`): as datas são
@@ -150,19 +130,13 @@ export const PIXEL_PIECES: PixelPiece[] = [
     alt:
       'A green slime with a small face, shaded in three greens with a darker ' +
       'green outline.',
-    caption:
-      'A slime. The first time the outline took the colour of the thing ' +
-      'instead of plain black.',
   },
   {
-    id: 'wolf',
-    src: pixelartWolf,
+    id: 'badger',
+    src: pixelartBadger,
     date: '2 August 2026',
     datetime: '2026-08-02',
-    alt: 'A grey wolf lying down with its ears up and a pale muzzle, painted in four greys.',
-    caption:
-      'A wolf lying down. Four greys doing the work of fur, which is fewer ' +
-      'than I thought it would take.',
+    alt: 'A grey badger lying down, with a pale stripe across its face, painted in four greys.',
   },
   {
     id: 'mushroom',
@@ -170,7 +144,6 @@ export const PIXEL_PIECES: PixelPiece[] = [
     date: '11 August 2026',
     datetime: '2026-08-11',
     alt: 'A mushroom with a red cap covered in white spots, on a pale grey stem.',
-    caption: 'A spotted mushroom. The spots had to bend with the cap, or it read as a sticker.',
   },
   {
     id: 'clownfish',
@@ -178,7 +151,6 @@ export const PIXEL_PIECES: PixelPiece[] = [
     date: '19 August 2026',
     datetime: '2026-08-19',
     alt: 'An orange clownfish with white stripes edged in black.',
-    caption: 'A clownfish, small on purpose. At this size every stripe is a decision.',
   },
   {
     id: 'whale',
@@ -186,9 +158,6 @@ export const PIXEL_PIECES: PixelPiece[] = [
     date: '28 August 2026',
     datetime: '2026-08-28',
     alt: 'A blue whale blowing a spout of water, with a pale belly and a dark outline.',
-    caption:
-      'A whale and its spout. Clean edges, and a highlight that finally ' +
-      'makes a body look round.',
   },
   {
     id: 'fox',
@@ -196,14 +165,11 @@ export const PIXEL_PIECES: PixelPiece[] = [
     date: '6 September 2026',
     datetime: '2026-09-06',
     alt: 'An orange fox sitting upright, with a white chest and a white tip on its tail.',
-    caption:
-      'A fox. The most recent one, and the first where the shading, the fur ' +
-      'and the pose all hold together.',
   },
 ];
 
-/** O texto que abre e o que fecha a faixa. Ficam fora da lista porque falam
- *  DA faixa, não de uma peça. */
+/** O texto que abre a faixa. Fica fora da lista porque fala DA faixa, não
+ *  de uma peça. */
 export const PIXEL = {
   label: 'Pixel art',
   /** o título da faixa. Fala do que a faixa FAZ — guardar o primeiro desenho
@@ -212,23 +178,6 @@ export const PIXEL = {
   intro:
     'I started in April 2026. The first two are the same apple, drawn one ' +
     'day apart, and that pair says more than anything I could write here.',
-  /** A nota fecha a faixa, e ela LEVA — tem link próprio, não só uma frase
-   *  apontando pro fim da página.
-   *
-   *  Cheguei a deixar sem link, pra não ter duas portas pro mesmo lugar. Era
-   *  o raciocínio errado: as duas portas vão ao mesmo endereço mas atendem a
-   *  perguntas diferentes, e quem faz uma não está fazendo a outra. Aqui a
-   *  pergunta é "quero ver mais DESSES desenhos", e ela nasce olhando a
-   *  faixa; o fechamento responde "quero saber quem é essa pessoa", que só
-   *  aparece depois de a página inteira ter passado. Obrigar quem quer a
-   *  primeira a rolar até a segunda é cobrar pedágio por uma resposta que já
-   *  estava pronta. */
-  note:
-    'Eleven pieces is a sample, not the set. There is a lot more pixel art ' +
-    'than fits on one page, and the first picture here is nowhere near ' +
-    'where I am now: I got a great deal better at this, and I am still ' +
-    'going. To see the rest of it you have to go to the collection.',
-  noteLink: { label: 'See the rest of the pixel art', href: '/colecaocriacoes' },
 } as const;
 
 export interface Door {
@@ -257,10 +206,8 @@ export const DOORS: Door[] = [
     label: 'YouTube',
     title: '@sudocarlos',
     body:
-      'A small channel, and one I make with care. I teach Python and ' +
-      'computer architecture, and I talk about what a path through tech ' +
-      'looks like from the inside instead of from a job ad. Six videos in, I ' +
-      'still write every one of them out before I record.',
+      'A small channel where I teach Python and computer architecture, and ' +
+      'talk about working in tech.',
     href: 'https://www.youtube.com/@sudocarlos/videos',
     linkLabel: 'Watch the channel',
     external: true,
@@ -269,28 +216,8 @@ export const DOORS: Door[] = [
     id: 'photos',
     label: 'Photography',
     title: 'The mural',
-    body:
-      'Photographs taken with no plan, mostly of light doing something I had ' +
-      'not noticed until it did it. They have a page of their own here, hung ' +
-      'as a wall you walk along rather than a grid you scroll past.',
+    body: 'Photos I take without a plan, mostly of light. They have their own page.',
     href: '/photos',
-    linkLabel: 'Walk the wall',
+    linkLabel: 'See the photos',
   },
 ];
-
-/** O fechamento: a passagem pra Coleção de Criações.
- *
- *  Fica no FIM e sozinho, sem concorrer com as portas acima, porque é de
- *  outra ordem: as portas levam a mais coisas que eu faço, esta leva a quem
- *  eu sou quando a parte profissional para de falar. Duas naturezas, dois
- *  lugares na página. */
-export const CLOSING = {
-  kicker: 'Beyond the portfolio',
-  title: 'This is the edited half.',
-  text:
-    'Everything above is the part that behaves itself on a portfolio. The ' +
-    'Coleção de Criações is the rest of it: what I make, what I keep, what I ' +
-    'love, arranged for nobody in particular. If you want to know who Carlos ' +
-    'is once the professional half stops talking, that is the door.',
-  link: { label: 'Coleção de Criações', href: '/colecaocriacoes' },
-} as const;

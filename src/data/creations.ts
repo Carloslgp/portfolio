@@ -320,8 +320,6 @@ export const isInterlude = (entry: Entry): entry is Interlude => 'interlude' in 
 export const UI = {
   /** o prefixo da numeração na linha de cima: "Criação 03" */
   item: 'Criação',
-  /** a marca de link externo depois do rótulo do link */
-  linkMark: '↗',
   /** o rótulo acima da fita de evolução (ver `evolution` na interface Creation) */
   evolutionLabel: 'A evolução, mês a mês',
   /** o rótulo acima da fita de galeria, na versão simples (ver `gallery` na

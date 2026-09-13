@@ -504,7 +504,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
             <div class="cc-interlude-links" data-cc-line data-cc-link>
               {s.links.map((link) => (
                 <a class="cc-link" href={link.href} target="_blank" rel="noopener">
-                  {link.label} <span aria-hidden="true">{UI.linkMark}</span>
+                  {link.label}<svg class="cc-link-mark" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3.5 8.5l5-5M4.5 3.5h4v4" /></svg>
                 </a>
               ))}
             </div>
@@ -603,7 +603,7 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
             )}
             {s.link && (
               <a class="cc-link" data-cc-line data-cc-link href={s.link.href} target="_blank" rel="noopener">
-                {s.link.label} <span aria-hidden="true">{UI.linkMark}</span>
+                {s.link.label}<svg class="cc-link-mark" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3.5 8.5l5-5M4.5 3.5h4v4" /></svg>
               </a>
             )}
           </div>
@@ -1505,6 +1505,23 @@ const fieldCards = layoutField(FIELD_PHOTOS.length, CREATIONS.length)
   .cc-link:hover,
   .cc-link:focus-visible {
     text-decoration-color: currentColor;
+  }
+
+  /* A setinha de "abre em outra aba". Desenhada, e não o caractere ↗: o
+     iOS (e o Safari do Mac) troca esse caractere pelo emoji colorido, uma
+     caixinha azul no meio de uma linha de texto fino. Um SVG com a cor do
+     texto é o mesmo traço em qualquer aparelho, e segue o tema sozinho. */
+  .cc-link-mark {
+    display: inline-block;
+    width: 0.75em;
+    height: 0.75em;
+    margin-left: 0.3em;
+    vertical-align: -0.02em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   /* ——— o intervalo (ver `Interlude` em data/creations.ts) ———

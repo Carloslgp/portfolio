@@ -1,5 +1,10 @@
 # Portfolio
 
+[![The home page: a 3D ring of images under the word PORTFOLIO](.github/assets/portfolio.webp)](https://www.carlosleonardo.dev/)
+
+**Site:** [carlosleonardo.dev](https://www.carlosleonardo.dev/) ·
+**Coleção de Criações:** [carlosleonardo.dev/colecaocriacoes](https://www.carlosleonardo.dev/colecaocriacoes)
+
 My personal site. The home page is a 3D ring you spin with the scroll or by
 dragging; each face of it opens a different section.
 

@@ -52,6 +52,7 @@ import studySync3 from '../assets/craft/studysync_3.webp';
 import floodFill1 from '../assets/craft/floodfill_1.webp';
 import pokemon1 from '../assets/craft/pokemon_interactive_1.webp';
 import pokemon2 from '../assets/craft/pokemon_interactive_2.webp';
+import amandita1 from '../assets/craft/amandita_1.webp';
 import pythonDoZero1 from '../assets/craft/python_do_zero_1.webp';
 import lynxEngine1 from '../assets/craft/lynx_engine_1.webp';
 import myVector1 from '../assets/craft/my_vector_1.webp';
@@ -501,6 +502,26 @@ export const CODE_PROJECTS: CodeProject[] = [
         alt: 'A battle underway on a grass field, Charmander against Seel ' +
           'with an HP bar above each, and Flamethrower, Scratch, Rage and ' +
           'Slash to choose from underneath.',
+      },
+    ],
+  },
+  {
+    id: 'amandita-mod',
+    title: 'Amandita Mod',
+    mark: 'AM',
+    stack: ['Java', 'Minecraft Forge', 'Gradle'],
+    description:
+      'A Minecraft mod for 1.21, built on Forge, that adds a new gem to the ' +
+      'game: the Amandita Gem. I drew its pixel art and wrote the Java that ' +
+      'registers it, gives it a name and a model, and puts it in the creative ' +
+      'Ingredients tab, where it stacks to 64 like any other ingredient.',
+    repo: 'https://github.com/Carloslgp/AmanditaMod',
+    photos: [
+      {
+        src: amandita1,
+        alt: 'The Amandita Gem in the game: two of them dropped on the grass ' +
+          'in a birch forest, pale lilac with a pink streak, above a hotbar ' +
+          'holding four stacks of the gem.',
       },
     ],
   },

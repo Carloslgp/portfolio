@@ -67,6 +67,7 @@ import metaNoData1 from '../assets/craft/meta_no_data_1.webp';
 import elderWatch1 from '../assets/craft/elder_watch_1.webp';
 import ghosty1 from '../assets/craft/ghosty_1.webp';
 import projectCars1 from '../assets/craft/projectcar_2.webp';
+import amandita1 from '../assets/craft/amandita_1.webp';
 
 // Estas três SÃO cópias: a fonte mora em public/images/about_main_photos/,
 // que o Astro não otimiza (é servida como está — ver o comentário de `foto`
@@ -715,7 +716,7 @@ export const CREATIONS: Entry[] = [
     // o nome que o próprio app mostra na tela (o repositório se chama EasyRead)
     title: 'Easy Read',
     date: '',
-    // Esta e as seis seguintes: tradução da descrição do mesmo projeto em
+    // Esta e as sete seguintes: tradução da descrição do mesmo projeto em
     // /craft/programming (data/craftCode.ts), na ordem de peso de lá — o
     // roteiro pediu "projetos de código, copiar da página craft do
     // portfólio", e a coleção é em português. O Nock fica de fora porque já
@@ -867,6 +868,25 @@ export const CREATIONS: Entry[] = [
     layout: 'duet',
   },
   {
+    // O último dos projetos de código, e de propósito: é código E pixel art,
+    // e a criação seguinte é justamente a que muda de assunto pra arte.
+    id: 'amandita-mod',
+    kind: 'repo',
+    title: 'Amandita Mod',
+    date: '',
+    description:
+      'Um mod de Minecraft para a versão 1.21, feito com Forge, que adiciona ' +
+      'uma gema nova ao jogo: a Amandita Gem. Eu desenhei a pixel art dela e ' +
+      'escrevi o código em Java que registra o item, dá a ele um nome e um ' +
+      'modelo e o coloca na aba Ingredientes do modo criativo, onde ele ' +
+      'empilha até 64 como qualquer outro ingrediente.',
+    image: amandita1,
+    alt: 'A Amandita Gem no jogo: duas gemas lilás-claras com um risco rosa, largadas na grama de uma floresta de bétulas, sobre uma hotbar com quatro pilhas da gema.',
+    links: [{ label: 'Ver no GitHub', href: 'https://github.com/Carloslgp/AmanditaMod' }],
+    craftId: 'amandita-mod',
+    effect: 'tilt',
+  },
+  {
     id: 'aprender-pixel-art',
     kind: 'art',
     title: 'Aprender pixel art',
@@ -884,6 +904,10 @@ export const CREATIONS: Entry[] = [
     // fatiar VÁRIAS no tempo. 'grow' é neutro o bastante pra não competir
     // com o que acontece depois que ela chega.
     effect: 'grow',
+    // Cairia em 'quiet' pelo ciclo, que deixa a moldura um selo pequeno no
+    // canto — e aqui a evolução peça a peça é o assunto. 'flip' dá a moldura
+    // grande com o texto ao lado.
+    layout: 'flip',
     // A mesma sequência do PIXEL_PIECES em data/craftCreative.ts (mesmos
     // arquivos, cronológica): no palco, a moldura vai passando por elas
     // conforme se rola a pausa de leitura — ver `stageOp` em field.ts.
@@ -962,6 +986,10 @@ export const CREATIONS: Entry[] = [
     image: tecladoMidi,
     alt: 'Teclado Arturia KeyLab Essential sobre a escrivaninha.',
     effect: 'iris',
+    // Cairia em 'edge' pelo ciclo, que só cabe com foto bem vertical — esta é
+    // mais de duas vezes mais larga que alta (2,2:1) e sangraria sobre o texto.
+    // 'quiet' dá a pausa depois da moldura grande da pixel art.
+    layout: 'quiet',
   },
   {
     id: 'primeira-musica-autoral',
@@ -993,6 +1021,10 @@ export const CREATIONS: Entry[] = [
     image: colecaoDeJogos,
     alt: 'Coleção de jogos físicos de Nintendo 3DS e Switch.',
     effect: 'grow',
+    // Cairia em 'full' pelo ciclo, que põe o texto por cima da foto — e aqui
+    // as capas dos jogos são o assunto (mesmo motivo de 'dom-casmurro-e-
+    // companhia'). 'duet' dá a moldura grande com o texto ao lado.
+    layout: 'duet',
   },
   {
     id: 'apaixonado-por-pokemon',
@@ -1057,6 +1089,10 @@ export const CREATIONS: Entry[] = [
     alt: 'Uma pedra parada no meio de um riacho raso, com os pés de quem tira a foto entrando no quadro.',
     links: [{ label: 'Ver a parede de fotos', href: '/photos' }],
     effect: 'pieces',
+    // Cairia em 'quiet' pelo ciclo, logo depois da 'duet' do bonsai — e o
+    // silêncio só significa alguma coisa depois de uma cheia (ver STAGE.CYCLE
+    // no config). 'flip' alterna com a vizinha.
+    layout: 'flip',
   },
   {
     id: 'dom-casmurro-e-companhia',

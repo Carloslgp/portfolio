@@ -39,7 +39,7 @@ export type Kind = 'role' | 'build' | 'recognition';
 
 /** Em qual das duas listas da página a entrada cai.
  *
- *  Não dá pra deduzir isto de `kind`: a monitoria e a presidência do Builders
+ *  Não dá pra deduzir isto de `kind`: a monitoria e a vice-presidência do Builders
  *  Club são as duas 'role' e caem em lados OPOSTOS — uma é emprego, a outra é
  *  o que eu faço além de um. Só quem escreve a entrada sabe de que lado ela
  *  está, então o campo é obrigatório de propósito: entrada nova sem lado
@@ -229,14 +229,14 @@ export const ENTRIES: Entry[] = [
     track: 'project',
     kind: 'role',
     weight: 2,
-    title: 'President',
+    title: 'Vice President',
     org: 'Builders Club, PUCPR',
     logo: '/images/work/pucpr.webp',
     start: '2026-04',
     end: 'present',
     summary:
       'PUCPR’s developer community, meeting weekly. I speak on APIs and databases, my ' +
-      'co-president runs his own sessions, and about 15 people show up each week. Most ' +
+      'club’s president runs his own sessions, and about 15 people show up each week. Most ' +
       'of the work isn’t the talks; it’s keeping a room of students building on a schedule.',
     photos: [
       {
@@ -425,7 +425,7 @@ const byRelevance = (a: Entry, b: Entry) => {
  *
  * O rótulo mora aqui e não no template pelo mesmo motivo de todo o resto do
  * arquivo: é frase da página. "Projects & communities" é mais largo que
- * "Projects" de propósito — o grupo abriga a presidência do Builders Club e o
+ * "Projects" de propósito — o grupo abriga a vice-presidência do Builders Club e o
  * CBSoft, que não são projetos de ninguém, e um rótulo curto demais os
  * classificaria errado só para caber.
  */

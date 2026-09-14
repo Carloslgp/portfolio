@@ -206,7 +206,7 @@ export type Layout = (typeof LAYOUT_NAMES)[number];
 /** O que a criação é. Vira o rótulo do meio na linha de cima do texto
  *  ("Criação 03 · Projeto · 2024") — por isso mais vale um rótulo ESPECÍFICO
  *  do que empurrar tudo que não é foto/projeto/repositório pra `other`: oito
- *  criações bem diferentes (uma apresentação, uma presidência de clube, duas
+ *  criações bem diferentes (uma apresentação, uma vice-presidência de clube, duas
  *  monitorias, um discurso, uma poesia, um time de esports, um hobby de arte)
  *  lidas todas como "Outra coisa" não dizem nada sobre nenhuma delas. `other`
  *  continua existindo pro que realmente não se encaixa em nenhum balde. */
@@ -541,10 +541,10 @@ export const CREATIONS: Entry[] = [
   {
     id: 'builders-club',
     kind: 'leadership',
-    title: 'Presidente do Builders Club',
+    title: 'Vice-presidente do Builders Club',
     date: '2026',
     description:
-      'Como presidente do Builders Club, clube da PUCPR focado em ' +
+      'Como vice-presidente do Builders Club, clube da PUCPR focado em ' +
       'desenvolvimento de produtos de software, posso dizer que lidero e ' +
       'participo ativamente da comunidade de desenvolvedores da ' +
       'universidade.',
